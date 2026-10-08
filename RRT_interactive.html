@@ -1,0 +1,1369 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>같은 문제, 네 가지 나무 — RRT 변형 인터랙티브 실습</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #F2F5F9; --panel: #FFFFFF; --field: #E9EFF6;
+  --grid: rgba(25,60,110,.07); --grid2: rgba(25,60,110,.16);
+  --ink: #132640; --ink2: #425A7A; --ink3: #7C90AC; --line: rgba(19,38,64,.13);
+  --accent: #C7760F; --accentSoft: rgba(212,128,26,.2); --onAccent: #FFFFFF;
+  --tree: #0E84A0; --tree2: #CF4F38; --hit: #D23A4E; --ok: #1B9566;
+  --obst: rgba(19,38,64,.07); --hatch: rgba(19,38,64,.34);
+  --font: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --display: "Archivo", "IBM Plex Sans KR", system-ui, sans-serif;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0B213D; --panel: #0F2948; --field: #12315A;
+    --grid: rgba(220,233,249,.055); --grid2: rgba(220,233,249,.12);
+    --ink: #DCE9F9; --ink2: #A3BCDD; --ink3: #6A8BB3; --line: rgba(220,233,249,.14);
+    --accent: #FFB547; --accentSoft: rgba(255,181,71,.22); --onAccent: #0B213D;
+    --tree: #67D4F5; --tree2: #FF8A7A; --hit: #FF5468; --ok: #63E3AE;
+    --obst: rgba(220,233,249,.07); --hatch: rgba(220,233,249,.33);
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0B213D; --panel: #0F2948; --field: #12315A;
+  --grid: rgba(220,233,249,.055); --grid2: rgba(220,233,249,.12);
+  --ink: #DCE9F9; --ink2: #A3BCDD; --ink3: #6A8BB3; --line: rgba(220,233,249,.14);
+  --accent: #FFB547; --accentSoft: rgba(255,181,71,.22); --onAccent: #0B213D;
+  --tree: #67D4F5; --tree2: #FF8A7A; --hit: #FF5468; --ok: #63E3AE;
+  --obst: rgba(220,233,249,.07); --hatch: rgba(220,233,249,.33);
+}
+html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 64px); scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+*, *::before, *::after { box-sizing: inherit; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font); font-size: 16px; line-height: 1.75;
+  -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums;
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: inherit; }
+
+/* nav */
+.nav {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; align-items: center; gap: 18px;
+  padding: 10px max(20px, env(safe-area-inset-left, 0px));
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.nav-brand { font-family: var(--display); font-weight: 800; font-stretch: 120%; font-variation-settings: "wdth" 120; font-size: 15px; white-space: nowrap; }
+.nav ol { list-style: none; display: flex; gap: 4px; margin: 0 0 0 auto; padding: 0; overflow-x: auto; }
+.nav a {
+  display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
+  padding: 4px 10px; border-radius: 99px; font-size: 13px; color: var(--ink2); white-space: nowrap;
+}
+.nav a:hover { color: var(--ink); background: var(--panel); }
+.nav a.on { color: var(--ink); background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+.nav a b { font-family: var(--display); font-weight: 700; color: var(--accent); }
+@media (max-width: 900px) { .nav a span { display: none; } }
+
+/* hero */
+.hero { max-width: 1120px; margin: 0 auto; padding: 56px 24px 24px; display: grid; grid-template-columns: 1.05fr 1fr; gap: 40px; align-items: center; }
+.hero h1 {
+  font-family: var(--display); font-weight: 820; font-stretch: 125%; font-variation-settings: "wdth" 125;
+  font-size: clamp(34px, 5.2vw, 60px); line-height: 1.04; letter-spacing: -0.015em; margin: 0 0 18px;
+}
+.hero p { color: var(--ink2); font-size: 17px; max-width: 46ch; margin: 0 0 22px; }
+.hero p b { color: var(--ink); font-weight: 600; }
+.legend-row { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13.5px; color: var(--ink2); margin-bottom: 26px; }
+.legend-row i, .sw { display: inline-block; width: 16px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.legend-row i.dash { height: 0; border-top: 2px dashed var(--accent); }
+.hero-canvas { width: 100%; aspect-ratio: 1; display: block; border-radius: 14px; box-shadow: 0 0 0 1px var(--line); }
+
+/* chapter */
+.chapter { max-width: 1120px; margin: 0 auto; padding: 64px 24px 24px; }
+.ch-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 10px; }
+.ch-num {
+  flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  border: 1.5px solid var(--accent); color: var(--accent); font-family: var(--display); font-weight: 800; font-size: 16px;
+  transform: translateY(-4px);
+}
+.chapter h2 {
+  font-family: var(--display); font-weight: 760; font-stretch: 112%; font-variation-settings: "wdth" 112;
+  font-size: clamp(24px, 3vw, 32px); line-height: 1.2; margin: 0;
+}
+.prose { max-width: 66ch; color: var(--ink2); margin: 0 0 22px 48px; }
+.prose p { margin: 0 0 10px; }
+.prose b { color: var(--ink); font-weight: 600; }
+.eq { font-family: var(--display); color: var(--ink); white-space: nowrap; }
+.lab { background: var(--panel); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 18px; }
+.views { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; max-width: 900px; margin: 0 auto; }
+.views.four { grid-template-columns: repeat(4, 1fr); max-width: none; }
+.view-cap { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; color: var(--ink2); margin-bottom: 6px; }
+.view-cap b { color: var(--ink); font-weight: 600; }
+.view canvas { width: 100%; aspect-ratio: 1; display: block; border-radius: 8px; }
+canvas.drag { touch-action: none; cursor: crosshair; }
+.plot { max-width: 900px; margin: 16px auto 0; }
+.plot.wide { max-width: none; }
+.plot canvas { width: 100%; aspect-ratio: 3 / 1; display: block; border-radius: 8px; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 16px; }
+.readout { margin-top: 14px; font-size: 14px; color: var(--ink2); min-height: 1.75em; }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .hit { color: var(--hit); font-weight: 600; }
+.readout .ok { color: var(--ok); font-weight: 600; }
+
+.btn {
+  border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer; font-weight: 600; font-size: 14px;
+  background: var(--accent); color: var(--onAccent);
+}
+.btn:hover { filter: brightness(1.06); }
+.btn.line { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); font-weight: 500; }
+.btn.line:hover { box-shadow: inset 0 0 0 1px var(--ink3); }
+.btn:disabled { opacity: .45; cursor: default; filter: none; }
+.slider { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--ink2); }
+.slider output { min-width: 40px; color: var(--ink); font-weight: 600; text-align: right; }
+.slider input { width: 140px; accent-color: var(--accent); }
+.check { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--ink2); cursor: pointer; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; }
+select { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 13.5px; }
+.sel { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink2); }
+
+.after { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin: 22px 0 0 48px; }
+.try h3, .key h3 { font-size: 14px; margin: 0 0 8px; color: var(--ink); font-weight: 600; }
+.try ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.try li { position: relative; padding-left: 22px; font-size: 14.5px; color: var(--ink2); line-height: 1.65; }
+.try li::before { content: ""; position: absolute; left: 2px; top: .55em; width: 10px; height: 10px; border: 1.5px solid var(--ink3); border-radius: 2px; }
+.key p { margin: 0; padding-left: 14px; border-left: 3px solid var(--accent); font-size: 15px; color: var(--ink); line-height: 1.65; }
+
+/* step-through */
+.step-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 22px; max-width: 920px; margin: 0 auto; }
+.phases { list-style: none; margin: 0; padding: 0; counter-reset: ph; display: grid; gap: 4px; }
+.phases li {
+  counter-increment: ph; display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start;
+  padding: 7px 8px; border-radius: 8px; font-size: 13.5px; color: var(--ink3); line-height: 1.45;
+}
+.phases li::before {
+  content: counter(ph); width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--ink3); font-size: 11px; font-weight: 700; margin-top: 1px;
+}
+.phases li b { display: block; color: var(--ink2); font-weight: 600; }
+.phases li.on { background: var(--accentSoft); color: var(--ink); }
+.phases li.on::before { border-color: var(--accent); background: var(--accent); color: var(--onAccent); }
+.phases li.on b { color: var(--ink); }
+.phases li.new b::after { content: "RRT에 추가"; margin-left: 6px; font-size: 11px; font-weight: 600; color: var(--accent); }
+.phases small { font-size: inherit; }
+.phase-note { margin-top: 10px; font-size: 13.5px; color: var(--ink); line-height: 1.6; height: calc(5 * 1.6em + 20px); overflow-y: auto; padding: 10px; border-radius: 8px; background: var(--paper); scrollbar-width: thin; }
+.counters { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-top: 12px; font-size: 13px; color: var(--ink3); }
+.counters div { display: flex; justify-content: space-between; gap: 6px; }
+.counters b { color: var(--ink); font-weight: 600; }
+.auto-btn { min-width: 92px; }
+
+/* tables */
+.tbl-wrap { overflow-x: auto; margin-top: 16px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 600px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; color: var(--ink2); }
+td { color: var(--ink2); }
+td b { color: var(--ink); font-weight: 600; }
+.num { text-align: right; }
+td .sw { width: 12px; height: 12px; border-radius: 3px; margin-right: 8px; vertical-align: -1px; }
+
+.closing { max-width: 1120px; margin: 0 auto; padding: 72px 24px 96px; }
+.closing h2 { font-family: var(--display); font-weight: 760; font-stretch: 112%; font-variation-settings: "wdth" 112; font-size: 30px; margin: 0 0 16px; }
+.closing h3 { font-size: 17px; margin: 32px 0 6px; }
+.closing ol { max-width: 70ch; color: var(--ink2); padding-left: 22px; margin: 0 0 20px; }
+.closing ol li { margin-bottom: 8px; }
+.closing ol b { color: var(--ink); font-weight: 600; }
+.closing p { max-width: 66ch; color: var(--ink2); }
+.closing .tbl-wrap { max-width: 980px; }
+
+@media (max-width: 1000px) {
+  .views.four { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 760px) {
+  .hero { grid-template-columns: 1fr; padding-top: 32px; }
+  .views, .step-grid { grid-template-columns: 1fr; }
+  .views.four { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .prose, .after { margin-left: 0; }
+  .after { grid-template-columns: 1fr; }
+  .phases { grid-template-columns: 1fr 1fr; }
+  .phases small { display: none; }
+  .phases li.new b::after { display: none; }
+  .plot canvas { aspect-ratio: 2 / 1; }
+}
+.phase-note .hit, td .hit, .readout .hit { color: var(--hit); font-weight: 600; }
+.phase-note .okc { color: var(--ok); font-weight: 600; }
+.win { color: var(--ok); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<nav class="nav" aria-label="단계 이동">
+  <span class="nav-brand">RRT 변형 실습</span>
+  <ol>
+    <li><a href="#ch1"><b>1</b><span>기본 RRT</span></a></li>
+    <li><a href="#ch2"><b>2</b><span>RRT*</span></a></li>
+    <li><a href="#ch3"><b>3</b><span>RRT 대 RRT*</span></a></li>
+    <li><a href="#ch4"><b>4</b><span>Informed RRT*</span></a></li>
+    <li><a href="#ch5"><b>5</b><span>RRT-Connect</span></a></li>
+    <li><a href="#ch6"><b>6</b><span>한 판 비교</span></a></li>
+  </ol>
+</nav>
+
+<header class="hero" id="top">
+  <div>
+    <h1>같은 문제, 네 가지 나무</h1>
+    <p>지난번엔 RRT로 팔의 경로를 찾았어요. 이번엔 그 RRT를 고쳐 쓴 변형들을 봅니다. 경로를 점점 짧게 다듬는 <b>RRT*</b>, 다듬을 곳만 골라 뒤지는 <b>Informed RRT*</b>, 양쪽에서 마주 자라는 <b>RRT-Connect</b>.</p>
+    <p>무대는 평면 하나예요. 지난번 오른쪽 그림, 즉 C-space라고 생각하면 됩니다. 점 하나가 로봇의 자세 하나예요.</p>
+    <div class="legend-row" aria-label="색 안내">
+      <span><i style="background:var(--tree)"></i>탐색 트리</span>
+      <span><i style="background:var(--tree2)"></i>목표 쪽 트리</span>
+      <span><i style="background:var(--accent)"></i>경로와 목표</span>
+      <span><i style="background:var(--hit)"></i>충돌</span>
+    </div>
+    <a class="btn" href="#ch1" style="text-decoration:none;display:inline-block">1단계부터 시작</a>
+  </div>
+  <canvas id="hero" class="hero-canvas" aria-label="Informed RRT*가 경로를 찾고 탐색 타원을 줄여 가며 경로를 짧게 다듬는 예시 애니메이션"></canvas>
+</header>
+
+<!-- 1 -->
+<section class="chapter" id="ch1">
+  <div class="ch-head"><span class="ch-num">1</span><h2>출발점: 기본 RRT</h2></div>
+  <div class="prose">
+    <p>샘플, 최근접, 한 걸음, 충돌 검사, 추가. 지난번과 같은 다섯 단계예요. 이번엔 점 로봇이 평면 위를 움직이니 그림 하나가 곧 C-space입니다. 시작점(검은 점)과 목표(주황 과녁)는 끌어서 옮길 수 있어요.</p>
+    <p>이번 실습에서 눈여겨볼 것은 경로의 <b>비용</b>, 여기서는 경로의 길이입니다. 찾은 경로가 직선 거리의 몇 배인지 수치판에서 확인해 보세요.</p>
+  </div>
+  <div class="lab">
+    <div class="step-grid">
+      <div class="view"><div class="view-cap"><b>평면 = C-space</b><span>시작점과 목표를 끌어 옮기기</span></div><canvas id="c1" class="drag" aria-label="RRT 트리가 자라는 평면. 시작점과 목표를 끌어서 옮길 수 있습니다"></canvas></div>
+      <div>
+        <ol class="phases" id="c1ph">
+          <li><span><b>샘플</b><small>무작위 점 q_rand를 뽑아요</small></span></li>
+          <li><span><b>최근접</b><small>트리에서 가장 가까운 노드</small></span></li>
+          <li><span><b>한 걸음</b><small>step만큼만 다가간 q_new</small></span></li>
+          <li><span><b>충돌 검사</b><small>사이를 잘게 나눠 하나씩</small></span></li>
+          <li><span><b>추가 또는 버림</b><small>통과하면 붙이고 도착 확인</small></span></li>
+        </ol>
+        <div class="phase-note" id="c1note" aria-live="polite"></div>
+        <div class="counters">
+          <div>반복<b id="c1it">0</b></div><div>노드<b id="c1nd">1</b></div>
+          <div>충돌 검사<b id="c1ck">0</b></div><div>경로 길이<b id="c1len">–</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn" id="c1next">다음 단계</button>
+      <button class="btn line" id="c1iter">한 번 반복</button>
+      <button class="btn line auto-btn" id="c1auto">자동 재생</button>
+      <select id="c1speed" aria-label="자동 재생 속도">
+        <option value="slow">단계마다 천천히</option>
+        <option value="normal" selected>반복마다</option>
+        <option value="fast">빠르게</option>
+        <option value="max">최고 속도</option>
+      </select>
+      <button class="btn line" id="c1reset">처음부터</button>
+    </div>
+    <div class="controls">
+      <label class="slider">step <input type="range" id="c1step" min="0.2" max="1.5" step="0.05" value="0.5"><output id="c1stepo"></output></label>
+      <label class="slider">goal bias <input type="range" id="c1bias" min="0" max="0.5" step="0.01" value="0.05"><output id="c1biaso"></output></label>
+      <label class="check"><input type="checkbox" id="c1keep">도착 후에도 계속 돌리기</label>
+    </div>
+    <div class="readout" id="c1r"></div>
+  </div>
+  <div class="after">
+    <div class="try"><h3>해 볼 것</h3><ul>
+      <li>경로를 찾은 뒤 [도착 후에도 계속 돌리기]를 켜고 [최고 속도]로 돌려 보세요. 노드가 수천 개가 돼도 경로 길이는 거의 그대로입니다.</li>
+      <li>[처음부터]를 여러 번 눌러 경로 길이를 적어 보세요. 매번 얼마나 다른가요?</li>
+      <li>시작점과 목표를 장애물이 없는 곳에 나란히 두면 경로가 직선에 가까워지나요?</li>
+    </ul></div>
+    <div class="key"><h3>핵심</h3><p>RRT는 한번 붙인 가지를 고치지 않습니다. 각 노드의 부모는 “그때 가장 가까웠던 노드”로 고정돼서, 샘플을 아무리 늘려도 경로가 최단으로 다가가지 않아요. 이 성질을 고친 것이 RRT*입니다.</p></div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="chapter" id="ch2">
+  <div class="ch-head"><span class="ch-num">2</span><h2>RRT*: 붙일 때 고르고, 붙인 뒤 고친다</h2></div>
+  <div class="prose">
+    <p>RRT*는 RRT의 반복에 두 단계를 더합니다. q_new 주변 반경 r 안의 이웃을 모은 뒤, <b>부모 고르기</b>: 가장 가까운 노드 대신 시작점부터의 비용이 가장 작아지는 이웃을 부모로 삼아요. <b>다시 잇기</b>: 이웃 가운데 q_new를 거쳐 가면 더 싸지는 노드가 있으면 그 노드의 부모를 q_new로 바꿉니다.</p>
+    <p>반경은 노드가 늘수록 줄어듭니다(<span class="eq">r = γ·√(log n / n)</span>). 점이 촘촘해지면 가까운 이웃만 봐도 충분하니까요.</p>
+  </div>
+  <div class="lab">
+    <div class="step-grid">
+      <div class="view"><div class="view-cap"><b>평면 = C-space</b><span>숫자는 시작점부터의 비용</span></div><canvas id="c2" class="drag" aria-label="RRT* 트리가 자라는 평면. 이웃 반경, 부모 선택, 다시 잇기가 표시됩니다"></canvas></div>
+      <div>
+        <ol class="phases" id="c2ph">
+          <li><span><b>샘플</b><small>q_rand를 뽑아요</small></span></li>
+          <li><span><b>한 걸음</b><small>최근접에서 step만큼, 막히면 버림</small></span></li>
+          <li class="new"><span><b>이웃 찾기</b><small>반경 r 안의 노드</small></span></li>
+          <li class="new"><span><b>부모 고르기</b><small>시작점부터 가장 싼 길</small></span></li>
+          <li class="new"><span><b>다시 잇기</b><small>q_new를 거치면 싸지는 이웃</small></span></li>
+        </ol>
+        <div class="phase-note" id="c2note" aria-live="polite"></div>
+        <div class="counters">
+          <div>반복<b id="c2it">0</b></div><div>노드<b id="c2nd">1</b></div>
+          <div>다시 이음<b id="c2rw">0</b></div><div>경로 길이<b id="c2len">–</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn" id="c2next">다음 단계</button>
+      <button class="btn line" id="c2iter">한 번 반복</button>
+      <button class="btn line auto-btn" id="c2auto">자동 재생</button>
+      <select id="c2speed" aria-label="자동 재생 속도">
+        <option value="slow">단계마다 천천히</option>
+        <option value="normal" selected>반복마다</option>
+        <option value="fast">빠르게</option>
+        <option value="max">최고 속도</option>
+      </select>
+      <button class="btn line" id="c2reset">처음부터</button>
+    </div>
+    <div class="controls">
+      <label class="slider">반경 계수 γ <input type="range" id="c2gamma" min="0" max="24" step="1" value="12"><output id="c2gammao"></output></label>
+      <label class="check"><input type="checkbox" id="c2labels" checked>비용 숫자 보기</label>
+    </div>
+    <div class="readout" id="c2r"></div>
+  </div>
+  <div class="after">
+    <div class="try"><h3>해 볼 것</h3><ul>
+      <li>한 단계씩 넘기며 [다시 잇기]에서 초록 선이 생기는 순간을 찾아 보세요. 그 노드 아래 가지 전체의 비용이 함께 줄어듭니다.</li>
+      <li>γ를 0으로 두면 RRT*는 무엇과 같아지나요? 이웃이 최근접 하나뿐이면 고를 것도, 고칠 것도 없죠.</li>
+      <li>[최고 속도]로 돌리고 가지의 모양을 1단계와 비교해 보세요. 시작점에서 바깥으로 곧게 뻗는 부챗살 모양이 됩니다.</li>
+    </ul></div>
+    <div class="key"><h3>핵심</h3><p>RRT*는 반복이 늘수록 경로 비용이 최적값으로 다가갑니다. 이를 점근적 최적성이라고 해요. 대신 반복마다 이웃 검색과 충돌 검사를 여러 번 더 하니, 반복 한 번이 RRT보다 비쌉니다.</p></div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="chapter" id="ch3">
+  <div class="ch-head"><span class="ch-num">3</span><h2>같은 점, 다른 선</h2></div>
+  <div class="prose">
+    <p>두 플래너에 <b>똑같은 무작위 샘플</b>을 같은 순서로 넣었습니다. RRT*도 q_new는 RRT처럼 최근접에서 한 걸음 간 자리라서, 두 트리의 노드 위치는 완전히 같아요. 다른 것은 노드를 잇는 선뿐입니다.</p>
+    <p>아래 그래프는 반복에 따라 경로 길이가 어떻게 변하는지 보여 줍니다. 점선은 시작에서 목표까지의 직선 거리로, 어떤 경로도 이보다 짧을 수 없어요.</p>
+  </div>
+  <div class="lab">
+    <div class="views">
+      <div class="view"><div class="view-cap"><b><i class="sw" style="background:var(--ink2)"></i>RRT</b><span id="c3ca"></span></div><canvas id="c3a" aria-label="RRT 트리"></canvas></div>
+      <div class="view"><div class="view-cap"><b><i class="sw" style="background:var(--tree)"></i>RRT*</b><span id="c3cb"></span></div><canvas id="c3b" aria-label="RRT* 트리"></canvas></div>
+    </div>
+    <div class="plot"><div class="view-cap"><b>반복에 따른 경로 길이</b><span>낮을수록 짧은 경로</span></div><canvas id="c3p" aria-label="RRT와 RRT*의 경로 길이 그래프"></canvas></div>
+    <div class="controls">
+      <button class="btn" id="c3play">시작</button>
+      <button class="btn line" id="c3reset">새 샘플로 처음부터</button>
+      <label class="check"><input type="checkbox" id="c3nodes">노드만 보기</label>
+    </div>
+    <div class="readout" id="c3r"></div>
+  </div>
+  <div class="after">
+    <div class="try"><h3>해 볼 것</h3><ul>
+      <li>중간에 멈추고 [노드만 보기]를 켜 보세요. 두 그림이 정말 똑같나요?</li>
+      <li>그래프에서 RRT 선은 몇 번 내려가다 멈추고, RRT* 선은 계속 내려갑니다. RRT 선이 가끔 내려가는 건 어떤 때일까요?</li>
+      <li>[새 샘플로 처음부터]를 몇 번 해 보며 2500번 뒤 두 길이의 차이를 비교해 보세요.</li>
+    </ul></div>
+    <div class="key"><h3>핵심</h3><p>경로의 질은 점을 어디에 두느냐보다 점을 어떻게 잇느냐에서 갈립니다. RRT*는 같은 탐색 결과를 더 잘 엮을 뿐이에요.</p></div>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="chapter" id="ch4">
+  <div class="ch-head"><span class="ch-num">4</span><h2>Informed RRT*: 더 짧아질 수 있는 곳만 뒤지기</h2></div>
+  <div class="prose">
+    <p>경로를 하나 찾았고 그 길이가 c_best라고 합시다. 이보다 짧은 경로가 지나갈 수 있는 점 x는 <span class="eq">|start − x| + |x − goal| &lt; c_best</span>를 만족해야 해요. 이 조건을 만족하는 점들의 모임은 시작과 목표를 두 초점으로 하는 <b>타원</b>입니다.</p>
+    <p>타원 바깥에서는 아무리 샘플해도 경로를 줄일 수 없으니, Informed RRT*는 첫 경로를 찾은 뒤부터 <b>타원 안에서만</b> 샘플을 뽑습니다. 타원의 긴 축 길이는 c_best, 두 초점 사이 거리는 c_min(직선 거리)이에요. 경로가 짧아질수록 타원이 홀쭉해집니다.</p>
+  </div>
+  <div class="lab">
+    <div class="views">
+      <div class="view"><div class="view-cap"><b><i class="sw" style="background:var(--tree)"></i>RRT*</b><span>지도 전체에서 샘플</span></div><canvas id="c4a" aria-label="RRT* 트리"></canvas></div>
+      <div class="view"><div class="view-cap"><b><i class="sw" style="background:var(--accent)"></i>Informed RRT*</b><span>첫 경로 뒤엔 타원 안에서만</span></div><canvas id="c4b" aria-label="Informed RRT* 트리와 탐색 타원"></canvas></div>
+    </div>
+    <div class="plot"><div class="view-cap"><b>반복에 따른 경로 길이</b><span>차이가 잘 보이게 세로축을 확대했어요</span></div><canvas id="c4p" aria-label="RRT*와 Informed RRT*의 경로 길이 그래프"></canvas></div>
+    <div class="controls">
+      <button class="btn" id="c4play">시작</button>
+      <button class="btn line" id="c4reset">새 샘플로 처음부터</button>
+      <label class="check"><input type="checkbox" id="c4samp" checked>최근 샘플 보기</label>
+    </div>
+    <div class="readout" id="c4r"></div>
+  </div>
+  <div class="after">
+    <div class="try"><h3>해 볼 것</h3><ul>
+      <li>첫 경로를 찾는 순간 오른쪽 그림의 샘플 점들이 어떻게 바뀌는지 지켜보세요.</li>
+      <li>첫 경로를 찾기 전까지 두 그래프와 두 트리는 똑같습니다. 왜일까요?</li>
+      <li>타원이 지도 넓이의 몇 %까지 줄어드는지 보세요. 그만큼 샘플이 쓸모 있는 곳에 몰립니다.</li>
+      <li>아래 수치판의 “이미 넘어섰어요” 반복 수를 보세요. RRT*가 2500번 걸려 도달한 길이에 Informed는 몇 번 만에 닿나요?</li>
+    </ul></div>
+    <div class="key"><h3>핵심</h3><p>Informed RRT*는 첫 경로를 더 빨리 찾게 해 주지는 않습니다. 찾은 다음 경로를 줄이는 속도를 높여 줘요. 지도가 넓을수록, 차원이 높을수록 타원 바깥이 차지하는 몫이 커서 효과가 큽니다.</p></div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="chapter" id="ch5">
+  <div class="ch-head"><span class="ch-num">5</span><h2>RRT-Connect: 양쪽에서 마주 자라기</h2></div>
+  <div class="prose">
+    <p>지난번엔 경주로만 봤던 RRT-Connect를 이번엔 한 단계씩 봅니다. 트리 두 개를 번갈아 씁니다. 트리 A가 샘플 쪽으로 한 걸음 <b>확장</b>하면, 트리 B는 그 새 노드를 향해 막히거나 닿을 때까지 한 걸음씩 계속 뻗어요. 이것이 <b>연결</b>입니다. 닿으면 끝, 막히면 두 트리의 역할을 바꿔 다음 반복으로 갑니다.</p>
+    <p>연결 단계에서 한 번에 여러 걸음을 가는 탐욕스러운 방식이라, 트인 공간에서는 두 트리가 순식간에 만나요.</p>
+  </div>
+  <div class="lab">
+    <div class="step-grid">
+      <div class="view"><div class="view-cap"><b>평면 = C-space</b><span>시작점과 목표를 끌어 옮기기</span></div><canvas id="c5" class="drag" aria-label="RRT-Connect의 두 트리가 자라는 평면"></canvas></div>
+      <div>
+        <ol class="phases" id="c5ph">
+          <li><span><b>샘플</b><small>트리 A가 갈 방향</small></span></li>
+          <li><span><b>확장</b><small>트리 A가 한 걸음</small></span></li>
+          <li class="new"><span><b>연결</b><small>트리 B가 막힐 때까지 쭉</small></span></li>
+          <li class="new"><span><b>만남 또는 교대</b><small>닿으면 끝, 아니면 A와 B 교대</small></span></li>
+        </ol>
+        <div class="phase-note" id="c5note" aria-live="polite"></div>
+        <div class="counters">
+          <div>반복<b id="c5it">0</b></div><div>노드<b id="c5nd">2</b></div>
+          <div>충돌 검사<b id="c5ck">0</b></div><div>경로 길이<b id="c5len">–</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn" id="c5next">다음 단계</button>
+      <button class="btn line" id="c5iter">한 번 반복</button>
+      <button class="btn line auto-btn" id="c5auto">자동 재생</button>
+      <select id="c5speed" aria-label="자동 재생 속도">
+        <option value="slow" selected>단계마다 천천히</option>
+        <option value="normal">반복마다</option>
+        <option value="fast">빠르게</option>
+        <option value="max">최고 속도</option>
+      </select>
+      <button class="btn line" id="c5reset">처음부터</button>
+    </div>
+    <div class="controls">
+      <label class="sel">지도
+        <select id="c5scene">
+          <option value="basic">기본</option>
+          <option value="narrow">좁은 통로</option>
+          <option value="trap">갈고리</option>
+        </select>
+      </label>
+    </div>
+    <div class="readout" id="c5r"></div>
+  </div>
+  <div class="after">
+    <div class="try"><h3>해 볼 것</h3><ul>
+      <li>[연결] 단계에서 상대 트리가 한 번에 몇 걸음이나 뻗는지 세어 보세요.</li>
+      <li>지도를 [갈고리]로 바꿔 보세요. 시작점이 오목한 함정 안에 있어서 한쪽 RRT라면 고생할 곳입니다. 목표 쪽 트리가 바깥에서 입구를 찾아 들어오나요?</li>
+      <li>찾은 경로의 길이를 1단계의 RRT와 비교해 보세요.</li>
+    </ul></div>
+    <div class="key"><h3>핵심</h3><p>RRT-Connect는 첫 경로를 가장 빨리 찾는 편이지만, 찾으면 끝입니다. 경로를 다듬는 기능이 없어서 실제로는 지난번의 숏컷 스무딩을 꼭 붙여 씁니다. 그리고 목표가 자세로 정해져 있어야 해요. 팔이라면 IK 해가 필요하죠.</p></div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="chapter" id="ch6">
+  <div class="ch-head"><span class="ch-num">6</span><h2>네 가지를 한 판에</h2></div>
+  <div class="prose">
+    <p>같은 지도에서 네 플래너를 동시에 돌립니다. 이번엔 반복 횟수가 아니라 <b>충돌 검사 횟수</b>를 똑같이 나눠 줬어요. 실제 로봇팔에서는 충돌 검사가 계산 시간의 대부분을 차지하거든요. 각자 3만 번까지 쓸 수 있습니다.</p>
+    <p>RRT와 RRT-Connect는 첫 경로를 찾으면 멈추고, RRT*와 Informed RRT*는 예산을 다 쓸 때까지 경로를 줄입니다.</p>
+  </div>
+  <div class="lab">
+    <div class="views four">
+      <div class="view"><div class="view-cap"><b><i class="sw" style="background:var(--ink2)"></i>RRT</b></div><canvas id="c6v0" aria-label="RRT"></canvas></div>
+      <div class="view"><div class="view-cap"><b><i class="sw" style="background:var(--tree)"></i>RRT*</b></div><canvas id="c6v1" aria-label="RRT*"></canvas></div>
+      <div class="view"><div class="view-cap"><b><i class="sw" style="background:var(--accent)"></i>Informed RRT*</b></div><canvas id="c6v2" aria-label="Informed RRT*"></canvas></div>
+      <div class="view"><div class="view-cap"><b><i class="sw" style="background:var(--tree2)"></i>RRT-Connect</b></div><canvas id="c6v3" aria-label="RRT-Connect"></canvas></div>
+    </div>
+    <div class="plot wide"><div class="view-cap"><b>충돌 검사 횟수에 따른 경로 길이</b><span>왼쪽 아래일수록 빠르고 짧음</span></div><canvas id="c6p" aria-label="네 플래너의 경로 길이 그래프"></canvas></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>플래너</th><th>결과</th><th class="num">첫 경로까지 충돌 검사</th><th class="num">첫 경로 길이</th><th class="num">최종 길이</th></tr></thead>
+      <tbody id="c6tb"></tbody>
+    </table></div>
+    <div class="controls">
+      <label class="sel">지도
+        <select id="c6scene">
+          <option value="basic">기본</option>
+          <option value="focus">가까운 목표</option>
+          <option value="open">트인 공간</option>
+          <option value="narrow">좁은 통로</option>
+          <option value="trap">갈고리</option>
+        </select>
+      </label>
+      <button class="btn" id="c6go">경주 시작</button>
+      <button class="btn line" id="c6ten">10판 평균</button>
+    </div>
+    <div class="readout" id="c6r"></div>
+  </div>
+  <div class="after">
+    <div class="try"><h3>해 볼 것</h3><ul>
+      <li>[좁은 통로]에서 10판 평균을 돌려 보세요. 첫 경로는 누가 가장 빨리 찾나요? 예산 안에 못 찾는 판도 있나요?</li>
+      <li>그래프에서 RRT* 선과 Informed RRT* 선이 갈라지는 지점을 찾아 보세요. 두 선은 왜 그 전까지 붙어 있을까요?</li>
+      <li>[가까운 목표]와 [갈고리]에서 RRT*와 Informed RRT*의 최종 길이를 비교해 보세요. 갈고리에선 차이가 거의 없습니다. 경로가 직선 거리의 3배를 넘으면 타원이 지도 전체를 덮어 버리거든요.</li>
+    </ul></div>
+    <div class="key"><h3>핵심</h3><p>“빨리 하나 찾기”와 “좋은 것 찾기”는 다른 목표입니다. 빨리 하나가 필요하면 RRT-Connect, 짧은 경로가 필요하고 시간이 있으면 Informed RRT*가 출발점이에요.</p></div>
+  </div>
+</section>
+
+<section class="closing" id="end">
+  <h2>정리</h2>
+  <ol>
+    <li><b>RRT는 가능한 경로를 빠르게 찾는다.</b> 부모가 고정돼서 경로는 더 나아지지 않습니다.</li>
+    <li><b>RRT*는 부모 고르기와 다시 잇기를 더한다.</b> 반복할수록 최단 경로에 다가가지만 반복 한 번이 비쌉니다.</li>
+    <li><b>Informed RRT*는 샘플할 곳을 좁힌다.</b> 첫 경로 뒤엔 경로를 줄일 수 있는 타원 안에서만 뽑습니다.</li>
+    <li><b>RRT-Connect는 양쪽에서 탐욕스럽게 잇는다.</b> 첫 경로가 빠르지만 다듬는 일은 스무딩에 맡깁니다.</li>
+  </ol>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>변형</th><th>RRT에서 바꾼 것</th><th>얻는 것</th><th>대가</th></tr></thead>
+    <tbody>
+      <tr><td><b>RRT</b></td><td>기준</td><td>단순하고 빠름, 차원이 커도 같은 코드</td><td>경로가 길고 나아지지 않음</td></tr>
+      <tr><td><b>RRT*</b></td><td>반경 안 이웃에서 부모 고르기, 다시 잇기</td><td>반복할수록 최단에 가까워짐</td><td>반복마다 이웃 검색과 충돌 검사가 늘어남</td></tr>
+      <tr><td><b>Informed RRT*</b></td><td>첫 경로 뒤 타원 안에서만 샘플</td><td>같은 시간에 더 짧은 경로</td><td>첫 경로 전까지는 RRT*와 같음</td></tr>
+      <tr><td><b>RRT-Connect</b></td><td>트리 두 개, 막힐 때까지 연결</td><td>첫 경로가 가장 빠른 편</td><td>최적화 없음, 목표 자세(IK 해)가 필요</td></tr>
+    </tbody>
+  </table></div>
+  <h3>더 알아볼 것</h3>
+  <p>두 방향 탐색과 RRT*의 다시 잇기를 합친 양방향 RRT*, 샘플을 묶음으로 다뤄 더 빨리 수렴하는 BIT*, 속도와 가속도 제약을 지키며 트리를 키우는 kinodynamic RRT가 다음 단계예요. 여기 나온 네 가지와 BIT*는 OMPL 같은 플래닝 라이브러리에 들어 있어서, 이름만 바꿔 끼우며 7자유도 팔에서 직접 비교해 볼 수 있습니다. 차원이 높아질수록 타원 바깥의 몫이 커지니 Informed의 효과가 어떻게 달라지는지도 확인해 보세요.</p>
+</section>
+<script>
+// ================= engine =================
+const PI = Math.PI, WS = 10, RES = 0.05;
+function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const newSeed = () => Math.floor(Math.random() * 2147483647);
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+function steer(a, b, s) { const d = dist(a, b); if (d <= s) return [b[0], b[1]]; return [a[0] + (b[0] - a[0]) * s / d, a[1] + (b[1] - a[1]) * s / d]; }
+function inObs(p, obs) {
+  if (p[0] < 0 || p[0] > WS || p[1] < 0 || p[1] > WS) return true;
+  for (const o of obs) if (p[0] >= o.x && p[0] <= o.x + o.w && p[1] >= o.y && p[1] <= o.y + o.h) return true;
+  return false;
+}
+class Checker {
+  constructor(obs) { this.obs = obs; this.n = 0; this.hits = []; }
+  pt(p) { this.n++; const h = inObs(p, this.obs); if (h && this.hits.length < 4000) this.hits.push(p); return h; }
+  edge(a, b, rec) {
+    const n = Math.max(1, Math.ceil(dist(a, b) / RES));
+    for (let k = 1; k <= n; k++) {
+      const q = [a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n];
+      const h = this.pt(q); if (rec) rec.push(q);
+      if (h) return false;
+    }
+    return true;
+  }
+}
+function mkTree(root) { return { nodes: [root.slice()], parent: [-1], cost: [0], kids: [[]] }; }
+function addNode(Tr, q, p) { Tr.nodes.push(q); Tr.parent.push(p); Tr.cost.push(Tr.cost[p] + dist(Tr.nodes[p], q)); Tr.kids.push([]); const i = Tr.nodes.length - 1; Tr.kids[p].push(i); return i; }
+function reparent(Tr, i, p) {
+  const k = Tr.kids[Tr.parent[i]], j = k.indexOf(i); if (j >= 0) k.splice(j, 1);
+  Tr.kids[p].push(i); Tr.parent[i] = p; Tr.cost[i] = Tr.cost[p] + dist(Tr.nodes[p], Tr.nodes[i]);
+  const st = [i];
+  while (st.length) { const u = st.pop(); for (const c of Tr.kids[u]) { Tr.cost[c] = Tr.cost[u] + dist(Tr.nodes[u], Tr.nodes[c]); st.push(c); } }
+}
+function nearest(nodes, q) {
+  let bi = 0, bd = Infinity;
+  for (let i = 0; i < nodes.length; i++) { const dx = nodes[i][0] - q[0], dy = nodes[i][1] - q[1], d = dx * dx + dy * dy; if (d < bd) { bd = d; bi = i; } }
+  return bi;
+}
+function pathFrom(Tr, i) { const out = []; while (i >= 0) { out.push(Tr.nodes[i]); i = Tr.parent[i]; } return out.reverse(); }
+function pathLen(p) { let s = 0; for (let i = 1; i < p.length; i++) s += dist(p[i - 1], p[i]); return s; }
+
+class Base {
+  constructor(sc, o = {}) {
+    this.sc = sc; this.ch = new Checker(sc.obs); this.rand = rng(o.seed ?? newSeed());
+    this.step = o.step ?? 0.5; this.bias = o.bias ?? 0.05; this.maxIter = o.maxIter ?? 6000;
+    this.iter = 0; this.done = false; this.best = Infinity; this.bestPath = null; this.first = null;
+    this.hist = []; this.samples = []; this.goalNodes = []; this.cmin = dist(sc.start, sc.goal);
+    this.bad = inObs(sc.start, sc.obs) || inObs(sc.goal, sc.obs);
+    if (this.bad) this.done = true;
+  }
+  uniform() { return [this.rand() * WS, this.rand() * WS]; }
+  draw() { return this.uniform(); }
+  sample() {
+    const u = this.rand(); this.biased = u < this.bias;
+    const q = this.biased ? this.sc.goal.slice() : this.draw();
+    this.samples.push(q); if (this.samples.length > 240) this.samples.shift();
+    return q;
+  }
+  tryGoal(Tr, i) { const q = Tr.nodes[i]; if (dist(q, this.sc.goal) <= this.sc.tol && this.ch.edge(q, this.sc.goal)) this.goalNodes.push(i); }
+  record(c, path) {
+    this.best = c; this.bestPath = path;
+    if (!this.first) this.first = { checks: this.ch.n, iter: this.iter, cost: c };
+    this.hist.push({ it: this.iter, k: this.ch.n, c, path });
+  }
+  updateBest(Tr) {
+    let b = Infinity, bi = -1; const g = this.sc.goal;
+    for (const i of this.goalNodes) { const c = Tr.cost[i] + dist(Tr.nodes[i], g); if (c < b) { b = c; bi = i; } }
+    if (b < this.best - 1e-9) this.record(b, pathFrom(Tr, bi).concat([g.slice()]));
+  }
+  head() {
+    if (this.done) return false;
+    if (this.iter >= this.maxIter) { this.done = true; return false; }
+    this.iter++; return true;
+  }
+}
+
+class RRT extends Base {
+  constructor(sc, o = {}) { super(sc, o); this.T = mkTree(sc.start); this.stopAtGoal = o.stopAtGoal ?? true; }
+  iterate() {
+    if (!this.head()) return;
+    const Tr = this.T, n0 = Tr.nodes.length, h0 = this.ch.hits.length, k0 = this.ch.n;
+    const qr = this.sample(), ni = nearest(Tr.nodes, qr), qn = steer(Tr.nodes[ni], qr, this.step), rec = [];
+    const dup = dist(qn, Tr.nodes[ni]) < 1e-9;
+    const ok = !dup && this.ch.edge(Tr.nodes[ni], qn, rec);
+    let idx = -1; if (ok) { idx = addNode(Tr, qn, ni); this.tryGoal(Tr, idx); }
+    const b0 = this.best; this.updateBest(Tr);
+    this.last = { qr, biased: this.biased, ni, qn, ok, dup, rec, n0, h0, k0, idx, improved: this.best < b0, b0 };
+    if (this.stopAtGoal && this.best < Infinity) this.done = true;
+  }
+  get nodeCount() { return this.T.nodes.length; }
+}
+
+class RRTStar extends Base {
+  constructor(sc, o = {}) { super(sc, o); this.T = mkTree(sc.start); this.gamma = o.gamma ?? 12; this.rmax = o.rmax ?? 1.5; this.rewires = 0; }
+  radius(n) { return Math.min(this.gamma * Math.sqrt(Math.log(n + 1) / (n + 1)), this.rmax); }
+  iterate() {
+    if (!this.head()) return;
+    const Tr = this.T, n0 = Tr.nodes.length, h0 = this.ch.hits.length;
+    const qr = this.sample(), ni = nearest(Tr.nodes, qr), qn = steer(Tr.nodes[ni], qr, this.step), rec = [];
+    const dup = dist(qn, Tr.nodes[ni]) < 1e-9;
+    const ok = !dup && this.ch.edge(Tr.nodes[ni], qn, rec);
+    const b0 = this.best;
+    if (!ok) { this.last = { qr, biased: this.biased, ni, qn, ok, dup, rec, n0, h0, b0 }; return; }
+    const r = this.radius(n0), near = [];
+    for (let i = 0; i < n0; i++) if (i === ni || dist(Tr.nodes[i], qn) <= r) near.push(i);
+    const cand = near.map((i) => ({ i, base: Tr.cost[i], c: Tr.cost[i] + dist(Tr.nodes[i], qn), tested: false, free: false })).sort((a, b) => a.c - b.c);
+    let par = ni;
+    for (const c of cand) {
+      c.tested = true;
+      c.free = c.i === ni ? true : this.ch.edge(Tr.nodes[c.i], qn);
+      if (c.free) { par = c.i; break; }
+    }
+    const idx = addNode(Tr, qn, par), rw = [];
+    for (const i of near) {
+      if (i === par) continue;
+      const nc = Tr.cost[idx] + dist(qn, Tr.nodes[i]);
+      if (nc < Tr.cost[i] - 1e-9) {
+        const oldP = Tr.parent[i], oldC = Tr.cost[i], free = this.ch.edge(qn, Tr.nodes[i]);
+        rw.push({ i, oldP, oldC, newC: nc, free });
+        if (free) { reparent(Tr, i, idx); this.rewires++; }
+      }
+    }
+    this.tryGoal(Tr, idx); this.updateBest(Tr);
+    this.last = { qr, biased: this.biased, ni, qn, ok, dup, rec, n0, h0, r, near, cand, par, idx, rw, b0, improved: this.best < b0 };
+  }
+  get nodeCount() { return this.T.nodes.length; }
+}
+
+class Informed extends RRTStar {
+  ellipse() {
+    if (!(this.best < Infinity)) return null;
+    const s = this.sc.start, g = this.sc.goal, a = this.best / 2, b = Math.sqrt(Math.max(0, this.best ** 2 - this.cmin ** 2)) / 2;
+    return { cx: (s[0] + g[0]) / 2, cy: (s[1] + g[1]) / 2, a, b, th: Math.atan2(g[1] - s[1], g[0] - s[0]) };
+  }
+  draw() {
+    const E = this.ellipse(); if (!E) return this.uniform();
+    for (let t = 0; t < 100; t++) {
+      const r = Math.sqrt(this.rand()), ph = 2 * PI * this.rand();
+      const x = E.a * r * Math.cos(ph), y = E.b * r * Math.sin(ph);
+      const q = [E.cx + x * Math.cos(E.th) - y * Math.sin(E.th), E.cy + x * Math.sin(E.th) + y * Math.cos(E.th)];
+      if (q[0] >= 0 && q[0] <= WS && q[1] >= 0 && q[1] <= WS) return q;
+    }
+    return this.uniform();
+  }
+}
+
+class Connect extends Base {
+  constructor(sc, o = {}) { super(sc, { ...o, bias: 0 }); this.Ts = mkTree(sc.start); this.Tg = mkTree(sc.goal); this.A = this.Ts; this.B = this.Tg; }
+  extend(Tr, q, rec) {
+    const i = nearest(Tr.nodes, q);
+    if (dist(Tr.nodes[i], q) < 1e-9) return { s: 2, i, qn: q, idx: i };
+    const qn = steer(Tr.nodes[i], q, this.step);
+    if (!this.ch.edge(Tr.nodes[i], qn, rec)) return { s: 0, i, qn };
+    const idx = addNode(Tr, qn, i);
+    return { s: dist(qn, q) < 1e-9 ? 2 : 1, i, qn, idx };
+  }
+  iterate() {
+    if (!this.head()) return;
+    const A = this.A, B = this.B, aS = A === this.Ts;
+    const L = { A: aS ? "s" : "g", n0s: this.Ts.nodes.length, n0g: this.Tg.nodes.length, h0: this.ch.hits.length, conn: [], reached: false, block: null, blockRec: null };
+    L.qr = this.sample(); L.rec = [];
+    const e = this.extend(A, L.qr, L.rec);
+    L.ni = e.i; L.qn = e.qn; L.ok = e.s > 0; L.aIdx = e.idx;
+    if (L.ok) {
+      const q = A.nodes[e.idx]; let r, guard = 0;
+      do {
+        const crec = []; r = this.extend(B, q, crec);
+        if (r.s > 0 && r.idx >= (aS ? L.n0g : L.n0s)) L.conn.push(r.idx);
+        if (r.s === 0) { L.block = r.qn; L.blockRec = crec; L.blockFrom = B.nodes[r.i]; }
+      } while (r.s === 1 && ++guard < 400);
+      if (r.s === 2) {
+        L.reached = true;
+        const pa = pathFrom(A, e.idx), pb = pathFrom(B, r.idx);
+        const path = aS ? pa.concat(pb.reverse().slice(1)) : pb.concat(pa.reverse().slice(1));
+        this.record(pathLen(path), path); this.done = true;
+      }
+    }
+    this.last = L;
+    if (!this.done) { this.A = B; this.B = A; }
+  }
+  get nodeCount() { return this.Ts.nodes.length + this.Tg.nodes.length; }
+}
+
+// ================= scenes =================
+const SCENES = {
+  basic: { obs: [{ x: 2.6, y: 0, w: 1.0, h: 6.2 }, { x: 5.4, y: 3.8, w: 1.0, h: 6.2 }, { x: 7.7, y: 1.2, w: 1.3, h: 1.6 }], start: [1.0, 1.2], goal: [9.0, 8.8], tol: 0.35 },
+  open: { obs: [{ x: 2.5, y: 2.8, w: 1.6, h: 1.6 }, { x: 5.6, y: 5.4, w: 1.8, h: 1.4 }, { x: 5.4, y: 1.2, w: 1.2, h: 2.2 }, { x: 1.4, y: 6.4, w: 2.4, h: 1.0 }, { x: 7.8, y: 2.8, w: 1.0, h: 1.6 }], start: [0.8, 0.8], goal: [9.2, 9.2], tol: 0.35 },
+  focus: { obs: [{ x: 4.5, y: 3.4, w: 1.0, h: 3.2 }, { x: 0.8, y: 0.9, w: 1.6, h: 1.2 }, { x: 7.4, y: 7.9, w: 1.6, h: 1.2 }, { x: 7.6, y: 1.4, w: 1.0, h: 1.6 }, { x: 1.4, y: 7.6, w: 1.2, h: 1.2 }], start: [2.6, 5.0], goal: [7.4, 5.0], tol: 0.35 },
+  narrow: { obs: [{ x: 4.2, y: 0, w: 1.6, h: 4.8 }, { x: 4.2, y: 5.2, w: 1.6, h: 4.8 }], start: [1.5, 8.5], goal: [8.5, 1.5], tol: 0.35 },
+  trap: { obs: [{ x: 1.4, y: 2.6, w: 4.8, h: 0.4 }, { x: 1.4, y: 7.0, w: 4.8, h: 0.4 }, { x: 5.8, y: 3.0, w: 0.4, h: 4.0 }], start: [5.0, 5.0], goal: [8.6, 5.0], tol: 0.35 },
+};
+const cloneScene = (s) => ({ obs: s.obs.map((o) => ({ ...o })), start: s.start.slice(), goal: s.goal.slice(), tol: s.tol });
+
+// ================= theme & views =================
+const C = {};
+const TOKENS = ["paper", "panel", "field", "grid", "grid2", "ink", "ink2", "ink3", "line", "accent", "accentSoft", "tree", "tree2", "hit", "ok", "obst", "hatch"];
+function readTheme() { const cs = getComputedStyle(document.documentElement); for (const k of TOKENS) C[k] = cs.getPropertyValue("--" + k).trim(); C.font = cs.getPropertyValue("--font").trim() || "sans-serif"; }
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (id) => document.getElementById(id);
+const f1 = (x) => (x < Infinity ? x.toFixed(1) : "–"), f2 = (x) => (x < Infinity ? x.toFixed(2) : "–");
+const fmtK = (n) => Math.round(n).toLocaleString("ko-KR");
+
+const VIEWS = [];
+class View {
+  constructor(id) { this.c = $(id); this.g = this.c.getContext("2d"); VIEWS.push(this); this.fit(); }
+  fit() {
+    const r = this.c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    this.W = r.width || 300; this.H = r.height || this.W;
+    const w = Math.round(this.W * dpr), h = Math.round(this.H * dpr);
+    if (this.c.width !== w || this.c.height !== h) { this.c.width = w; this.c.height = h; }
+    this.g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.k = (this.W - 12) / WS;
+  }
+  X(x) { return 6 + x * this.k; }
+  Y(y) { return this.W - 6 - y * this.k; }
+  toW(px, py) { return [(px - 6) / this.k, (this.W - 6 - py) / this.k]; }
+}
+function evPos(c, e) { const r = c.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+
+// ================= drawing =================
+function base(V) {
+  const g = V.g, S = V.W;
+  g.fillStyle = C.field; g.fillRect(0, 0, S, S);
+  g.lineWidth = 1;
+  for (const [st, col] of [[1, C.grid], [5, C.grid2]]) {
+    g.strokeStyle = col; g.beginPath();
+    for (let v = 0; v <= WS + 1e-6; v += st) { const px = Math.round(V.X(v)) + 0.5, py = Math.round(V.Y(v)) + 0.5; g.moveTo(px, V.Y(WS)); g.lineTo(px, V.Y(0)); g.moveTo(V.X(0), py); g.lineTo(V.X(WS), py); }
+    g.stroke();
+  }
+}
+function obstacles(V, obs) {
+  const g = V.g;
+  for (const o of obs) {
+    const x = V.X(o.x), y = V.Y(o.y + o.h), w = o.w * V.k, h = o.h * V.k;
+    g.save(); g.beginPath(); g.rect(x, y, w, h); g.fillStyle = C.obst; g.fill(); g.clip();
+    g.strokeStyle = C.hatch; g.lineWidth = 1; g.beginPath();
+    for (let d = -h; d < w; d += 6) { g.moveTo(x + d, y + h); g.lineTo(x + d + h, y); }
+    g.stroke(); g.restore();
+    g.strokeStyle = C.ink; g.lineWidth = 1.3; g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  }
+}
+function treeDraw(V, Tr, color, alpha = 0.85, lim = Infinity, par = null, w = 1) {
+  const g = V.g, n = Math.min(lim, Tr.nodes.length);
+  g.save(); g.globalAlpha = alpha; g.strokeStyle = color; g.lineWidth = w; g.beginPath();
+  for (let i = 1; i < n; i++) {
+    const p = par ? par(i) : Tr.parent[i]; if (p < 0) continue;
+    const a = Tr.nodes[p], b = Tr.nodes[i];
+    g.moveTo(V.X(a[0]), V.Y(a[1])); g.lineTo(V.X(b[0]), V.Y(b[1]));
+  }
+  g.stroke(); g.restore();
+}
+function nodeDots(V, Tr, color, lim = Infinity, s = 2.6, alpha = 1) {
+  const g = V.g, n = Math.min(lim, Tr.nodes.length); g.save(); g.globalAlpha = alpha; g.fillStyle = color;
+  for (let i = 0; i < n; i++) g.fillRect(V.X(Tr.nodes[i][0]) - s / 2, V.Y(Tr.nodes[i][1]) - s / 2, s, s);
+  g.restore();
+}
+function hitDots(V, hits, n = Infinity) {
+  const g = V.g, m = Math.min(n, hits.length); g.save(); g.fillStyle = C.hit; g.globalAlpha = 0.7;
+  for (let i = 0; i < m; i++) g.fillRect(V.X(hits[i][0]) - 1.2, V.Y(hits[i][1]) - 1.2, 2.4, 2.4);
+  g.restore();
+}
+function polyline(V, pts, color, w, alpha = 1, dash) {
+  if (!pts || pts.length < 2) return;
+  const g = V.g; g.save(); g.globalAlpha = alpha; g.strokeStyle = color; g.lineWidth = w; g.lineJoin = "round"; g.lineCap = "round";
+  if (dash) g.setLineDash(dash);
+  g.beginPath(); g.moveTo(V.X(pts[0][0]), V.Y(pts[0][1]));
+  for (let i = 1; i < pts.length; i++) g.lineTo(V.X(pts[i][0]), V.Y(pts[i][1]));
+  g.stroke(); g.restore();
+}
+function seg(V, a, b, color, w = 1.5, dash = null, alpha = 1) { polyline(V, [a, b], color, w, alpha, dash); }
+function dot(V, q, r, fill, stroke, sw = 1.6) {
+  const g = V.g; g.beginPath(); g.arc(V.X(q[0]), V.Y(q[1]), r, 0, 2 * PI);
+  if (fill) { g.fillStyle = fill; g.fill(); }
+  if (stroke) { g.strokeStyle = stroke; g.lineWidth = sw; g.stroke(); }
+}
+function cross(V, q, s, color) {
+  const g = V.g, x = V.X(q[0]), y = V.Y(q[1]); g.save(); g.strokeStyle = color; g.lineWidth = 2.2; g.lineCap = "round";
+  g.beginPath(); g.moveTo(x - s, y - s); g.lineTo(x + s, y + s); g.moveTo(x + s, y - s); g.lineTo(x - s, y + s); g.stroke(); g.restore();
+}
+function label(V, q, text, color, dx = 7, dy = -7, align = "left", weight = 600) {
+  const g = V.g; let x = V.X(q[0]) + dx, y = V.Y(q[1]) + dy;
+  g.save(); g.font = `${weight} 11px ${C.font}`; g.textBaseline = "middle";
+  const tw = g.measureText(text).width;
+  if (align === "left" && x + tw > V.W - 4) { x = V.X(q[0]) - Math.abs(dx); align = "right"; }
+  else if (align === "right" && x - tw < 4) { x = V.X(q[0]) + Math.abs(dx); align = "left"; }
+  if (y < 8) y = V.Y(q[1]) + Math.abs(dy); else if (y > V.W - 8) y = V.Y(q[1]) - Math.abs(dy);
+  g.textAlign = align;
+  g.lineWidth = 3; g.strokeStyle = C.field; g.lineJoin = "round"; g.strokeText(text, x, y);
+  g.fillStyle = color; g.fillText(text, x, y); g.restore();
+}
+function startMark(V, p) { dot(V, p, 6.5, C.field, null); dot(V, p, 5, C.ink, null); }
+function goalMark(V, p, tol) {
+  const g = V.g, px = V.X(p[0]), py = V.Y(p[1]);
+  g.save();
+  g.beginPath(); g.arc(px, py, tol * V.k, 0, 2 * PI); g.fillStyle = C.accentSoft; g.fill();
+  g.strokeStyle = C.accent; g.lineWidth = 1.6;
+  g.beginPath(); g.arc(px, py, 7, 0, 2 * PI); g.stroke();
+  g.beginPath(); g.moveTo(px - 12, py); g.lineTo(px - 3, py); g.moveTo(px + 3, py); g.lineTo(px + 12, py);
+  g.moveTo(px, py - 12); g.lineTo(px, py - 3); g.moveTo(px, py + 3); g.lineTo(px, py + 12); g.stroke();
+  g.restore();
+}
+function sampleMark(V, q, biased, showLabel = true) {
+  dot(V, q, 6, null, C.ink2, 1.4); dot(V, q, 1.8, C.ink2, null);
+  if (showLabel) label(V, q, biased ? "q_rand = 목표" : "q_rand", C.ink2, 9, -9);
+}
+function checkDots(V, rec, hitLast) {
+  const g = V.g; g.save(); g.fillStyle = C.ink3;
+  for (let i = 0; i < rec.length; i++) { if (hitLast && i === rec.length - 1) continue; g.fillRect(V.X(rec[i][0]) - 1.1, V.Y(rec[i][1]) - 1.1, 2.2, 2.2); }
+  g.restore();
+  if (hitLast && rec.length) dot(V, rec[rec.length - 1], 3.4, C.hit, null);
+}
+function ellipseDraw(V, E, withAxes) {
+  const g = V.g; g.save();
+  g.beginPath(); g.ellipse(V.X(E.cx), V.Y(E.cy), Math.max(0.5, E.a * V.k), Math.max(0.5, E.b * V.k), -E.th, 0, 2 * PI);
+  g.fillStyle = C.accentSoft; g.globalAlpha = 0.45; g.fill(); g.globalAlpha = 1;
+  g.setLineDash([6, 4]); g.strokeStyle = C.accent; g.lineWidth = 1.6; g.stroke(); g.restore();
+}
+function sampleDots(V, pts, color) {
+  const g = V.g; g.save(); g.fillStyle = color; g.globalAlpha = 0.75;
+  for (const q of pts) { g.beginPath(); g.arc(V.X(q[0]), V.Y(q[1]), 1.7, 0, 2 * PI); g.fill(); }
+  g.restore();
+}
+function shownPath(P, pend) {
+  const h = P.hist; if (!h.length) return null;
+  if (pend) { for (let i = h.length - 1; i >= 0; i--) if (h[i].it < P.iter) return h[i].path; return null; }
+  return h[h.length - 1].path;
+}
+function scene(V, sc) { base(V); obstacles(V, sc.obs); }
+function marks(V, sc) { goalMark(V, sc.goal, sc.tol); startMark(V, sc.start); }
+
+// ---- plot ----
+function niceStep(r) { const p = 10 ** Math.floor(Math.log10(r)); const m = r / p; return (m < 1.5 ? 1 : m < 3 ? 2 : m < 7 ? 5 : 10) * p; }
+function plot(V, { series, xmax, lb, xlab, zoom }) {
+  const g = V.g, W = V.W, H = V.H, l = 40, r = 14, t = 12, b = 24, pw = W - l - r, ph = H - t - b;
+  g.fillStyle = C.field; g.fillRect(0, 0, W, H);
+  let hi = 0, any = false, m = Infinity;
+  for (const s of series) if (s.hist.length) { any = true; hi = Math.max(hi, s.hist[0].c); m = Math.min(m, s.hist[s.hist.length - 1].c); }
+  if (!any) hi = lb * 1.6;
+  hi *= 1.04; let lo = lb * 0.94;
+  if (zoom && any) { lo = m - 0.12 * (m - lb); hi = Math.min(hi, m + 0.9 * (m - lb)); }
+  const X = (x) => l + Math.min(1, x / xmax) * pw, Y = (y) => t + (1 - (y - lo) / (hi - lo)) * ph;
+  g.font = `500 11px ${C.font}`; g.lineWidth = 1;
+  const st = niceStep((hi - lo) / 4);
+  g.textAlign = "right"; g.textBaseline = "middle";
+  for (let v = Math.ceil(lo / st) * st; v <= hi; v += st) {
+    const y = Math.round(Y(v)) + 0.5; g.strokeStyle = C.grid2; g.beginPath(); g.moveTo(l, y); g.lineTo(l + pw, y); g.stroke();
+    g.fillStyle = C.ink3; g.fillText(st < 1 ? v.toFixed(1) : String(Math.round(v)), l - 6, y);
+  }
+  g.textBaseline = "top"; g.fillStyle = C.ink3;
+  g.textAlign = "left"; g.fillText("0", l, t + ph + 6);
+  g.textAlign = "center"; g.fillText(fmtK(xmax / 2), X(xmax / 2), t + ph + 6);
+  g.textAlign = "right"; g.fillText(`${fmtK(xmax)} ${xlab}`, l + pw, t + ph + 6);
+  if (lb >= lo) {
+    g.save(); g.setLineDash([5, 4]); g.strokeStyle = C.ink3; g.beginPath(); g.moveTo(l, Y(lb)); g.lineTo(l + pw, Y(lb)); g.stroke(); g.restore();
+    g.textAlign = "left"; g.textBaseline = "bottom"; g.fillStyle = C.ink3; g.fillText(`직선 거리 ${lb.toFixed(1)}`, l + 6, Y(lb) - 3);
+  }
+  g.save(); g.beginPath(); g.rect(l, t - 4, pw + 4, ph + 8); g.clip();
+  for (const s of series) {
+    if (!s.hist.length) continue;
+    g.save(); g.strokeStyle = s.color; g.lineWidth = 2.2; g.lineJoin = "round"; g.beginPath();
+    let px = X(s.hist[0][s.x]), py = Y(s.hist[0].c); g.moveTo(px, py);
+    for (let i = 1; i < s.hist.length; i++) { const nx = X(s.hist[i][s.x]), ny = Y(s.hist[i].c); g.lineTo(nx, py); g.lineTo(nx, ny); py = ny; }
+    g.lineTo(X(s.cur), py); g.stroke();
+    g.beginPath(); g.arc(X(s.hist[0][s.x]), Y(s.hist[0].c), 3.2, 0, 2 * PI); g.fillStyle = s.color; g.fill();
+    g.restore();
+  }
+  g.restore();
+}
+
+// ================= chapter loop =================
+const CH = [];
+function chapter(o) { o.dirty = true; o.visible = false; CH.push(o); return o; }
+let lastTs = 0;
+function loop(ts) {
+  const dt = lastTs ? Math.min(0.05, (ts - lastTs) / 1000) : 0; lastTs = ts;
+  for (const c of CH) { if (!c.visible) continue; if (c.tick) c.tick(dt); if (c.dirty) { c.draw(); c.dirty = false; } }
+  requestAnimationFrame(loop);
+}
+function refreshAll() { readTheme(); VIEWS.forEach((v) => v.fit()); CH.forEach((c) => (c.dirty = true)); }
+
+// ================= step-through helper =================
+function stepper(cfg) {
+  const c = chapter(Object.assign({ phase: -1, auto: false, acc: 0 }, cfg));
+  const id = c.id;
+  c.lis = [...$(id + "ph").children];
+  c.reset = function () { this.P = this.make(); this.phase = -1; this.setAuto(false); this.ui(); this.dirty = true; };
+  c.setAuto = function (v) { this.auto = v; this.acc = 0; $(id + "auto").textContent = v ? "멈춤" : "자동 재생"; };
+  c.next = function () {
+    if (this.phase >= 0) { const np = this.nextPhase(this.P.last, this.phase); if (np >= 0) { this.phase = np; this.ui(); this.dirty = true; return; } }
+    if (this.P.done) { this.phase = -1; this.setAuto(false); }
+    else { const it0 = this.P.iter; this.P.iterate(); this.phase = this.P.iter > it0 ? 0 : -1; }
+    this.ui(); this.dirty = true;
+  };
+  c.iterOnce = function () { if (this.phase >= 0) this.phase = -1; else if (!this.P.done) this.P.iterate(); this.ui(); this.dirty = true; };
+  c.tick = function (dt) {
+    if (!this.auto) return;
+    if (this.P.done && this.phase < 0) { this.setAuto(false); this.ui(); return; }
+    const sp = $(id + "speed").value;
+    if (sp === "slow") { this.acc += dt; if (this.acc >= 0.75) { this.acc = 0; this.next(); } }
+    else if (sp === "normal") { this.acc += dt; if (this.acc >= 0.06) { this.acc = 0; this.phase = -1; if (!this.P.done) this.P.iterate(); this.ui(); this.dirty = true; } }
+    else { const n = sp === "fast" ? 6 : 80; this.phase = -1; for (let i = 0; i < n && !this.P.done; i++) this.P.iterate(); this.ui(); this.dirty = true; }
+  };
+  c.uiPhases = function () { this.lis.forEach((li, i) => li.classList.toggle("on", i === this.phase)); };
+  c.initBase = function () {
+    $(id + "next").onclick = () => { this.setAuto(false); this.next(); };
+    $(id + "iter").onclick = () => { this.setAuto(false); this.iterOnce(); };
+    $(id + "auto").onclick = () => { if (this.P.done && this.phase < 0) this.reset(); this.setAuto(!this.auto); this.ui(); };
+    $(id + "reset").onclick = () => this.reset();
+    const cv = $(id); let drag = null;
+    const hitKey = (p) => { for (const key of ["start", "goal"]) { const q = this.sc[key]; if (Math.hypot(this.V.X(q[0]) - p[0], this.V.Y(q[1]) - p[1]) < 18) return key; } return null; };
+    cv.addEventListener("pointerdown", (e) => { const k = hitKey(evPos(cv, e)); if (k) { drag = k; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; } });
+    cv.addEventListener("pointermove", (e) => {
+      const p = evPos(cv, e);
+      if (drag) { const w = this.V.toW(p[0], p[1]); this.sc[drag] = [Math.min(9.85, Math.max(0.15, w[0])), Math.min(9.85, Math.max(0.15, w[1]))]; this.reset(); }
+      else cv.style.cursor = hitKey(p) ? "grab" : "default";
+    });
+    const end = () => { if (drag) { drag = null; cv.style.cursor = "grab"; } };
+    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+  };
+  return c;
+}
+const BAD = "시작점이나 목표가 장애물 안에 있어요. 끌어서 빈 곳으로 옮겨 주세요.";
+function sampleNote(L) { return L.biased ? "q_rand를 뽑았어요. 이번엔 goal bias에 걸려 <b>목표점 자체</b>를 뽑았습니다." : `q_rand = (${f2(L.qr[0])}, ${f2(L.qr[1])})를 뽑았어요. 지도 전체에서 고르게 뽑습니다.`; }
+const ratio = (P) => (P.best / P.cmin).toFixed(2);
+
+// ================= hero =================
+const hero = chapter({
+  V: new View("hero"), sc: cloneScene(SCENES.focus), wait: 0, N: 1800,
+  init() { this.newP(); if (REDUCED) while (this.P.iter < this.N) this.P.iterate(); },
+  newP() { this.P = new Informed(this.sc, { maxIter: this.N }); },
+  tick(dt) {
+    if (REDUCED) return;
+    if (this.P.iter < this.N) { for (let i = 0; i < 5; i++) this.P.iterate(); this.dirty = true; }
+    else { this.wait += dt; if (this.wait > 2.5) { this.wait = 0; this.newP(); this.dirty = true; } }
+  },
+  draw() {
+    const V = this.V, P = this.P; scene(V, this.sc);
+    const E = P.ellipse(); if (E) ellipseDraw(V, E);
+    treeDraw(V, P.T, C.tree, 0.6); polyline(V, P.bestPath, C.accent, 3.2); marks(V, this.sc);
+  },
+});
+
+// ================= 1. RRT =================
+const ch1 = stepper({
+  id: "c1", V: new View("c1"), sc: cloneScene(SCENES.basic),
+  make() { return new RRT(this.sc, { step: +$("c1step").value, bias: +$("c1bias").value, stopAtGoal: !$("c1keep").checked, maxIter: 6000 }); },
+  nextPhase(L, p) { return p < 4 ? p + 1 : -1; },
+  init() {
+    this.initBase();
+    for (const k of ["step", "bias"]) { const el = $("c1" + k), o = $("c1" + k + "o"); const f = () => (o.textContent = (+el.value).toFixed(2)); f(); el.oninput = () => { f(); this.reset(); }; }
+    $("c1keep").onchange = () => {
+      const P = this.P; P.stopAtGoal = !$("c1keep").checked;
+      if (P.stopAtGoal && P.best < Infinity) P.done = true;
+      else if (!P.stopAtGoal && !P.bad && P.iter < P.maxIter) P.done = false;
+      this.ui();
+    };
+    this.reset();
+  },
+  ui() {
+    const P = this.P, L = P.last, p = this.phase, pend = p >= 0 && !!L; this.uiPhases();
+    $("c1it").textContent = fmtK(P.iter); $("c1nd").textContent = fmtK(pend && p < 4 ? L.n0 : P.nodeCount);
+    $("c1ck").textContent = fmtK(pend && p < 3 ? L.k0 : P.ch.n);
+    const sp = shownPath(P, pend && p < 4); $("c1len").textContent = sp ? f2(pathLen(sp)) : "–";
+    $("c1note").innerHTML = this.note();
+    let r = `직선 거리는 <b>${f2(P.cmin)}</b>입니다.`;
+    if (P.bestPath) {
+      r = `경로 길이 <b>${f2(P.best)}</b>, 직선 거리 ${f2(P.cmin)}의 <b>${ratio(P)}배</b>예요.`;
+      if (P.iter > P.first.iter) r += ` 첫 경로 뒤로 ${fmtK(P.iter - P.first.iter)}번 더 반복하는 동안 경로는 ${f2(P.first.cost)}에서 ${f2(P.best)}로 ${P.best < P.first.cost - 1e-9 ? "바뀌었어요" : "그대로예요"}.`;
+    }
+    $("c1r").innerHTML = P.bad ? `<span class="hit">${BAD}</span>` : r;
+  },
+  note() {
+    const P = this.P, L = P.last, p = this.phase;
+    if (P.bad) return BAD;
+    if (p < 0) {
+      if (P.iter === 0) return "[다음 단계]를 눌러 첫 샘플을 뽑아 보세요.";
+      if (P.bestPath && P.done) return `경로를 찾았어요. 길이 <b>${f2(P.best)}</b>로 직선 거리의 <b>${ratio(P)}배</b>입니다.`;
+      if (P.done) return "반복 한도에 닿았어요. [처음부터]로 다시 해 보세요.";
+      return P.bestPath ? "경로를 찾은 뒤에도 트리를 계속 키우는 중이에요. 경로 길이가 바뀌는지 보세요." : "[다음 단계]로 다음 반복을 시작합니다.";
+    }
+    const nd = P.T.nodes[L.ni];
+    switch (p) {
+      case 0: return sampleNote(L);
+      case 1: return `노드 ${fmtK(L.n0)}개 중 q_rand에 가장 가까운 노드를 찾았어요(거리 ${f2(dist(nd, L.qr))}).`;
+      case 2: return L.dup ? "가장 가까운 노드가 이미 q_rand 자리에 있어요. 새로 붙일 것이 없습니다." : dist(nd, L.qr) <= P.step ? `q_rand가 step(${P.step})보다 가까워서 q_new = q_rand예요.` : `그 노드에서 q_rand 쪽으로 step(${P.step})만큼만 간 자리가 q_new입니다.`;
+      case 3: return L.dup ? "검사할 구간이 없어요." : L.ok ? `두 점 사이를 ${RES} 간격으로 나눠 <b>${L.rec.length}번</b> 검사했고 모두 통과했어요.` : `<b>${L.rec.length}번째</b> 검사에서 장애물에 걸렸어요. <span class="hit">빨간 점</span>이 그 자리입니다.`;
+      case 4:
+        if (!L.ok) return "q_new를 버렸어요. 이번 반복은 충돌 검사만 쓰고 끝났습니다.";
+        return "q_new를 트리에 붙였어요." + (L.improved ? (L.b0 === Infinity ? ` 목표 반경 안에 들어와 <b>경로를 찾았습니다!</b> 길이 ${f2(P.best)}.` : ` 목표에 닿는 더 짧은 가지가 생겨 경로가 ${f2(L.b0)}에서 ${f2(P.best)}로 줄었어요.`) : "");
+    }
+    return "";
+  },
+  draw() {
+    const V = this.V, P = this.P, L = P.last, p = this.phase, pend = p >= 0 && !!L; scene(V, this.sc);
+    hitDots(V, P.ch.hits, pend && p < 3 ? L.h0 : Infinity);
+    const lim = pend ? L.n0 : Infinity;
+    treeDraw(V, P.T, C.tree, 0.85, lim); nodeDots(V, P.T, C.tree, lim, 2.4, 0.8);
+    polyline(V, shownPath(P, pend && p < 4), C.accent, 3);
+    marks(V, this.sc);
+    if (!pend) return;
+    const nd = P.T.nodes[L.ni];
+    sampleMark(V, L.qr, L.biased, p < 2);
+    if (p >= 1) { dot(V, nd, 7, null, C.ink2, 1.6); seg(V, nd, L.qr, C.ink3, 1, [4, 4]); }
+    if (p >= 2 && !L.dup) {
+      if (p < 4) seg(V, nd, L.qn, C.ink2, 1.4, [3, 3]);
+      if (p >= 3) checkDots(V, L.rec, !L.ok);
+      if (p >= 4) { if (L.ok) seg(V, nd, L.qn, C.accent, 2.8); else seg(V, nd, L.qn, C.hit, 1.6, [5, 4]); }
+      dot(V, L.qn, 4.2, p >= 4 && !L.ok ? null : C.accent, p >= 4 && !L.ok ? C.hit : null);
+      label(V, L.qn, "q_new", C.accent, -9, 12, "right");
+    }
+  },
+});
+
+// ================= 2. RRT* =================
+const ch2 = stepper({
+  id: "c2", V: new View("c2"), sc: cloneScene(SCENES.basic),
+  make() { return new RRTStar(this.sc, { gamma: +$("c2gamma").value, maxIter: 6000 }); },
+  nextPhase(L, p) { if (!L.ok && p >= 1) return -1; return p < 4 ? p + 1 : -1; },
+  init() {
+    this.initBase();
+    const el = $("c2gamma"), o = $("c2gammao"); const f = () => (o.textContent = el.value); f();
+    el.oninput = () => { f(); this.P.gamma = +el.value; this.ui(); };
+    $("c2labels").onchange = () => (this.dirty = true);
+    this.reset();
+  },
+  ui() {
+    const P = this.P, L = P.last, p = this.phase, pend = p >= 0 && !!L; this.uiPhases();
+    $("c2it").textContent = fmtK(P.iter); $("c2nd").textContent = fmtK(pend && p < 3 && L.ok ? L.n0 : P.nodeCount);
+    $("c2rw").textContent = fmtK(P.rewires - (pend && p < 4 && L.rw ? L.rw.filter((r) => r.free).length : 0));
+    const sp = shownPath(P, pend && p < 4); $("c2len").textContent = sp ? f2(pathLen(sp)) : "–";
+    $("c2note").innerHTML = this.note();
+    let r = `반경 r은 지금 <b>${f2(P.radius(P.nodeCount))}</b>이에요(노드 ${fmtK(P.nodeCount)}개, γ = ${P.gamma}).`;
+    if (P.bestPath) r += ` 경로 길이 <b>${f2(P.best)}</b>, 직선 거리의 <b>${ratio(P)}배</b>.` + (P.best < P.first.cost - 1e-9 ? ` 첫 경로(${f2(P.first.cost)})보다 <b>${Math.round((1 - P.best / P.first.cost) * 100)}%</b> 짧아졌어요.` : "");
+    $("c2r").innerHTML = P.bad ? `<span class="hit">${BAD}</span>` : r;
+  },
+  note() {
+    const P = this.P, L = P.last, p = this.phase;
+    if (P.bad) return BAD;
+    if (p < 0) {
+      if (P.iter === 0) return "[다음 단계]를 눌러 시작하세요. 앞의 두 단계는 RRT와 같고, 3~5단계가 RRT*에서 새로 생긴 부분이에요.";
+      if (P.done) return `반복 한도(${fmtK(P.maxIter)}번)에 닿았어요.`;
+      return P.bestPath ? "경로를 찾은 뒤에도 RRT*는 멈추지 않아요. 계속 돌리면 경로가 짧아집니다." : "[다음 단계]로 다음 반복을 시작합니다.";
+    }
+    switch (p) {
+      case 0: return sampleNote(L);
+      case 1: return L.dup ? "가장 가까운 노드가 이미 그 자리에 있어서 건너뜁니다." : L.ok ? "최근접 노드에서 step만큼 간 q_new까지 충돌이 없어요. 여기까지는 RRT와 똑같습니다." : "최근접 노드에서 q_new로 가는 길이 막혀 이번 샘플은 버립니다. RRT*도 여기서 끝이에요.";
+      case 2: return `반경 r = <b>${f2(L.r)}</b> 안의 이웃 <b>${L.near.length}개</b>를 모았어요.` + (L.near.length === 1 ? " 최근접 노드 하나뿐이네요." : "") + " 숫자는 각 이웃까지 시작점에서 오는 비용입니다.";
+      case 3: {
+        const tested = L.cand.filter((c) => c.tested), blocked = tested.filter((c) => !c.free).length, chs = L.cand.find((c) => c.i === L.par);
+        return "이웃마다 “이웃의 비용 + q_new까지 거리”를 계산해 싼 순서로 시도해요. " + (L.par === L.ni ? "이번엔 최근접 노드가 가장 쌌어요." : "<b>최근접 노드가 아닌 이웃</b>이 더 싸서 부모로 골랐어요.") + (blocked ? ` 더 싼 후보 ${blocked}개는 길이 막혀(빨간 점선) 건너뛰었어요.` : "") + ` q_new의 비용은 <b>${f2(chs.c)}</b>.`;
+      }
+      case 4: {
+        const ok = L.rw.filter((r) => r.free).length, bl = L.rw.length - ok;
+        let s = ok ? `q_new를 거치면 더 싸지는 이웃 <b>${ok}개</b>의 부모를 q_new로 바꿨어요(<span class="okc">초록 선</span>). 그 아래 가지의 비용도 함께 줄어듭니다.` : "q_new를 거쳐서 더 싸지는 이웃이 없어 고칠 것이 없어요.";
+        if (bl) s += ` 더 싸질 수 있었지만 길이 막힌 이웃이 ${bl}개 있었어요.`;
+        if (L.improved) s += L.b0 === Infinity ? ` <b>경로를 찾았습니다!</b> 길이 ${f2(P.best)}.` : ` 경로가 ${f2(L.b0)}에서 <b>${f2(P.best)}</b>로 짧아졌어요.`;
+        return s;
+      }
+    }
+    return "";
+  },
+  draw() {
+    const V = this.V, P = this.P, Tr = P.T, L = P.last, p = this.phase, pend = p >= 0 && !!L; scene(V, this.sc);
+    const lim = pend ? L.n0 : Infinity;
+    let par = null;
+    if (pend && L.ok && p < 4) { const m = new Map(L.rw.filter((r) => r.free).map((r) => [r.i, r.oldP])); if (m.size) par = (i) => (m.has(i) ? m.get(i) : Tr.parent[i]); }
+    treeDraw(V, Tr, C.tree, 0.85, lim, par); nodeDots(V, Tr, C.tree, lim, 2.4, 0.8);
+    polyline(V, shownPath(P, pend && p < 4), C.accent, 3);
+    marks(V, this.sc);
+    if (!pend) return;
+    const nd = Tr.nodes[L.ni], labels = $("c2labels").checked;
+    sampleMark(V, L.qr, L.biased, p < 2);
+    if (p >= 1) {
+      dot(V, nd, 7, null, C.ink2, 1.6); seg(V, nd, L.qr, C.ink3, 1, [4, 4]);
+      if (L.dup) return;
+      if (!L.ok) { checkDots(V, L.rec, true); seg(V, nd, L.qn, C.hit, 1.6, [5, 4]); dot(V, L.qn, 4, null, C.hit); return; }
+      if (p < 3) seg(V, nd, L.qn, C.ink2, 1.4, [3, 3]);
+    }
+    if (p >= 2) {
+      const g = V.g; g.save(); g.beginPath(); g.arc(V.X(L.qn[0]), V.Y(L.qn[1]), Math.max(2, L.r * V.k), 0, 2 * PI);
+      g.fillStyle = C.accentSoft; g.globalAlpha = 0.5; g.fill(); g.globalAlpha = 1; g.setLineDash([5, 4]); g.strokeStyle = C.accent; g.lineWidth = 1.3; g.stroke(); g.restore();
+      for (const i of L.near) dot(V, Tr.nodes[i], 4.5, null, C.ink, 1.4);
+      if (labels && p <= 3 && L.near.length <= 14) for (const c of L.cand) label(V, Tr.nodes[c.i], f1(c.base), C.ink, 7, -8);
+    }
+    if (p >= 3) {
+      for (const c of L.cand) {
+        if (c.i === L.par) continue;
+        const a = Tr.nodes[c.i];
+        if (c.tested && !c.free) seg(V, a, L.qn, C.hit, 1.4, [4, 3]);
+        else if (p === 3) seg(V, a, L.qn, C.ink3, 1, [2, 4], 0.7);
+      }
+      seg(V, Tr.nodes[L.par], L.qn, C.accent, 2.8);
+      if (labels && p === 3) { const chs = L.cand.find((c) => c.i === L.par); label(V, L.qn, f1(chs.c), C.accent, 9, -9); }
+    }
+    if (p >= 4) {
+      for (const r of L.rw) {
+        const q = Tr.nodes[r.i];
+        if (r.free) { seg(V, Tr.nodes[r.oldP], q, C.hit, 1.4, [4, 3], 0.9); seg(V, L.qn, q, C.ok, 2.6); if (labels) label(V, q, `${f1(r.oldC)}→${f1(r.newC)}`, C.ok, 7, -8); }
+        else seg(V, L.qn, q, C.ink3, 1, [2, 3]);
+      }
+    }
+    dot(V, L.qn, 4.2, C.accent, null); label(V, L.qn, "q_new", C.accent, -9, 12, "right");
+  },
+});
+
+// ================= 3 & 4. duels =================
+function duel(o) {
+  const c = chapter(Object.assign({ running: false, N: 2500, per: 8 }, o)); const id = c.id;
+  c.reset = function () { const seed = newSeed(); this.a = this.mkA(seed); this.b = this.mkB(seed); this.running = false; this.ui(); this.dirty = true; };
+  c.init = function () {
+    $(id + "play").onclick = () => { if (this.a.iter >= this.N) this.reset(); this.running = !this.running; this.ui(); };
+    $(id + "reset").onclick = () => { this.reset(); this.running = true; this.ui(); };
+    if (this.extraInit) this.extraInit();
+    this.reset();
+  };
+  c.tick = function () {
+    if (!this.running) return;
+    const per = REDUCED ? this.N : this.per;
+    for (let i = 0; i < per && this.a.iter < this.N; i++) { this.a.iterate(); this.b.iterate(); }
+    if (this.a.iter >= this.N) this.running = false;
+    this.ui(); this.dirty = true;
+  };
+  c.btnText = function () { return this.running ? "일시정지" : this.a.iter >= this.N ? "다시 시작" : this.a.iter > 0 ? "계속" : "시작"; };
+  return c;
+}
+
+const ch3 = duel({
+  id: "c3", A: new View("c3a"), B: new View("c3b"), G: new View("c3p"), sc: cloneScene(SCENES.basic),
+  mkA(seed) { return new RRT(this.sc, { seed, stopAtGoal: false, maxIter: this.N }); },
+  mkB(seed) { return new RRTStar(this.sc, { seed, maxIter: this.N }); },
+  extraInit() { $("c3nodes").onchange = () => (this.dirty = true); },
+  ui() {
+    $("c3play").textContent = this.btnText();
+    const a = this.a, b = this.b;
+    $("c3ca").textContent = `노드 ${fmtK(a.nodeCount)}`; $("c3cb").textContent = `노드 ${fmtK(b.nodeCount)}`;
+    $("c3r").innerHTML = a.iter === 0 ? "같은 시작, 같은 목표, 같은 샘플입니다. [시작]을 눌러 보세요." :
+      `반복 <b>${fmtK(a.iter)}</b>. 경로 길이 RRT <b>${f2(a.best)}</b>, RRT* <b>${f2(b.best)}</b>` + (a.best < Infinity && b.best < Infinity ? `. RRT*가 <b>${Math.max(0, Math.round((1 - b.best / a.best) * 100))}%</b> 짧아요.` : ".");
+  },
+  draw() {
+    const only = $("c3nodes").checked;
+    for (const [V, P] of [[this.A, this.a], [this.B, this.b]]) {
+      scene(V, this.sc);
+      if (only) nodeDots(V, P.T, C.tree, Infinity, 2.6, 0.9);
+      else { treeDraw(V, P.T, C.tree, 0.8); polyline(V, P.bestPath, C.accent, 3); }
+      marks(V, this.sc);
+    }
+    plot(this.G, { series: [{ hist: this.a.hist, color: C.ink2, x: "it", cur: this.a.iter }, { hist: this.b.hist, color: C.tree, x: "it", cur: this.b.iter }], xmax: this.N, lb: this.a.cmin, xlab: "반복" });
+  },
+});
+
+const ch4 = duel({
+  id: "c4", A: new View("c4a"), B: new View("c4b"), G: new View("c4p"), sc: cloneScene(SCENES.focus),
+  mkA(seed) { return new RRTStar(this.sc, { seed, maxIter: this.N }); },
+  mkB(seed) { return new Informed(this.sc, { seed, maxIter: this.N }); },
+  extraInit() { $("c4samp").onchange = () => (this.dirty = true); },
+  ui() {
+    $("c4play").textContent = this.btnText();
+    const a = this.a, b = this.b, E = b.ellipse();
+    let s = a.iter === 0 ? "두 플래너가 같은 샘플 순서로 출발합니다. [시작]을 눌러 보세요." : `반복 <b>${fmtK(a.iter)}</b>. 경로 길이 RRT* <b>${f2(a.best)}</b>, Informed RRT* <b>${f2(b.best)}</b>.`;
+    if (E) s += ` 탐색 타원의 넓이는 지도의 약 <b>${Math.min(100, Math.round((PI * E.a * E.b) / (WS * WS) * 100))}%</b>예요.`;
+    if (a.best < Infinity && b.best < a.best - 1e-6) { const h = b.hist.find((x) => x.c <= a.best); if (h) s += ` RRT*의 지금 길이를 Informed RRT*는 <b>${fmtK(h.it)}번째</b> 반복에서 이미 넘어섰어요.`; }
+    else if (a.iter > 0) s += " 아직 첫 경로 전이라 두 플래너가 똑같이 움직입니다.";
+    $("c4r").innerHTML = s;
+  },
+  draw() {
+    const samp = $("c4samp").checked;
+    for (const [V, P] of [[this.A, this.a], [this.B, this.b]]) {
+      scene(V, this.sc);
+      const E = P.ellipse ? P.ellipse() : null;
+      if (E) ellipseDraw(V, E);
+      treeDraw(V, P.T, C.tree, 0.7);
+      if (samp) sampleDots(V, P.samples.slice(-150), C.ink2);
+      if (E) seg(V, this.sc.start, this.sc.goal, C.ink3, 1, [3, 4]);
+      polyline(V, P.bestPath, C.accent, 3);
+      marks(V, this.sc);
+    }
+    plot(this.G, { series: [{ hist: this.a.hist, color: C.tree, x: "it", cur: this.a.iter }, { hist: this.b.hist, color: C.accent, x: "it", cur: this.b.iter }], xmax: this.N, lb: this.a.cmin, xlab: "반복", zoom: true });
+  },
+});
+
+// ================= 5. RRT-Connect =================
+const NM = { s: "시작 쪽", g: "목표 쪽" };
+const ch5 = stepper({
+  id: "c5", V: new View("c5"), sc: cloneScene(SCENES.basic),
+  make() { return new Connect(this.sc, { maxIter: 6000 }); },
+  nextPhase(L, p) { if (p === 1 && !L.ok) return 3; return p < 3 ? p + 1 : -1; },
+  init() { this.initBase(); $("c5scene").onchange = (e) => { this.sc = cloneScene(SCENES[e.target.value]); this.reset(); }; this.reset(); },
+  ui() {
+    const P = this.P, L = P.last, p = this.phase, pend = p >= 0 && !!L; this.uiPhases();
+    $("c5it").textContent = fmtK(P.iter); $("c5nd").textContent = `${fmtK(P.Ts.nodes.length)} + ${fmtK(P.Tg.nodes.length)}`;
+    $("c5ck").textContent = fmtK(P.ch.n);
+    $("c5len").textContent = P.bestPath && !(pend && p < 3) ? f2(P.best) : "–";
+    $("c5note").innerHTML = this.note();
+    let r = `직선 거리는 <b>${f2(P.cmin)}</b>입니다.`;
+    if (P.bestPath) r = `경로 길이 <b>${f2(P.best)}</b>, 직선 거리의 <b>${ratio(P)}배</b>. 충돌 검사 <b>${fmtK(P.ch.n)}번</b>, 노드 <b>${fmtK(P.nodeCount)}개</b>로 찾았어요.`;
+    $("c5r").innerHTML = P.bad ? `<span class="hit">${BAD}</span>` : r;
+  },
+  note() {
+    const P = this.P, L = P.last, p = this.phase;
+    if (P.bad) return BAD;
+    if (p < 0) {
+      if (P.iter === 0) return "[다음 단계]를 눌러 시작하세요. 처음엔 시작 쪽 트리(청록)가 A, 목표 쪽 트리(산호)가 B예요.";
+      if (P.bestPath) return `두 트리가 만나 경로를 찾았어요. 길이 <b>${f2(P.best)}</b>, 직선 거리의 <b>${ratio(P)}배</b>.`;
+      if (P.done) return "반복 한도에 닿았어요.";
+      return `다음 반복에서는 <b>${NM[P.A === P.Ts ? "s" : "g"]}</b> 트리가 확장합니다.`;
+    }
+    const a = NM[L.A], b = NM[L.A === "s" ? "g" : "s"];
+    switch (p) {
+      case 0: return `트리 A(${a})가 갈 방향으로 q_rand를 뽑았어요.`;
+      case 1: return L.ok ? `${a} 트리가 q_rand 쪽으로 한 걸음 확장해 q_new를 만들었어요.` : `${a} 트리의 확장이 장애물에 막혔어요. 연결은 건너뛰고 역할만 바꿉니다.`;
+      case 2: return `${b} 트리가 q_new를 향해 <b>${L.conn.length}걸음</b> 뻗었고, ` + (L.reached ? "q_new에 <b>닿았어요!</b>" : "장애물에 막혀 멈췄어요(빨간 X).");
+      case 3: return L.reached ? `두 트리가 만나 경로가 완성됐어요. 길이 <b>${f2(P.best)}</b>.` : `만나지 못했으니 역할을 바꿔요. 다음 반복에서는 <b>${b}</b> 트리가 확장하고 ${a} 트리가 연결을 시도합니다.`;
+    }
+    return "";
+  },
+  draw() {
+    const V = this.V, P = this.P, L = P.last, p = this.phase, pend = p >= 0 && !!L; scene(V, this.sc);
+    let limS = Infinity, limG = Infinity;
+    if (pend) {
+      const aS = L.A === "s", a0 = aS ? L.n0s : L.n0g, b0 = aS ? L.n0g : L.n0s;
+      const la = p >= 1 ? Infinity : a0, lb = p >= 2 ? Infinity : b0;
+      if (aS) { limS = la; limG = lb; } else { limG = la; limS = lb; }
+    }
+    hitDots(V, P.ch.hits, pend && p < 1 ? L.h0 : Infinity);
+    treeDraw(V, P.Ts, C.tree, 0.85, limS); nodeDots(V, P.Ts, C.tree, limS, 2.4, 0.8);
+    treeDraw(V, P.Tg, C.tree2, 0.85, limG); nodeDots(V, P.Tg, C.tree2, limG, 2.4, 0.8);
+    if (P.bestPath && !(pend && p < 3)) polyline(V, P.bestPath, C.accent, 3);
+    marks(V, this.sc);
+    if (!pend) return;
+    const A = L.A === "s" ? P.Ts : P.Tg, B = L.A === "s" ? P.Tg : P.Ts, nd = A.nodes[L.ni];
+    sampleMark(V, L.qr, false, p < 2);
+    if (p >= 1) {
+      dot(V, nd, 7, null, C.ink2, 1.6); seg(V, nd, L.qr, C.ink3, 1, [4, 4]);
+      if (L.ok) { if (p <= 2) seg(V, nd, L.qn, C.accent, 2.8); dot(V, L.qn, 4.2, C.accent, null); label(V, L.qn, "q_new", C.accent, -9, 12, "right"); }
+      else { checkDots(V, L.rec, true); seg(V, nd, L.qn, C.hit, 1.6, [5, 4]); }
+    }
+    if (p >= 2 && L.ok) {
+      for (const i of L.conn) seg(V, B.nodes[B.parent[i]], B.nodes[i], C.accent, 2.8);
+      dot(V, L.qn, 9, null, C.accent, 1.6);
+      if (L.block && L.blockRec && L.blockRec.length) { seg(V, L.blockFrom, L.block, C.hit, 1.4, [4, 3]); cross(V, L.blockRec[L.blockRec.length - 1], 5, C.hit); }
+    }
+  },
+});
+
+// ================= 6. four-way race =================
+const KINDS = [
+  { name: "RRT", col: () => C.ink2, stops: true, mk: (sc, seed) => new RRT(sc, { seed, maxIter: 1e9 }) },
+  { name: "RRT*", col: () => C.tree, mk: (sc, seed) => new RRTStar(sc, { seed, maxIter: 1e9 }) },
+  { name: "Informed RRT*", col: () => C.accent, mk: (sc, seed) => new Informed(sc, { seed, maxIter: 1e9 }) },
+  { name: "RRT-Connect", col: () => C.tree2, stops: true, mk: (sc, seed) => new Connect(sc, { seed, maxIter: 1e9 }) },
+];
+const ch6 = chapter({
+  Vs: [0, 1, 2, 3].map((i) => new View("c6v" + i)), G: new View("c6p"), CAP: 30000, budget: 160, running: false, tally: null, series: 0,
+  init() {
+    this.sc = cloneScene(SCENES.basic);
+    $("c6scene").onchange = (e) => { this.sc = cloneScene(SCENES[e.target.value]); this.tally = null; this.newRace(false); };
+    $("c6go").onclick = () => { this.tally = null; this.newRace(true); };
+    $("c6ten").onclick = () => { this.tally = { n: 0, rows: KINDS.map(() => ({ found: 0, fk: 0, fc: 0, lc: 0 })) }; this.series = 10; this.newRace(true); };
+    this.newRace(false);
+  },
+  newRace(run) {
+    const seed = newSeed(); this.Ps = KINDS.map((k) => k.mk(this.sc, seed)); this.running = run;
+    $("c6go").disabled = $("c6ten").disabled = run; $("c6scene").disabled = run;
+    this.ui(); this.dirty = true;
+  },
+  advance(P, budget) {
+    const k0 = P.ch.n;
+    while (!P.done && P.ch.n - k0 < budget) { if (P.ch.n >= this.CAP) { P.done = true; P.capped = true; break; } P.iterate(); }
+    if (!P.done && P.ch.n >= this.CAP) { P.done = true; P.capped = true; }
+  },
+  tick() {
+    if (!this.running) return;
+    if (this.tally) { for (const P of this.Ps) this.advance(P, Infinity); this.finish(); }
+    else { const bud = REDUCED ? Infinity : this.budget; for (const P of this.Ps) this.advance(P, bud); if (this.Ps.every((P) => P.done)) this.finish(); }
+    this.ui(); this.dirty = true;
+  },
+  finish() {
+    this.running = false; const t = this.tally;
+    if (t) {
+      this.Ps.forEach((P, i) => { const r = t.rows[i]; if (P.first) { r.found++; r.fk += P.first.checks; r.fc += P.first.cost; r.lc += P.best; } });
+      t.n++;
+      if (t.n < this.series) { this.newRace(true); return; }
+    }
+    $("c6go").disabled = $("c6ten").disabled = $("c6scene").disabled = false;
+  },
+  ui() {
+    const t = this.tally && this.tally.n > 0 ? this.tally : null, cells = [];
+    this.Ps.forEach((P, i) => {
+      const k = KINDS[i]; let res, fk, fc, lc, fkv = Infinity;
+      if (t) {
+        const r = t.rows[i]; res = `${t.n}판 중 <b>${r.found}판</b> 찾음`;
+        fkv = r.found ? r.fk / r.found : Infinity;
+        fk = r.found ? fmtK(fkv) : "–"; fc = r.found ? f2(r.fc / r.found) : "–"; lc = r.found ? f2(r.lc / r.found) : "–";
+      } else {
+        res = P.bad ? "시작이나 목표가 막힘" : !P.done ? (P.first ? "다듬는 중" : "탐색 중") : P.first ? (k.stops ? "찾고 멈춤" : "예산을 다 씀") : `<span class="hit">예산 안에 못 찾음</span>`;
+        if (P.first) fkv = P.first.checks;
+        fk = P.first ? fmtK(P.first.checks) : "–"; fc = P.first ? f2(P.first.cost) : "–"; lc = P.first ? f2(P.best) : "–";
+      }
+      cells.push({ k, res, fk, fc, lc, fkv, lcv: t ? (t.rows[i].found ? t.rows[i].lc / t.rows[i].found : Infinity) : P.best });
+    });
+    const minFk = Math.min(...cells.map((c) => c.fkv)), minLc = Math.min(...cells.map((c) => c.lcv));
+    $("c6tb").innerHTML = cells.map((c) => `<tr><td><i class="sw" style="background:${c.k.col()}"></i><b>${c.k.name}</b></td><td>${c.res}</td>` +
+      `<td class="num">${c.fkv === minFk && minFk < Infinity ? `<span class="win">${c.fk}</span>` : c.fk}</td><td class="num">${c.fc}</td>` +
+      `<td class="num">${c.lcv === minLc && minLc < Infinity ? `<span class="win">${c.lc}</span>` : c.lc}</td></tr>`).join("");
+    let r;
+    if (this.tally && this.running) r = `${this.tally.n + 1} / ${this.series}판 진행 중…`;
+    else if (t) r = `${t.n}판 결과입니다. 첫 경로와 길이 칸은 경로를 찾은 판만 평균했어요. <span class="win">초록 숫자</span>가 가장 좋은 값이에요.`;
+    else if (this.running) r = `한 장면마다 각자 충돌 검사 <b>${this.budget}번</b>씩 씁니다.`;
+    else if (this.Ps[0].ch.n > 0) r = "<span class=\"win\">초록 숫자</span>가 가장 좋은 값이에요. 지도를 바꾸거나 10판 평균으로 운을 걸러 보세요.";
+    else r = "[경주 시작]을 누르면 네 플래너가 같은 지도에서 동시에 출발합니다.";
+    $("c6r").innerHTML = r;
+  },
+  draw() {
+    const maxK = Math.max(...this.Ps.map((P) => P.ch.n));
+    this.Ps.forEach((P, i) => {
+      const V = this.Vs[i]; scene(V, this.sc);
+      if (P instanceof Connect) { treeDraw(V, P.Ts, C.tree, 0.75); treeDraw(V, P.Tg, C.tree2, 0.75); }
+      else { const E = P.ellipse ? P.ellipse() : null; if (E) ellipseDraw(V, E); treeDraw(V, P.T, C.tree, 0.7); }
+      polyline(V, P.bestPath, C.accent, 2.6); marks(V, this.sc);
+    });
+    plot(this.G, { series: this.Ps.map((P, i) => ({ hist: P.hist, color: KINDS[i].col(), x: "k", cur: P.done ? Math.max(maxK, P.ch.n) : P.ch.n })), xmax: this.CAP, lb: this.Ps[0].cmin, xlab: "충돌 검사" });
+  },
+});
+
+// ================= boot =================
+function boot() {
+  readTheme();
+  for (const c of CH) c.init && c.init();
+  const map = [[hero, "top"], [ch1, "ch1"], [ch2, "ch2"], [ch3, "ch3"], [ch4, "ch4"], [ch5, "ch5"], [ch6, "ch6"]];
+  const io = new IntersectionObserver((ents) => {
+    for (const en of ents) { const c = CH.find((x) => x.el === en.target); if (c) { c.visible = en.isIntersecting; if (c.visible) c.dirty = true; } }
+  }, { rootMargin: "200px 0px" });
+  for (const [c, id] of map) { c.el = $(id); io.observe(c.el); }
+  const links = [...document.querySelectorAll(".nav a")];
+  const navIo = new IntersectionObserver((ents) => {
+    for (const en of ents) if (en.isIntersecting) links.forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + en.target.id));
+  }, { rootMargin: "-45% 0px -50% 0px" });
+  document.querySelectorAll(".chapter").forEach((s) => navIo.observe(s));
+  window.addEventListener("resize", refreshAll);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", refreshAll);
+  new MutationObserver(refreshAll).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  if (document.fonts) document.fonts.ready.then(refreshAll);
+  requestAnimationFrame(loop);
+}
+boot();
+</script>
+</body></html>
