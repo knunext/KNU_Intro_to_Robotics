@@ -1,0 +1,2573 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>두 팔이 서로 비켜 가는 길 찾기 — 양팔 모션 플래닝 인터랙티브 실습</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #F2F5F9; --panel: #FFFFFF; --field: #E9EFF6;
+  --grid: rgba(25,60,110,.07); --grid2: rgba(25,60,110,.16);
+  --ink: #132640; --ink2: #425A7A; --ink3: #7C90AC; --line: rgba(19,38,64,.13);
+  --accent: #C7760F; --accentSoft: rgba(212,128,26,.2); --onAccent: #FFFFFF;
+  --tree: #0E84A0; --tree2: #CF4F38; --hit: #D23A4E; --ok: #1B9566;
+  --obst: rgba(19,38,64,.07); --hatch: rgba(19,38,64,.34); --cobst: rgba(19,38,64,.2);
+  --mud: #9A6A2E; --wall: #2B3F5E;
+  --font: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --display: "Archivo", "IBM Plex Sans KR", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "IBM Plex Sans KR", monospace;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0B213D; --panel: #0F2948; --field: #12315A;
+    --grid: rgba(220,233,249,.055); --grid2: rgba(220,233,249,.12);
+    --ink: #DCE9F9; --ink2: #A3BCDD; --ink3: #6A8BB3; --line: rgba(220,233,249,.14);
+    --accent: #FFB547; --accentSoft: rgba(255,181,71,.22); --onAccent: #0B213D;
+    --tree: #67D4F5; --tree2: #FF8A7A; --hit: #FF5468; --ok: #63E3AE;
+    --obst: rgba(220,233,249,.07); --hatch: rgba(220,233,249,.33); --cobst: rgba(220,233,249,.2);
+    --mud: #D6A15E; --wall: #A9C1E2;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0B213D; --panel: #0F2948; --field: #12315A;
+  --grid: rgba(220,233,249,.055); --grid2: rgba(220,233,249,.12);
+  --ink: #DCE9F9; --ink2: #A3BCDD; --ink3: #6A8BB3; --line: rgba(220,233,249,.14);
+  --accent: #FFB547; --accentSoft: rgba(255,181,71,.22); --onAccent: #0B213D;
+  --tree: #67D4F5; --tree2: #FF8A7A; --hit: #FF5468; --ok: #63E3AE;
+  --obst: rgba(220,233,249,.07); --hatch: rgba(220,233,249,.33); --cobst: rgba(220,233,249,.2);
+  --mud: #D6A15E; --wall: #A9C1E2;
+}
+html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 64px); scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+*, *::before, *::after { box-sizing: inherit; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font); font-size: 16px; line-height: 1.75;
+  -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums;
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: inherit; }
+
+.nav {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; align-items: center; gap: 18px;
+  padding: 10px max(20px, env(safe-area-inset-left, 0px));
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.nav-brand { font-family: var(--display); font-weight: 800; font-stretch: 120%; font-variation-settings: "wdth" 120; font-size: 15px; white-space: nowrap; }
+.nav ol { list-style: none; display: flex; gap: 2px; margin: 0 0 0 auto; padding: 0; overflow-x: auto; scrollbar-width: none; }
+.nav a {
+  display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
+  padding: 4px 9px; border-radius: 99px; font-size: 13px; color: var(--ink2); white-space: nowrap;
+}
+.nav a:hover { color: var(--ink); background: var(--panel); }
+.nav a.on { color: var(--ink); background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+.nav a b { font-family: var(--display); font-weight: 700; color: var(--accent); }
+.nav .part { width: 1px; background: var(--line); margin: 4px 6px; flex: none; }
+@media (max-width: 1240px) { .nav a span { display: none; } }
+
+.hero { max-width: 1120px; margin: 0 auto; padding: 56px 24px 24px; display: grid; grid-template-columns: 1fr 1.1fr; gap: 40px; align-items: center; }
+.hero h1 {
+  font-family: var(--display); font-weight: 820; font-stretch: 125%; font-variation-settings: "wdth" 125;
+  font-size: clamp(34px, 5vw, 58px); line-height: 1.06; letter-spacing: -0.015em; margin: 0 0 18px;
+}
+.hero p { color: var(--ink2); font-size: 17px; max-width: 46ch; margin: 0 0 22px; }
+.hero p b { color: var(--ink); font-weight: 600; }
+.legend-row { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13.5px; color: var(--ink2); margin-bottom: 26px; }
+.legend-row i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.hero-canvas { width: 100%; aspect-ratio: 3 / 2; display: block; border-radius: 14px; box-shadow: 0 0 0 1px var(--line); }
+
+.part-head { max-width: 1120px; margin: 0 auto; padding: 88px 24px 0; }
+.part-head h2 { font-family: var(--display); font-weight: 800; font-stretch: 118%; font-variation-settings: "wdth" 118; font-size: clamp(26px, 3.4vw, 38px); margin: 0 0 8px; line-height: 1.15; }
+.part-head p { color: var(--ink2); max-width: 64ch; margin: 0; }
+.part-head .tag { display: inline-block; font-size: 13px; color: var(--accent); font-weight: 600; margin-bottom: 6px; }
+
+.chapter { max-width: 1120px; margin: 0 auto; padding: 64px 24px 24px; }
+.ch-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 10px; }
+.ch-num {
+  flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  border: 1.5px solid var(--accent); color: var(--accent); font-family: var(--display); font-weight: 800; font-size: 16px;
+  transform: translateY(-4px);
+}
+.chapter h2 {
+  font-family: var(--display); font-weight: 760; font-stretch: 112%; font-variation-settings: "wdth" 112;
+  font-size: clamp(24px, 3vw, 32px); line-height: 1.2; margin: 0;
+}
+.prose { max-width: 66ch; color: var(--ink2); margin: 0 0 22px 48px; }
+.prose p { margin: 0 0 10px; }
+.prose b { color: var(--ink); font-weight: 600; }
+.lab { background: var(--panel); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 18px; }
+.views { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.quad { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 18px; }
+.view-cap { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; color: var(--ink2); margin-bottom: 6px; }
+.view-cap b { color: var(--ink); font-weight: 600; }
+.view-cap i { font-style: normal; display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.view canvas, canvas.map { width: 100%; aspect-ratio: 3 / 2; display: block; border-radius: 8px; }
+.view.solo, canvas.map { max-width: 860px; margin-left: auto; margin-right: auto; }
+.quad.narrow { max-width: 920px; margin: 0 auto; }
+canvas.edit { touch-action: none; cursor: crosshair; }
+.vstat { font-size: 13px; color: var(--ink3); margin-top: 6px; min-height: 1.75em; line-height: 1.6; }
+.vstat b { color: var(--ink); font-weight: 600; }
+.vstat .ok { color: var(--ok); font-weight: 600; } .vstat .bad { color: var(--hit); font-weight: 600; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 16px; }
+.controls .sep { flex-basis: 100%; height: 0; }
+.readout { margin-top: 14px; font-size: 14px; color: var(--ink2); min-height: 1.75em; }
+.readout b { color: var(--ink); font-weight: 600; }
+.readout .bad { color: var(--hit); font-weight: 600; }
+.readout .ok { color: var(--ok); font-weight: 600; }
+
+.btn {
+  border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer; font-weight: 600; font-size: 14px;
+  background: var(--accent); color: var(--onAccent);
+}
+.btn:hover { filter: brightness(1.06); }
+.btn.line { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); font-weight: 500; }
+.btn.line:hover { box-shadow: inset 0 0 0 1px var(--ink3); }
+.btn:disabled { opacity: .45; cursor: default; filter: none; }
+.btn.play { min-width: 84px; }
+.slider { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--ink2); }
+.slider output { min-width: 40px; color: var(--ink); font-weight: 600; text-align: right; }
+.slider input { width: 130px; accent-color: var(--accent); }
+.check { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--ink2); cursor: pointer; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; }
+select { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 13.5px; }
+.field-label { font-size: 13.5px; color: var(--ink2); display: inline-flex; align-items: center; gap: 8px; }
+.seg { display: inline-grid; grid-auto-flow: column; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 7px 12px; cursor: pointer; font-weight: 600; font-size: 13.5px; color: var(--ink2); }
+.seg button + button { box-shadow: inset 1px 0 0 var(--line); }
+.seg button[aria-checked="true"] { background: var(--ink); color: var(--panel); }
+
+.after { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin: 22px 0 0 48px; }
+.try h3, .key h3 { font-size: 14px; margin: 0 0 8px; color: var(--ink); font-weight: 600; }
+.try ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.try li { position: relative; padding-left: 22px; font-size: 14.5px; color: var(--ink2); line-height: 1.65; }
+.try li::before { content: ""; position: absolute; left: 2px; top: .55em; width: 10px; height: 10px; border: 1.5px solid var(--ink3); border-radius: 2px; }
+.key p { margin: 0; padding-left: 14px; border-left: 3px solid var(--accent); font-size: 15px; color: var(--ink); line-height: 1.65; }
+
+.side-grid { display: grid; grid-template-columns: 1fr 260px; gap: 20px; }
+.side-grid.two { grid-template-columns: 1fr 1fr 230px; }
+.phases { list-style: none; margin: 0; padding: 0; counter-reset: ph; display: grid; gap: 4px; }
+.phases li {
+  counter-increment: ph; display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start;
+  padding: 7px 8px; border-radius: 8px; font-size: 13.5px; color: var(--ink3); line-height: 1.45;
+}
+.phases li::before {
+  content: counter(ph); width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--ink3); font-size: 11px; font-weight: 700; margin-top: 1px;
+}
+.phases li b { display: block; color: var(--ink2); font-weight: 600; }
+.phases li.on { background: var(--accentSoft); color: var(--ink); }
+.phases li.on::before { border-color: var(--accent); background: var(--accent); color: var(--onAccent); }
+.phases li.on b { color: var(--ink); }
+.counters { display: grid; grid-template-columns: 1fr; gap: 4px; margin-top: 12px; font-size: 13px; color: var(--ink3); }
+.counters div { display: flex; justify-content: space-between; gap: 10px; }
+.counters b { color: var(--ink); font-weight: 600; }
+.counters .ok { color: var(--ok); } .counters .bad { color: var(--hit); }
+.side-note { margin-top: 12px; font-size: 13px; color: var(--ink); line-height: 1.6; padding: 10px; border-radius: 8px; background: var(--paper); min-height: 4.4em; }
+.side-note b { font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.chips span { font-size: 11.5px; padding: 1px 6px; border-radius: 4px; background: var(--field); color: var(--ink2); }
+.chips span:first-child { background: var(--accentSoft); color: var(--ink); }
+.side-h { font-size: 13px; font-weight: 600; color: var(--ink); margin: 14px 0 4px; }
+
+.cmp { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 16px; }
+.cmp-wrap { overflow-x: auto; }
+.cmp th { text-align: left; font-weight: 600; color: var(--ink2); font-size: 13px; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.cmp td { padding: 8px 10px; border-bottom: 1px solid var(--line); color: var(--ink2); white-space: nowrap; }
+.cmp td:first-child { color: var(--ink); font-weight: 600; }
+.cmp td.num { text-align: right; color: var(--ink); }
+.cmp th.num { text-align: right; }
+.cmp tr.row { cursor: default; }
+.cmp tr.row:hover td { background: var(--accentSoft); }
+.cmp .sw { display: inline-block; width: 22px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 8px; }
+.cmp .sw.dash { border-top-style: dashed; }
+.cmp .best { color: var(--ok); }
+.cmp .bad { color: var(--hit); }
+
+.closing { max-width: 1120px; margin: 0 auto; padding: 72px 24px 96px; }
+.closing h2 { font-family: var(--display); font-weight: 760; font-stretch: 112%; font-variation-settings: "wdth" 112; font-size: 30px; margin: 0 0 16px; }
+.closing ol { max-width: 70ch; color: var(--ink2); padding-left: 22px; margin: 0 0 20px; }
+.closing ol li { margin-bottom: 8px; }
+.closing ol b { color: var(--ink); font-weight: 600; }
+.closing p { max-width: 66ch; color: var(--ink2); }
+.pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 26px 0; max-width: 980px; }
+.pick div { padding: 14px 16px; border-radius: 10px; background: var(--panel); box-shadow: 0 0 0 1px var(--line); font-size: 14px; color: var(--ink2); line-height: 1.6; }
+.pick b { display: block; color: var(--ink); font-weight: 600; margin-bottom: 4px; font-size: 14.5px; }
+
+
+/* pseudocode */
+.code { font-family: var(--mono); font-size: 12.5px; line-height: 1.62; background: var(--paper); border-radius: 8px; padding: 10px 0; overflow-x: auto; color: var(--ink2); }
+.code .ln { padding: 0 12px 0 9px; white-space: pre; border-left: 3px solid transparent; min-height: 1.62em; }
+.code .ln.on { background: var(--accentSoft); border-left-color: var(--accent); color: var(--ink); }
+.code .ln i { font-style: normal; color: var(--ink3); }
+.code .ln b { font-weight: 500; color: var(--ink); }
+.code .ln.head { color: var(--ink); }
+.code-h { font-size: 13px; font-weight: 600; color: var(--ink); margin: 0 0 6px; }
+.code-row { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; margin-top: 18px; align-items: start; }
+.code-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px 20px; margin-top: 18px; }
+.why { margin-top: 12px; font-size: 13.5px; color: var(--ink2); line-height: 1.65; }
+.why b { color: var(--ink); font-weight: 600; }
+.why p { margin: 0 0 8px; }
+.lab-h { font-size: 16px; margin: 0 0 4px; font-weight: 600; }
+.lab .sub { margin: 0 0 14px; font-size: 14px; color: var(--ink2); max-width: 72ch; }
+.lab + .lab { margin-top: 18px; }
+.side-grid.wide { grid-template-columns: 1fr 350px; }
+.mini-grid { display: grid; grid-template-columns: 1fr 360px; gap: 20px; align-items: start; }
+.dtab-wrap { overflow-x: auto; margin-top: 10px; }
+.dtab { border-collapse: collapse; font-size: 13px; width: 100%; }
+.dtab th, .dtab td { padding: 4px 8px; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.dtab th { color: var(--ink3); font-weight: 600; text-align: left; }
+.dtab thead th { text-align: center; color: var(--ink); }
+.dtab td { color: var(--ink2); }
+.dtab td.cur { background: var(--accentSoft); color: var(--ink); font-weight: 600; }
+.dtab td.chg { color: var(--accent); font-weight: 600; }
+.seg.wrap { display: inline-flex; flex-wrap: wrap; }
+.mini-grid > *, .code-row > *, .side-grid > *, .code-cols > *, .views > *, .quad > * { min-width: 0; }
+@media (max-width: 420px) { .code-cols { grid-template-columns: 1fr; } }
+.seg.wrap button + button { box-shadow: inset 1px 0 0 var(--line); }
+@media (max-width: 1000px) { .side-grid.wide, .mini-grid, .code-row { grid-template-columns: 1fr; } }
+
+@media (max-width: 1000px) {
+  .side-grid, .side-grid.two { grid-template-columns: 1fr; }
+  .side-grid.two .views-in { grid-column: auto; }
+  .pick { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .hero { grid-template-columns: 1fr; padding-top: 32px; }
+  .views, .quad { grid-template-columns: 1fr; }
+  .prose, .after { margin-left: 0; }
+  .after { grid-template-columns: 1fr; }
+  .lab { padding: 12px; }
+}
+
+/* ---- bayes filter page additions ---- */
+:root {
+  --fDR: #7C90AC; --fKF: #C7760F; --fEKF: #2F6FD6; --fUKF: #1B9566; --fPF: #CF4F38; --fMCL: #8A4FC7;
+  --fVel: #D23A4E; --fOdo: #0E84A0; --rug: rgba(154,106,46,.16); --mag: rgba(194,59,140,.17);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fDR: #8AA6CB; --fKF: #FFB547; --fEKF: #7DB2FF; --fUKF: #63E3AE; --fPF: #FF8A7A; --fMCL: #C9A2FF;
+    --fVel: #FF5468; --fOdo: #67D4F5; --rug: rgba(214,161,94,.15); --mag: rgba(255,120,200,.15);
+  }
+}
+:root[data-theme="dark"] {
+  --fDR: #8AA6CB; --fKF: #FFB547; --fEKF: #7DB2FF; --fUKF: #63E3AE; --fPF: #FF8A7A; --fMCL: #C9A2FF;
+  --fVel: #FF5468; --fOdo: #67D4F5; --rug: rgba(214,161,94,.15); --mag: rgba(255,120,200,.15);
+}
+.view canvas.house, canvas.house, .hero-canvas.house { aspect-ratio: 103 / 73; }
+.view.solo { max-width: 860px; margin-left: auto; margin-right: auto; }
+.sidepanel { min-width: 0; }
+canvas.sens { width: 100%; max-width: 300px; aspect-ratio: 4 / 5.6; display: block; border-radius: 8px; background: var(--paper); margin: 0 auto; }
+canvas.hist { width: 100%; aspect-ratio: 5 / 2.6; display: block; border-radius: 8px; }
+canvas.chart { width: 100%; aspect-ratio: 5 / 1; min-height: 120px; display: block; border-radius: 8px; background: var(--paper); }
+.chart-box { margin-top: 18px; }
+.chart-box .view-cap { margin-bottom: 4px; }
+
+.fchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; justify-content: center; }
+.fchip {
+  border: 0; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); border-radius: 99px;
+  padding: 4px 12px 4px 9px; font-size: 13px; font-weight: 500; color: var(--ink); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px; line-height: 1.5;
+}
+.fchip i { display: inline-block; width: 16px; height: 4px; border-radius: 2px; }
+.fchip i.dash { height: 0; border-top: 3px dashed; background: none !important; border-radius: 0; }
+.fchip i.dots { height: 8px; width: 16px; border-radius: 0; background-image: radial-gradient(currentColor 1.4px, transparent 1.6px) !important; background-size: 5px 5px !important; background-color: transparent !important; }
+.fchip[aria-pressed="false"] { color: var(--ink3); }
+.fchip[aria-pressed="false"] i { opacity: .25; }
+
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+.presets span { font-size: 13.5px; color: var(--ink2); align-self: center; margin-right: 4px; }
+.presets button {
+  border: 0; border-radius: 6px; padding: 6px 11px; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  background: transparent; color: var(--ink2); box-shadow: inset 0 0 0 1px var(--line);
+}
+.presets button[aria-pressed="true"] { background: var(--ink); color: var(--panel); box-shadow: none; }
+
+.pad { display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(2, 44px); gap: 6px; margin-top: 14px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.pad[hidden] { display: none; }
+.pad button {
+  border: 0; border-radius: 8px; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 16px; color: var(--ink); cursor: pointer; touch-action: none;
+}
+.pad button.on { background: var(--accent); color: var(--onAccent); box-shadow: none; }
+.pad .u { grid-column: 2; grid-row: 1; } .pad .l { grid-column: 1; grid-row: 2; } .pad .d { grid-column: 2; grid-row: 2; } .pad .r { grid-column: 3; grid-row: 2; }
+.pad-note { font-size: 13px; color: var(--ink3); margin-top: 6px; }
+
+.readout { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.readout .warn { color: var(--hit); font-weight: 600; }
+
+.eq {
+  font-family: var(--mono); font-size: 13px; line-height: 1.8; background: var(--panel); box-shadow: 0 0 0 1px var(--line);
+  border-radius: 10px; padding: 12px 16px; overflow-x: auto; white-space: pre; color: var(--ink);
+  margin: 4px 0 24px 48px; max-width: 780px;
+}
+.eq i { font-style: normal; color: var(--ink3); }
+.eq b { font-weight: 500; color: var(--accent); }
+.prose .note { font-size: 14.5px; padding: 8px 12px; border-radius: 8px; background: var(--field); color: var(--ink2); }
+
+.cmp td .over { color: var(--hit); font-weight: 600; margin-left: 6px; font-size: 12.5px; }
+.cmp td.dim, .cmp tr.dim td { opacity: .45; }
+.cmp.wrapcells td, .cmp.wrapcells th { white-space: normal; min-width: 7.5em; vertical-align: top; line-height: 1.55; }
+.cmp.wrapcells td:first-child { min-width: 6em; }
+.cmp .yes { color: var(--ok); font-weight: 600; } .cmp .no { color: var(--hit); font-weight: 600; }
+
+.dtab td.ok { color: var(--ok); font-weight: 600; }
+.dtab td.rej { color: var(--hit); font-weight: 600; }
+.dtab td.mono, .dtab th.mono { font-family: var(--mono); font-size: 12px; }
+.side-note.tall { min-height: 0; }
+@media (max-width: 760px) {
+  .eq { margin-left: 0; font-size: 12px; }
+  .fchips { justify-content: flex-start; }
+}
+
+.side-grid.wide.ekf { grid-template-columns: 1fr 380px; }
+.side-grid.ekf .dtab th, .side-grid.ekf .dtab td { padding: 4px 5px; font-size: 12.5px; }
+.side-grid.ekf .dtab td.mono, .side-grid.ekf .dtab th.mono { font-size: 11.5px; }
+@media (max-width: 1000px) { .side-grid.wide.ekf { grid-template-columns: 1fr; } }
+
+.view canvas.sea { aspect-ratio: 10 / 7; }
+canvas.chiplog { width: 100%; aspect-ratio: 5 / 2.2; display: block; border-radius: 8px; background: var(--paper); }
+.logbook { max-height: 230px; overflow-y: auto; }
+.logbook .dtab th, .logbook .dtab td { padding: 3px 6px; font-size: 12.5px; }
+.logbook .dtab td:last-child { text-align: left; white-space: normal; min-width: 7em; }
+.sidepanel .why { font-size: 13px; margin: 8px 0 4px; }
+.prose.next { margin-top: 56px; }
+.sub-h { font-family: var(--display); font-weight: 700; font-stretch: 108%; font-variation-settings: "wdth" 108; font-size: 21px; color: var(--ink); margin: 0 0 10px; line-height: 1.3; }
+[hidden] { display: none !important; }
+/* ---- motion model page ---- */
+.theory { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 18px; margin: 4px 0 24px 48px; align-items: start; }
+.theory .eq { margin: 0; max-width: none; }
+.codebox { min-width: 0; }
+.codebox .code { background: var(--panel); box-shadow: 0 0 0 1px var(--line); border-radius: 10px; }
+.codebox .code-h { margin-bottom: 6px; }
+.lab .chart { margin-top: 10px; }
+.sidepanel .controls { margin-top: 12px; }
+.sidepanel .controls:first-child { margin-top: 0; }
+.sidepanel .slider { width: 100%; }
+.sidepanel .slider input { flex: 1; width: auto; min-width: 80px; }
+.sidepanel .slider > span:first-child, .sidepanel .slider { white-space: nowrap; }
+.sidepanel .presets { margin-top: 12px; }
+.sidepanel .counters { margin-top: 14px; }
+.sidepanel .fchips { margin-top: 12px; }
+.sidepanel .dtab-wrap { margin-top: 12px; }
+.sidepanel .pad-note { margin-top: 4px; }
+.closing .cmp-wrap { max-width: 1000px; }
+@media (max-width: 1000px) { .theory { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .theory { margin-left: 0; } }
+/* ---- matrix lens ---- */
+.mxsec { margin: 56px 0 0; }
+.mxsec .sub-h { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.mxsec .sub-h .lens { font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--accent); border: 1.5px solid var(--accent); border-radius: 99px; padding: 0 9px; line-height: 1.7; }
+.mxsec .prose { margin-bottom: 18px; }
+.mx-eqs { display: grid; gap: 6px; padding: 6px 4px 14px; overflow-x: auto; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+.mx-eq { display: flex; align-items: center; gap: 10px 12px; min-width: max-content; padding: 6px 2px; }
+.mx-eq .mx-lbl { font-family: var(--font); font-size: 14.5px; font-weight: 600; color: var(--ink2); width: 7.5em; flex: none; line-height: 1.4; }
+.mx-term { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; }
+.mx-name { font-family: var(--font); font-size: 13.5px; color: var(--ink3); text-align: center; line-height: 1.35; max-width: 14em; }
+.mx { display: grid; position: relative; padding: 3px 12px; gap: 2px 3px; }
+.mx::before, .mx::after { content: ""; position: absolute; top: 0; bottom: 0; width: 7px; border: 2px solid var(--ink2); }
+.mx::before { left: 0; border-right: 0; border-radius: 5px 0 0 5px; }
+.mx::after { right: 0; border-left: 0; border-radius: 0 5px 5px 0; }
+.mx-c {
+  min-width: 4.6em; padding: 5px 7px 4px; text-align: center; border-radius: 6px; font-family: var(--mono); font-size: 16px; line-height: 1.25;
+  color: var(--ink); transition: background-color .18s, opacity .18s, box-shadow .18s; cursor: default; font-variant-numeric: tabular-nums;
+}
+.mx-c small { display: block; font-family: var(--font); font-size: 12.5px; color: var(--ink3); margin-top: 1px; white-space: nowrap; }
+.mx.sm .mx-c { min-width: 3.9em; font-size: 14px; padding: 4px 4px 3px; }
+.mx.sm .mx-c small { font-size: 11.5px; }
+.mx-c.dim { opacity: .28; }
+.mx-c.h1 { background: var(--accentSoft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.mx-c.h2 { background: color-mix(in srgb, var(--tree) 17%, transparent); box-shadow: inset 0 0 0 1.5px var(--tree); }
+.mx-c.h6 { background: color-mix(in srgb, var(--tree2) 15%, transparent); box-shadow: inset 0 0 0 1.5px var(--tree2); }
+.mx-c.h3 { background: color-mix(in srgb, var(--hit) 14%, transparent); box-shadow: inset 0 0 0 1.5px var(--hit); }
+.mx-c.h4 { background: color-mix(in srgb, var(--ok) 15%, transparent); box-shadow: inset 0 0 0 1.5px var(--ok); }
+.mx-c.h5 { background: color-mix(in srgb, var(--fEKF) 15%, transparent); box-shadow: inset 0 0 0 1.5px var(--fEKF); }
+.mx-c.tip { cursor: help; }
+.mx-op { font-family: var(--mono); font-size: 22px; color: var(--ink2); padding: 0 2px; }
+.mx-hover { font-size: 15px; color: var(--ink2); min-height: 1.6em; margin: -6px 0 12px; }
+.mx-hover b { color: var(--ink); font-weight: 600; }
+.mx-calc { font-family: var(--mono); font-size: 14.5px; background: var(--paper); border-radius: 8px; padding: 9px 12px; margin-top: 10px; line-height: 1.85; overflow-x: auto; white-space: pre; color: var(--ink2); }
+.mx-calc:empty { display: none; }
+.mx-calc .t1 { color: var(--accent); font-weight: 600; } .mx-calc .t2 { color: var(--tree); font-weight: 600; }
+.mx-calc .t3 { color: var(--hit); font-weight: 600; } .mx-calc .t4 { color: var(--ok); font-weight: 600; } .mx-calc .t5 { color: var(--fEKF); font-weight: 600; }
+.mx-calc b { color: var(--ink); font-weight: 600; }
+.mx-body { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+.mx-body > * { min-width: 0; }
+.mx-body canvas.map { aspect-ratio: 16 / 10; max-width: none; }
+.mx-nav { display: flex; gap: 8px; margin: 10px 0 0; }
+.mx-side .side-note { min-height: 7.5em; font-size: 15px; line-height: 1.7; }
+.mx-side .phases li { font-size: 14.5px; }
+.mxsec .vstat { font-size: 14px; }
+.mx-side .controls { margin-top: 12px; }
+.mx-side .slider { width: 100%; white-space: nowrap; }
+.mx-side .slider input { flex: 1; width: auto; min-width: 70px; }
+.phases li { cursor: pointer; }
+.phases li:hover { background: var(--field); }
+.phases li.on:hover { background: var(--accentSoft); }
+.mx-bars { width: 100%; display: block; border-radius: 8px; background: var(--paper); }
+@media (max-width: 1000px) { .mx-body { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .mx-c { font-size: 14px; min-width: 3.8em; } .mx-eq .mx-lbl { width: 5.5em; } }
+.mx-c .sym { font-family: var(--font); font-size: 1.12em; }
+.mx-strip { display: flex; gap: 2px; margin-top: 10px; }
+.mx-strip span { flex: 1; height: 16px; border-radius: 2px; background: color-mix(in srgb, var(--ok) 55%, transparent); }
+.mx-strip span.bad { background: var(--hit); }
+.mx-strip span.cur { box-shadow: 0 0 0 2px var(--ink); position: relative; z-index: 1; }
+.mx-bh { font-family: var(--font); font-size: 13.5px; color: var(--ink3); margin: 6px 0 0; }
+.mx-bh b { color: var(--accent); font-weight: 700; margin-right: 6px; }
+.mx-blk { display: grid; gap: 6px; min-width: max-content; }
+.mx-blk.sym { padding-bottom: 10px; border-bottom: 1px dashed var(--line); margin-bottom: 4px; }
+.mx-blk.sym .mx-c { font-family: var(--font); font-size: 16.5px; }
+.mx-blk.sym .mx.sm .mx-c { font-size: 14px; min-width: 3.2em; padding: 4px 3px 3px; }
+.mx-blk.sym .mx.sm .mx-c small { font-size: 11px; }
+.mx-calc::before { display: block; font-family: var(--font); font-size: 12.5px; font-weight: 700; color: var(--ink3); margin-bottom: 2px; }
+.mx-calc.sym::before { content: "식으로"; color: var(--accent); }
+.mx-calc.num::before { content: "숫자로"; }
+.mx-calc.sym { font-family: var(--font); font-size: 15.5px; color: var(--ink); }
+/* ---- typeset key equations (MathJax SVG) ---- */
+mjx-container[jax="SVG"] { direction: ltr; }
+mjx-container[jax="SVG"][display="true"] { display: block; text-align: center; margin: 0 !important; }
+mjx-container[jax="SVG"] > svg { overflow: visible; min-height: 1px; min-width: 1px; }
+mjx-assistive-mml { position: absolute !important; top: 0; left: 0; clip: rect(1px, 1px, 1px, 1px); padding: 1px 0 0 0 !important; border: 0 !important; display: block !important; width: auto !important; overflow: hidden !important; user-select: none; }
+.tex-fb { font-family: var(--mono); font-size: 14px; white-space: pre-wrap; color: var(--ink2); }
+.keq { background: var(--panel); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 18px 22px 10px; margin: 6px 0 22px 48px; max-width: 1000px; }
+.keq-h { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; color: var(--ink); margin-bottom: 6px; }
+.keq-h .tag { background: var(--accent); color: var(--onAccent); font-size: 13.5px; font-weight: 700; padding: 3px 9px; border-radius: 6px; }
+.keq-row { display: flex; align-items: center; gap: 12px; }
+.mstage { position: relative; flex: 1; min-width: 0; overflow-x: auto; overflow-y: visible; padding: 16px 10px 10px; font-size: 21px; color: var(--ink); }
+.mstage > mjx-container { position: relative; z-index: 1; }
+.keq .mstage { font-size: 22px; }
+.keq-no { font-family: var(--mono); font-size: 15px; color: var(--ink3); flex: none; }
+.mboxes { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 0; }
+.mbox { position: absolute; border-radius: 6px; border: 1.8px solid var(--accent); background: var(--accentSoft); transition: opacity .15s; }
+.mbox.h2 { border-color: var(--tree); background: color-mix(in srgb, var(--tree) 15%, transparent); }
+.mbox.h3 { border-color: var(--hit); background: color-mix(in srgb, var(--hit) 13%, transparent); }
+.mbox.h4 { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.mbox.h5 { border-color: var(--fEKF); background: color-mix(in srgb, var(--fEKF) 14%, transparent); }
+.mbox.h6 { border-color: var(--tree2); background: color-mix(in srgb, var(--tree2) 14%, transparent); }
+.mbox.faint { opacity: .25; }
+.mbadge, .kb { display: inline-grid; place-items: center; width: 21px; height: 21px; border-radius: 50%; font-family: var(--font); font-size: 12.5px; font-weight: 700; color: var(--onAccent); background: var(--accent); flex: none; }
+.mbadge { position: absolute; left: -10px; top: -12px; z-index: 3; box-shadow: 0 0 0 2px var(--panel); }
+.h2 > .mbadge, .kb.h2 { background: var(--tree); } .h3 > .mbadge, .kb.h3 { background: var(--hit); }
+.h4 > .mbadge, .kb.h4 { background: var(--ok); } .h5 > .mbadge, .kb.h5 { background: var(--fEKF); } .h6 > .mbadge, .kb.h6 { background: var(--tree2); }
+.keq-leg { list-style: none; margin: 8px 0 0; padding: 0; border-top: 1px dashed var(--line); }
+.keq-leg li { display: flex; gap: 12px; align-items: baseline; padding: 9px 2px; border-bottom: 1px dashed var(--line); font-size: 15.5px; line-height: 1.6; color: var(--ink); }
+.keq-leg li .kb { transform: translateY(3px); }
+.keq-leg li.off { opacity: .45; }
+.keq-foot { font-size: 14px; color: var(--ink2); margin: 10px 2px 6px; line-height: 1.6; }
+.keq-foot b { color: var(--ink); }
+.keq .dtab-wrap { margin: 10px 0 6px; }
+.mx-blk.sym .mx-eq { align-items: center; min-width: 0; }
+.mx-blk.sym .mstage { padding: 14px 6px 6px; }
+.mx-blk.sym { min-width: 0; }
+.mx-leg { margin: 0 0 6px; border-top: 0; }
+.mx-leg:empty { display: none; }
+.mx-calc.sym { white-space: normal; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
+.mx-calc.sym::before { width: 100%; }
+.mx-calc.sym .cnote { font-family: var(--font); font-size: 15px; color: var(--ink2); }
+.mx-calc.sym .cmath { font-size: 19px; max-width: 100%; overflow-x: auto; }
+.cmath .t1 { color: var(--accent); } .cmath .t2 { color: var(--tree); } .cmath .t3 { color: var(--hit); } .cmath .t4 { color: var(--ok); } .cmath .t5 { color: var(--fEKF); }
+@media (max-width: 760px) { .keq { margin-left: 0; padding: 14px 12px 8px; } .keq .mstage { font-size: 17px; } .mstage { font-size: 17px; } }
+.theory { grid-template-columns: minmax(0, 1fr) !important; }
+.theory .keq { margin: 0 0 4px; max-width: none; }
+.theory .codebox { max-width: 860px; }
+.theory .eq { max-width: 860px; }
+.mx-blk.sym .mstage { font-size: 25px; padding: 16px 6px 4px; }
+.mx-blk.sym mjx-container[jax="SVG"][display="true"] { text-align: left !important; }
+.mx-blk.sym .mx-eq { padding: 0; }
+#mxfk .mx-blk.sym .mstage { font-size: 16.5px; }
+#mxj .mx-blk.sym .mstage { font-size: 16px; }
+#mx14 .mx-blk.sym .mstage { font-size: 14px; padding-top: 14px; }
+.keq { min-width: 0; } .keq-row { min-width: 0; }
+.keq-h .tag { white-space: nowrap; }
+@media (max-width: 760px) { .keq .mstage { font-size: 15px; } .keq mjx-container[jax="SVG"][display="true"] { text-align: left !important; } .keq-leg li { font-size: 14.5px; } }
+canvas.hero-canvas, .lab canvas.map { cursor: grab; }
+.lab canvas.map:active { cursor: grabbing; }
+.lab canvas.map { max-width: none; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>window.MathJax = { tex: { packages: { '[+]': ['html'] } }, svg: { fontCache: 'local', mtextInheritFont: true, scale: 1 }, options: { enableMenu: false }, startup: { typeset: false } };</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg-full.js"></script>
+</head>
+<body>
+
+<nav class="nav" aria-label="단계 이동">
+  <span class="nav-brand">양팔 계획 실습</span>
+  <ol>
+    <li><a href="#ch1"><b>1</b><span>관절 일곱 개</span></a></li>
+    <li><a href="#ch2"><b>2</b><span>구슬 충돌 모델</span></a></li>
+    <li><a href="#ch3"><b>3</b><span>IK와 팔꿈치</span></a></li>
+    <li class="part" aria-hidden="true"></li>
+    <li><a href="#ch4"><b>4</b><span>7차원 RRT</span></a></li>
+    <li><a href="#ch5"><b>5</b><span>14차원, 두 팔</span></a></li>
+    <li class="part" aria-hidden="true"></li>
+    <li><a href="#end"><b>6</b><span>정리</span></a></li>
+  </ol>
+</nav>
+
+<header class="hero" id="top">
+  <div>
+    <h1>두 팔이 서로 비켜 가는 길 찾기</h1>
+    <p>RRT 팔 실습에서는 관절 두 개짜리 팔로 C-space를 직접 눈으로 봤습니다. 실제 로봇팔은 관절이 일곱 개고, 가사 로봇은 그런 팔이 두 개예요. <b>관절각 14개가 곧 C-space의 점 하나</b>인데, 14차원은 그릴 수 없습니다. 그래도 알고리즘은 그대로예요.</p>
+    <p>연구실에서 가장 많이 쓰는 7자유도 팔인 Franka Panda 두 대를 책상에 나란히 놓고, 순기구학, 충돌 검사, 역기구학, 7차원 RRT, 14차원 양팔 계획을 차례로 만들어 봅니다. 오른쪽 그림은 페이지가 열릴 때 RRT-Connect로 실제로 계획한 경로예요.</p>
+    <div class="legend-row" aria-label="색 안내">
+      <span><i style="background:var(--tree)"></i>왼팔, 출발 쪽 트리</span>
+      <span><i style="background:var(--tree2)"></i>오른팔, 목표 쪽 트리</span>
+      <span><i style="background:var(--accent)"></i>목표와 경로</span>
+      <span><i style="background:var(--hit)"></i>충돌</span>
+    </div>
+    <a class="btn" href="#ch1" style="text-decoration:none;display:inline-block">1단계부터 시작</a>
+  </div>
+  <canvas id="hero" class="hero-canvas" role="img" aria-label="두 로봇팔이 가운데 기둥을 사이에 두고 서로 자리를 바꾸는 3D 애니메이션"></canvas>
+</header>
+
+<div class="part-head">
+  <span class="tag">1부</span>
+  <h2>팔을 계산할 수 있게 만들기</h2>
+  <p>경로 계획기는 두 가지만 물어봅니다. 관절각이 이럴 때 팔은 어디 있나(순기구학), 그리고 그 자세가 무언가에 부딪히나(충돌 검사). 목표가 손 위치로 주어지면 하나가 더 필요해요. 손이 거기 있으려면 관절각이 얼마여야 하나(역기구학).</p>
+</div>
+
+<!-- 1 -->
+<section class="chapter" id="ch1">
+  <div class="ch-head"><span class="ch-num">1</span><h2>관절 일곱 개, 손 하나</h2></div>
+  <div class="prose">
+    <p>팔은 링크와 관절이 번갈아 이어진 사슬입니다. 관절마다 좌표계를 하나씩 붙이면, ‘앞 좌표계에서 본 다음 좌표계의 위치와 방향’은 그 사이 링크의 모양(고정된 숫자)과 관절각 하나로 정해져요. 이걸 4×4 변환행렬로 쓰고 <b>어깨부터 손끝까지 차례로 곱하면</b> 손끝의 위치와 방향이 나옵니다. 그래픽스의 장면 그래프와 똑같은 계산이에요.</p>
+    <p>링크 모양을 숫자 세 개 (a, d, α)로 적는 약속이 DH 파라미터인데, 표를 직접 만들 일은 거의 없습니다. 제조사가 공개하고, MuJoCo 모델 파일이나 URDF에도 이미 들어 있어요. 여기서는 Franka가 공개한 값을 그대로 썼습니다. 중요한 건 이 계산의 결과가 <b>관절각 7개 → 손 자세</b>라는 함수라는 점입니다. 관절각 7개 묶음이 C-space의 점 하나고요.</p>
+  </div>
+  <div class="theory">
+    <div class="keq">
+    <div class="keq-h"><span class="tag">핵심</span>관절 하나의 변환과, 손끝까지 이어 곱하기</div>
+    <script type="text/tex">
+\begin{aligned}
+T_i(q_i) &= \mathrm{RotX}(\alpha_{i-1})\;\mathrm{TransX}(a_{i-1})\;\A1{\mathrm{RotZ}(q_i)}\;\mathrm{TransZ}(d_i)\\[8pt]
+T_{\text{끝}} &= T_{\text{받침}}\;\A2{T_1(q_1)\,T_2(q_2)\cdots T_7(q_7)}\;T_{\text{손}}\\[8pt]
+T &= \begin{bmatrix} \A3{R} & \A4{\mathbf p} \\ \mathbf 0 & 1 \end{bmatrix}
+\end{aligned}</script>
+    <ol class="keq-leg"><li>관절각 q가 들어가는 <b>유일한 곳</b>. 나머지 셋은 링크 모양(a, d, α)으로 정해진 상수라 표 한 장이면 끝입니다.</li><li>관절 순서대로 곱합니다. 앞에 곱해진 관절이 돌면 그 뒤에 붙은 모든 것이 함께 돌아요. q₁이 팔 전체를 돌리는 이유.</li><li>3×3 회전 부분: 세 열이 그 좌표계의 x, y, z축이 가리키는 방향. 손에서는 셋째 열이 손이 향하는 방향.</li><li>위치 부분: 그 좌표계의 원점, 손에서는 손끝의 위치.</li></ol><p class="keq-foot"><b>Franka Panda</b> (Craig 방식 DH)</p><div class="dtab-wrap"><table class="dtab"><thead><tr><th>관절</th><th>a<sub>i−1</sub> (m)</th><th>d<sub>i</sub> (m)</th><th>α<sub>i−1</sub></th><th>관절 한계</th></tr></thead><tbody>
+<tr><th>1</th><td>0</td><td>0.333</td><td>0</td><td>±166°</td></tr><tr><th>2</th><td>0</td><td>0</td><td>−90°</td><td>±101°</td></tr>
+<tr><th>3</th><td>0</td><td>0.316</td><td>+90°</td><td>±166°</td></tr><tr><th>4</th><td>0.0825</td><td>0</td><td>+90°</td><td>−176° ~ −4°</td></tr>
+<tr><th>5</th><td>−0.0825</td><td>0.384</td><td>−90°</td><td>±166°</td></tr><tr><th>6</th><td>0</td><td>0</td><td>+90°</td><td>−1° ~ 215°</td></tr>
+<tr><th>7</th><td>0.088</td><td>0</td><td>+90°</td><td>±166°</td></tr><tr><th>플랜지</th><td>0</td><td>0.107</td><td>0</td><td></td></tr>
+<tr><th>손끝</th><td>0</td><td>0.1034</td><td>0</td><td>z축으로 −45° 돌림</td></tr></tbody></table></div>
+  </div>
+    <div class="codebox"><div class="code-h">파이썬</div><pre class="src">import numpy as np
+PI = np.pi
+# (a_{i-1}, d_i, alpha_{i-1})
+PANDA = [(0, 0.333, 0), (0, 0, -PI/2), (0, 0.316, PI/2),
+         (0.0825, 0, PI/2), (-0.0825, 0.384, -PI/2),
+         (0, 0, PI/2), (0.088, 0, PI/2)]
+
+def link_T(a, d, al, q):
+    ca, sa, cq, sq = np.cos(al), np.sin(al), np.cos(q), np.sin(q)
+    return np.array([[cq,    -sq,     0,   a],
+                     [sq*ca,  cq*ca, -sa, -sa*d],
+                     [sq*sa,  cq*sa,  ca,  ca*d],
+                     [0,      0,      0,   1]])
+
+def fk(T_base, q):
+    frames, T = [T_base], T_base
+    for (a, d, al), qi in zip(PANDA, q):
+        T = T @ link_T(a, d, al, qi)     # 차례로 곱한다
+        frames.append(T)
+    T = T @ link_T(0, 0.107, 0, 0)         # 플랜지
+    T = T @ link_T(0, 0.1034, 0, -PI/4)    # 손끝
+    frames.append(T)
+    return frames    # 위치 T[:3, 3], 손 방향 T[:3, 2]
+
+# MuJoCo라면 mj_kinematics() 뒤 data.xpos, data.xmat에
+# 같은 값이 이미 계산되어 있다.</pre></div>
+  </div>
+  <div class="lab" id="lab1"></div>
+  <div class="after">
+    <div class="try"><h3>해 볼 것</h3><ul>
+      <li>q₁만 움직여 보세요. 팔 전체가 받침대 축을 중심으로 돕니다. q₁은 다른 모든 변환의 앞에 곱해지니까요. 이번엔 q₇만 움직이면 손만 제자리에서 돕니다.</li>
+      <li>[준비 자세]의 손끝 위치가 (0.307, 0, 0.487) m입니다. Franka 문서의 값과 같아요. 숫자가 맞는지 확인하는 건 FK를 직접 짤 때 가장 먼저 할 일입니다.</li>
+      <li>[무작위]를 몇 번 눌러 보세요. 관절 한계 안에서 아무렇게나 뽑은 자세 중 상당수가 책상을 뚫거나 자기 몸을 뚫습니다. 다음 장의 충돌 검사가 필요한 이유예요.</li>
+    </ul></div>
+    <div class="key"><h3>핵심</h3><p>순기구학은 ‘변환을 차례로 곱하기’ 하나뿐입니다. 결과는 관절각 7개를 받아 손 자세를 돌려주는 함수이고, 플래너는 이 함수를 수만 번 부르면서 팔이 어디 있는지 확인해요. 그래서 빠르고 정확하게 짜는 게 중요합니다.</p></div>
+  </div>
+
+  <div class="mxsec">
+    <div class="prose">
+      <h3 class="sub-h"><span class="lens">행렬로 보기</span>4×4 행렬 아홉 장을 곱하면 손이 나온다</h3>
+      <p>순기구학은 결국 <b>4×4 행렬을 차례로 곱하는 일</b>입니다. 행렬 한 장은 좌표계 하나를 담고 있어요. 어느 칸이 축의 방향이고 어느 칸이 위치인지, 관절각 q는 어느 칸에 들어가는지만 알면 행렬 곱셈이 “링크를 하나씩 이어 붙이는 것”으로 보입니다.</p>
+      <p>단계를 넘기면 그 단계에서 볼 칸이 색으로 강조되고, 3D 그림에서 같은 색 화살표가 그 칸들이 실제로 무엇인지 보여 줍니다. 칸에 마우스를 올리면 뜻이 나와요.</p>
+    </div>
+    <div id="mxfk"></div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="chapter" id="ch2">
+  <div class="ch-head"><span class="ch-num">2</span><h2>몸을 구슬로 감싸기</h2></div>
+  <div class="prose">
+    <p>2관절 팔 실습에서는 링크가 선분이라 충돌 검사가 쉬웠습니다. 실제 팔은 굵은 3D 덩어리예요. 정확한 메시끼리 겹침을 검사하는 방법도 있지만 느려서, 경로 계획에서는 흔히 <b>팔을 구 여러 개로 감싸고</b> 구끼리, 구와 상자끼리만 검사합니다. 구 두 개가 겹치는지는 중심 사이 거리가 반지름 합보다 작은지 보면 되고, 구와 상자는 상자 안에서 구 중심에 가장 가까운 점까지의 거리를 보면 돼요.</p>
+    <p>여기서는 관절 원점 사이를 잇는 캡슐마다 반지름보다 촘촘하게 구를 깔아, 팔 하나를 구 24개로 감쌌습니다(바닥에 붙은 받침대는 빼고). 구 하나가 실제 팔보다 조금 크게 감싸니 <b>보수적</b>이에요. 검사가 ‘충돌 아님’이라고 하면 정말 안 부딪히지만, 아슬아슬하게 지나갈 수 있는 틈은 막혔다고 볼 수 있습니다. GPU로 수천 개 자세를 한꺼번에 검사하는 NVIDIA cuRobo 같은 최신 플래너도 이 구 근사를 씁니다.</p>
+    <p>두 팔이 있으면 검사가 세 종류가 됩니다. 각 팔과 장애물, 각 팔과 책상, 그리고 <b>왼팔과 오른팔</b>. 마지막 것 때문에 두 팔의 계획을 따로 떼어 생각할 수 없어요. 여기서는 단순하게 하려고 한 팔이 자기 몸에 부딪히는 자기 충돌은 빼고, 관절 한계로만 막았습니다.</p>
+  </div>
+  <div class="theory">
+    <div class="keq">
+    <div class="keq-h"><span class="tag">핵심</span>구로 감싼 몸의 충돌 검사</div>
+    <script type="text/tex">
+\begin{aligned}
+\text{구–구}\quad & \A1{\lVert \mathbf c_1 - \mathbf c_2 \rVert < r_1 + r_2}\\[6pt]
+\text{구–상자}\quad & \A2{\mathbf p = \mathrm{clip}(\mathbf c,\; \mathbf b_{\min},\; \mathbf b_{\max})}, \qquad \lVert \mathbf c - \mathbf p \rVert < r\\[6pt]
+\text{구–책상}\quad & \A3{c_z - r < 0}
+\end{aligned}</script>
+    <ol class="keq-leg"><li>두 중심 사이 거리가 두 반지름의 합보다 작으면 겹칩니다. 구 두 개의 검사는 이 비교 하나예요.</li><li>축마다 구의 중심을 상자 범위 안으로 잘라 넣으면, 상자 안에서 구와 가장 가까운 점 p가 됩니다. 그 거리를 반지름과 비교.</li><li>책상 윗면이 z = 0이니, 구의 바닥(c<sub>z</sub> − r)이 0 아래로 내려가면 충돌.</li></ol><p class="keq-foot">한 자세 검사 비용(팔 2개, 상자 6개): 구 24 × 2 × (상자 6 + 책상 1) ≈ 340번, 왼팔 구 24 × 오른팔 구 24 ≈ 580번 → <b>거리 계산 약 900번</b>. 플래너는 이걸 수천~수만 번 부릅니다.</p>
+  </div>
+    <div class="codebox"><div class="code-h">파이썬</div><pre class="src">def sphere_box_hit(c, r, bmin, bmax):
+    p = np.clip(c, bmin, bmax)       # 상자 안 최근접점
+    return np.sum((c - p)**2) &lt; r*r
+
+def arm_spheres(frames, caps):
+    out = []
+    for i, j, r in caps:             # 두 프레임 원점 사이 캡슐
+        a, b = frames[i][:3, 3], frames[j][:3, 3]
+        n = max(1, int(np.ceil(np.linalg.norm(b - a) / (0.9*r))))
+        for t in np.linspace(0, 1, n + 1):
+            out.append((a + (b - a)*t, r))
+    return out
+
+def is_free(qL, qR, boxes):
+    SL = arm_spheres(fk(T_L, qL), CAPS)
+    SR = arm_spheres(fk(T_R, qR), CAPS)
+    for c, r in SL + SR:
+        if c[2] - r &lt; 0:                       # 책상
+            return False
+        if any(sphere_box_hit(c, r, *b) for b in boxes):
+            return False
+    for c1, r1 in SL:                          # 팔 대 팔
+        for c2, r2 in SR:
+            if np.sum((c1 - c2)**2) &lt; (r1 + r2)**2:
+                return False
+    return True</pre></div>
+  </div>
+  <div class="lab" id="lab2"></div>
+  <div class="after">
+    <div class="try"><h3>해 볼 것</h3><ul>
+      <li>예시 버튼 세 개를 차례로 눌러 보세요. 선반, 오른팔, 책상과 부딪히는 자세에서 각각 어느 구가 빨개지는지 봅니다.</li>
+      <li>[팔 모양]을 끄면 플래너가 실제로 보는 세상만 남습니다. 구 사이의 틈이 실제 팔보다 넓거나 좁은 곳을 찾아보세요.</li>
+      <li>[선반 판에 닿기]에서 q₄를 조금씩 바꿔 빨간 구가 사라지는 경계를 찾아보세요. 그 경계가 C-space 장애물의 표면입니다. 2관절 실습의 C-space 그림에서 장애물 테두리에 해당해요.</li>
+    </ul></div>
+    <div class="key"><h3>핵심</h3><p>플래너에게 충돌 검사는 ‘이 점이 C-space 장애물 안인가’라는 예/아니오 질문입니다. 장애물의 모양을 C-space에 미리 그려 둘 수 없으니(14차원이니까요), 필요할 때마다 순기구학으로 팔을 놓아 보고 구로 검사합니다. 경로 계획 시간의 대부분이 여기에 쓰여요.</p></div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="chapter" id="ch3">
+  <div class="ch-head"><span class="ch-num">3</span><h2>손에서 관절로: IK와 남는 자유도</h2></div>
+  <div class="prose">
+    <p>목표는 보통 ‘컵 위 10 cm에서 손을 아래로’처럼 손 자세로 주어집니다. 플래너는 C-space에서 일하니 목표도 관절각으로 바꿔야 해요. 이게 <b>역기구학</b>(IK)입니다. 7관절 팔은 식을 풀어 답을 바로 쓰기 어려워서, 숫자로 조금씩 다가가는 방법을 씁니다. 지금 손과 목표의 차이를 재고, ‘관절을 조금 움직이면 손이 얼마나 움직이는지’를 담은 <b>야코비안</b> J로 그 차이를 줄이는 관절 변화를 구해 한 걸음 가는 걸 반복해요. 최적화의 경사하강과 같은 생각입니다.</p>
+    <p>J는 6×7이라 역행렬이 없으니 최소제곱으로 풉니다. 그냥 풀면 팔이 거의 다 펴진 특이 자세 근처에서 관절이 폭주해서, 작은 값 λ²을 더해 걸음을 누그러뜨리는 <b>감쇠 최소제곱</b>(DLS)을 써요. 손 위치 3개와 방향 3개를 맞추는 데 관절이 7개니 자유도가 <b>하나 남습니다</b>. 손을 그대로 둔 채 팔꿈치를 원을 그리며 돌릴 수 있다는 뜻이에요. 이 남는 방향(영공간)으로는 마음대로 움직여도 손이 안 흔들리니, 장애물을 피하거나 관절 한계에서 멀어지는 데 씁니다.</p>
+  </div>
+  <div class="theory">
+    <div class="keq">
+    <div class="keq-h"><span class="tag">핵심</span>감쇠 최소제곱 IK 한 걸음</div>
+    <script type="text/tex">
+\begin{aligned}
+\A1{\mathbf e} &= \Big[\; \mathbf p_{\text{목표}} - \mathbf p \;,\;\; \tfrac12\,(\mathbf z \times \mathbf z_{\text{목표}}) \;\Big]\\[6pt]
+\A2{J_{:,j}} &= \Big[\; \mathbf z_j \times (\mathbf p - \mathbf o_j) \;;\;\; \mathbf z_j \;\Big]\\[6pt]
+\A3{\Delta\mathbf q} &= J^{+}\,\mathbf e, \qquad J^{+} = J^{\mathsf T}\,(JJ^{\mathsf T} + \A4{\lambda^2 I})^{-1}\\[6pt]
+\Delta\mathbf q &\mathrel{+}= \A5{(I - J^{+}J)}\;k\,(\mathbf q_{\text{선호}} - \mathbf q)
+\end{aligned}</script>
+    <ol class="keq-leg"><li>손이 가야 할 만큼(위치 차이)과 돌아야 할 만큼(손 방향 차이)을 한 줄로 모은 오차.</li><li>관절 j를 돌렸을 때 손이 움직이는 속도(축 × 손까지의 거리)와 도는 축. 이걸 일곱 관절 모아 놓은 표가 야코비안 J.</li><li>e를 만드는 관절 변화 중 가장 작은 것. J를 “거꾸로” 쓰는 계산입니다.</li><li>팔이 다 펴져 J가 납작해져도 Δq가 폭주하지 않게 하는 작은 쿠션. λ = 0.08.</li><li>손을 건드리지 않는 방향만 남기는 필터(영공간). 이 방향으로 팔꿈치만 돌립니다.</li></ol><p class="keq-foot">반복: <b>q ← clip(q + Δq, 관절 한계)</b>, 오차 e가 충분히 작아질 때까지.</p>
+  </div>
+    <div class="codebox"><div class="code-h">파이썬</div><pre class="src">def jacobian(F):                       # F = fk(...) 의 프레임들
+    p = F[-1][:3, 3]
+    J = np.zeros((6, 7))
+    for j in range(7):
+        z, o = F[j+1][:3, 2], F[j+1][:3, 3]
+        J[:3, j] = np.cross(z, p - o)  # 손끝 선속도
+        J[3:, j] = z                   # 손 각속도
+    return J
+
+def ik_step(q, p_goal, z_goal, q_pref, lam=0.08, k=0.3):
+    F = fk(T_base, q)
+    p, z = F[-1][:3, 3], F[-1][:3, 2]
+    e = np.r_[p_goal - p, 0.5*np.cross(z, z_goal)]
+    J = jacobian(F)
+    J_pinv = J.T @ np.linalg.inv(J @ J.T + lam**2*np.eye(6))
+    dq = J_pinv @ e
+    N = np.eye(7) - J_pinv @ J         # 영공간 투영
+    dq += N @ (k * (q_pref - q))
+    return np.clip(q + dq, Q_MIN, Q_MAX)
+
+# MuJoCo: mj_jacSite()가 J의 두 블록을 바로 준다.
+# 라이브러리로는 mink(MuJoCo용 미분 IK)가 이 방식이다.</pre></div>
+  </div>
+  <div class="lab" id="lab3"></div>
+  <div class="after">
+    <div class="try"><h3>해 볼 것</h3><ul>
+      <li>[한 걸음씩]으로 두고 목표 슬라이더를 크게 옮겨 보세요. 손이 목표로 곧장 가지 않고 휘어 갑니다. 각 걸음은 ‘지금 자세에서’ 가장 효율적인 방향일 뿐이에요.</li>
+      <li>손이 목표에 닿은 뒤 [팔꿈치 돌리기]를 움직여 보세요. 손은 그대로인데 팔꿈치가 청록 원호를 그립니다. 이게 7번째 자유도예요.</li>
+      <li>목표를 (0.5, 0.15, 0.35)처럼 어깨 바로 앞 높은 곳으로 옮기고 팔꿈치를 돌려 보세요. 이번엔 팔꿈치가 거의 안 움직이고 q₁과 q₃만 서로 반대로 돕니다. 위팔이 거의 수직이면 두 관절의 축이 겹쳐서, 남는 자유도가 팔 모양을 바꾸지 못해요. 특이 자세의 한 모습입니다.</li>
+      <li>[다른 해 찾기]를 여러 번 누르면 같은 목표에 전혀 다른 자세로 도착합니다. 플래너 입장에서는 목표 자세가 하나가 아니라는 뜻이에요. 다음 장의 목표 자세(반투명 팔)도 이 중 충돌 없는 하나를 고른 것입니다.</li>
+      <li>목표 x를 0.85, z를 0.9로 올려 팔이 닿지 않게 해 보세요. 오차가 줄다가 멈추고, 팔은 목표 쪽으로 쭉 뻗은 자세에서 섭니다.</li>
+    </ul></div>
+    <div class="key"><h3>핵심</h3><p>IK는 ‘오차를 줄이는 방향으로 한 걸음’의 반복입니다. 답이 여러 개일 수도, 없을 수도 있고, 어디서 출발하느냐에 따라 다른 답에 도착해요. 7관절 팔의 남는 자유도는 손을 움직이지 않고 팔 모양을 바꾸는 데 쓸 수 있어서, 좁은 곳에서 팔을 다룰 때 큰 도움이 됩니다.</p></div>
+  </div>
+
+  <div class="mxsec">
+    <div class="prose">
+      <h3 class="sub-h"><span class="lens">행렬로 보기</span>야코비안: 관절 하나가 손에 주는 효과를 모은 표</h3>
+      <p>위 실습의 IK는 매 반복마다 행렬 두 개를 씁니다. <b>야코비안 J</b>는 “관절을 조금 돌리면 손이 어떻게 움직이나”를 관절마다 한 열씩 적은 6×7 표이고, <b>J⁺</b>는 그 표를 거꾸로 써서 “손을 이만큼 옮기려면 관절을 얼마나 돌려야 하나”를 계산합니다. 열이 일곱 개인데 손의 움직임은 여섯 숫자라서 하나가 남는데, 그게 팔꿈치 회전이에요.</p>
+    </div>
+    <div id="mxj"></div>
+  </div>
+</section>
+
+<div class="part-head">
+  <span class="tag">2부</span>
+  <h2>고차원 C-space에서 길 찾기</h2>
+  <p>이제 재료가 다 모였습니다. 순기구학과 충돌 검사가 ‘이 점은 자유 공간인가’에 답하고, IK가 목표 점을 줍니다. RRT는 2관절 팔에서 했던 것과 한 줄도 다르지 않아요. 벡터가 2개에서 7개, 14개로 길어졌을 뿐입니다.</p>
+</div>
+
+<!-- 4 -->
+<section class="chapter" id="ch4">
+  <div class="ch-head"><span class="ch-num">4</span><h2>팔 하나: 7차원 RRT-Connect</h2></div>
+  <div class="prose">
+    <p>출발 자세와 목표 자세가 7차원 공간의 두 점입니다. 관절 한계 안에서 무작위로 점을 뽑고, 트리에서 가장 가까운 노드부터 그 점을 향해 ε만큼 가 보고, 가는 길이 충돌 없으면 노드로 붙입니다. 가는 길은 관절 공간의 직선을 0.04 rad 간격으로 잘라 모두 검사해요. 2관절 실습에서 본 그대로입니다.</p>
+    <p>차원이 높아지면 두 가지가 달라집니다. 첫째, 공간이 넓어서 <b>목표 근처에 우연히 닿기가 훨씬 어렵습니다</b>. 목표 쪽으로 가끔 끌어당기는(목표 편향) 단일 트리 RRT가 좁은 틈 앞에서 오래 헤매는 이유예요. 양쪽에서 트리를 키워 서로를 향해 뻗는 <b>RRT-Connect</b>는 이 문제에 훨씬 강해서, MoveIt의 기본 플래너도 오랫동안 RRT-Connect였습니다. 둘째, 트리를 그릴 수 없습니다. 그래서 이 그림은 각 노드의 <b>손끝 위치</b>만 3D에 찍었어요. 그림자처럼 정보를 잃은 투영이라, 손끝 선이 서로 겹치거나 장애물을 지나는 것처럼 보여도 실제 7차원에서는 떨어져 있을 수 있습니다.</p>
+  </div>
+  <div class="theory">
+    <div class="keq">
+    <div class="keq-h"><span class="tag">핵심</span>7차원 C-space에서 쓰는 세 가지 계산</div>
+    <script type="text/tex">
+\begin{aligned}
+\A1{d(\mathbf q_a, \mathbf q_b)} &= \lVert \mathbf q_a - \mathbf q_b \rVert = \sqrt{\textstyle\sum_{k=1}^{7} (q_{a,k} - q_{b,k})^2}\\[8pt]
+\A2{\mathbf q_{\text{new}}} &= \mathbf q_{\text{near}} + \min\!\Big(1,\, \frac{\varepsilon}{\lVert \mathbf q - \mathbf q_{\text{near}} \rVert}\Big)\,(\mathbf q - \mathbf q_{\text{near}})\\[8pt]
+\A3{n_{\text{검사}}} &= \Big\lceil\, \max_k |\Delta q_k| \;/\; 0.04 \,\Big\rceil
+\end{aligned}</script>
+    <ol class="keq-leg"><li>C-space의 거리: 관절각 차이의 제곱합에 루트. “가장 가까운 노드”를 고를 때 노드마다 이 계산을 합니다.</li><li>가장 가까운 노드에서 표본 쪽으로 <b>최대 ε만큼만</b> 나아간 새 점(EXTEND).</li><li>그 한 걸음이 안전한지 보려고 검사하는 점의 수. 가장 많이 움직이는 관절이 정합니다.</li></ol>
+  </div>
+    <pre class="eq"><i>EXTEND(T, q)</i>
+   q<sub>near</sub> ← T에서 q에 가장 가까운 노드
+   q<sub>new</sub>  ← q<sub>near</sub>에서 q 쪽으로 최대 ε
+   q<sub>near</sub>→q<sub>new</sub> 직선을 0.04 rad 간격으로 검사 → 모두 자유면 T에 추가
+
+<i>RRT-Connect</i>
+   반복:  q<sub>rand</sub> ← 무작위 표본
+          EXTEND(A, q<sub>rand</sub>) 로 q<sub>new</sub>를 만들면
+          B를 q<sub>new</sub> 쪽으로 막힐 때까지 계속 EXTEND
+          B가 q<sub>new</sub>에 닿으면 → 두 트리를 이어 경로 완성
+          A ↔ B 역할 바꾸기</pre>
+    <div class="codebox"><div class="code-h">파이썬</div><pre class="src">def edge_free(qa, qb, free, res=0.04):
+    n = int(np.ceil(np.max(np.abs(qb - qa)) / res))
+    return all(free(qa + (qb - qa)*t)
+               for t in np.linspace(0, 1, n + 1)[1:])
+
+def extend(T, q, free, eps=0.35):
+    i = T.nearest(q)
+    d = np.linalg.norm(q - T.q[i])
+    q_new = q if d &lt;= eps else T.q[i] + (q - T.q[i])*eps/d
+    if not edge_free(T.q[i], q_new, free):
+        return 'trapped', None
+    return ('reached' if d &lt;= eps else 'advanced'), T.add(q_new, i)
+
+def rrt_connect(q_start, q_goal, free, max_iter=5000):
+    A, B = Tree(q_start), Tree(q_goal)
+    for _ in range(max_iter):
+        q_rand = np.random.uniform(Q_MIN, Q_MAX)
+        st, j = extend(A, q_rand, free)
+        if st != 'trapped':
+            while (r := extend(B, A.q[j], free))[0] == 'advanced':
+                pass
+            if r[0] == 'reached':
+                return join(A, j, B, r[1])   # 두 트리를 잇는다
+        A, B = B, A
+    return None</pre></div>
+  </div>
+  <div class="lab" id="lab4"></div>
+  <div class="after">
+    <div class="try"><h3>해 볼 것</h3><ul>
+      <li>[아래 칸]에서 RRT-Connect로 몇 번 계획해 보세요. 매번 노드 수와 경로가 다릅니다. 무작위 표본에 기대는 방법이라 그래요.</li>
+      <li>같은 문제를 [RRT (목표 편향 10%)]로 바꾸고 [빠르게]로 돌려 보세요. 트리가 책상 위를 넓게 덮으며 노드가 수천 개로 늘어나도 아래 칸 입구를 잘 못 찾습니다. 노드 6,000개에서 포기하게 해 두었어요. [위 칸]과도 비교해 보세요.</li>
+      <li>ε를 0.1로 줄이면 한 걸음이 짧아 노드가 많이 필요하고, 0.8로 늘리면 걸음마다 충돌로 막히는 일이 늘어납니다. 충돌 검사 횟수를 비교해 보세요.</li>
+      <li>계획이 끝난 경로는 지그재그입니다. [경로 다듬기]를 누르면 관절 공간 길이와 실행 시간이 확 줄어요.</li>
+    </ul></div>
+    <div class="key"><h3>핵심</h3><p>RRT 계열은 차원에 거의 상관없이 같은 코드로 돌아갑니다. 바뀌는 건 충돌 검사가 비싸지고 공간이 넓어진다는 것뿐이에요. 그래서 고차원에서는 양쪽에서 자라는 RRT-Connect처럼 ‘목표를 빨리 찾는’ 구조와, 찾은 뒤 다듬는 후처리가 결과를 크게 좌우합니다.</p></div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="chapter" id="ch5">
+  <div class="ch-head"><span class="ch-num">5</span><h2>팔 두 개: 14차원과 서로 비켜 주기</h2></div>
+  <div class="prose">
+    <p>두 팔을 함께 움직이는 가장 정직한 방법은 두 팔의 관절각을 이어 붙여 <b>14차원 점 하나</b>로 보는 것입니다. 충돌 검사에 왼팔-오른팔 검사가 들어가니, 이 공간의 자유 영역은 ‘두 팔이 동시에 그 자세일 때 아무것도 안 부딪히는 조합’이에요. 플래너 코드는 4장과 똑같고 벡터 길이만 14입니다.</p>
+    <p>더 쉬워 보이는 방법은 <b>한 팔씩 차례로</b> 계획하는 것입니다. 왼팔을 먼저 옮기는 동안 오른팔은 출발 자세로 가만히 있는 장애물로 보고, 왼팔이 도착하면 그 자세를 장애물로 놓고 오른팔을 계획해요. 각각은 7차원이라 빠르지만, 이 방식은 <b>완전하지 않습니다</b>. 두 팔이 서로 길을 내줘야만 풀리는 문제에서는, 한쪽이 가만히 서 있는 동안 다른 쪽이 갈 길이 아예 없을 수 있어요.</p>
+    <p>찾은 경로는 다듬은 뒤 시간을 붙여야 실행할 수 있습니다. 여기서는 구간마다 ‘가장 많이 움직이는 관절이 최대 속도의 절반으로 움직이는 시간’을 배정하고, 구간 안에서는 부드럽게 가속·감속하게 했어요. 실제 시스템은 가속도 한계까지 넣은 시간 최적화(예: TOPP-RA)를 씁니다.</p>
+  </div>
+  <div class="theory">
+    <div class="keq">
+    <div class="keq-h"><span class="tag">핵심</span>두 팔을 한 점으로</div>
+    <script type="text/tex">
+\begin{aligned}
+\A1{\mathbf x} &= (\mathbf q_L,\; \mathbf q_R) \in \mathbb R^{14}\\[6pt]
+\A2{\mathrm{free}(\mathbf x)} &= \text{책상} \;\wedge\; \text{장애물} \;\wedge\; \text{팔끼리}\\[6pt]
+\A3{\Delta t_{\text{구간}}} &= \max_k \frac{|\Delta q_k|}{0.5\; v_{\max,k}}
+\end{aligned}</script>
+    <ol class="keq-leg"><li>두 팔의 관절각 14개를 한 줄로 묶은 점. 플래너는 이 점 하나를 움직입니다.</li><li>책상, 장애물, 그리고 <b>팔끼리</b>까지 모두 안 부딪혀야 자유. 팔끼리 검사 때문에 두 팔을 따로 풀 수 없어요.</li><li>경로의 구간마다 가장 많이 움직이는 관절이 최대 속도의 절반으로 움직이게 시간을 붙입니다.</li></ol>
+  </div>
+    <pre class="eq"><i>한 팔씩</i>          ① q<sub>L</sub>: 출발 → 목표      (q<sub>R</sub> = 출발 자세로 고정)
+                 ② q<sub>R</sub>: 출발 → 목표      (q<sub>L</sub> = 목표 자세로 고정)
+                 <i>빠르지만, 서로 비켜 줘야 하는 문제는 못 푼다</i>
+
+<i>다듬기</i>          경로 위 두 점 i &lt; j를 뽑아
+                 직선 i→j가 자유면 그 사이 점들을 지운다  <i>(200번 반복)</i>
+
+<i>시간 붙이기</i>     Δt<sub>구간</sub> = max<sub>k</sub> |Δq<sub>k</sub>| / (0.5 · v<sub>max,k</sub>)</pre>
+    <div class="codebox"><div class="code-h">파이썬</div><pre class="src"># 동시에: 14차원 점 하나
+free14 = lambda x: is_free(x[:7], x[7:], boxes)
+path = rrt_connect(np.r_[qL0, qR0], np.r_[qL1, qR1], free14)
+
+# 한 팔씩 차례로
+pathL = rrt_connect(qL0, qL1, lambda q: is_free(q, qR0, boxes))
+pathR = rrt_connect(qR0, qR1, lambda q: is_free(qL1, q, boxes))
+
+def shortcut(path, free, iters=200):
+    for _ in range(iters):
+        i, j = sorted(np.random.choice(len(path), 2, replace=False))
+        if j - i > 1 and edge_free(path[i], path[j], free):
+            path = path[:i+1] + path[j:]
+    return path
+
+def segment_time(qa, qb, vmax):
+    return np.max(np.abs(qb - qa) / (0.5*vmax))  # 가장 바쁜 관절 기준</pre></div>
+  </div>
+  <div class="lab" id="lab5"></div>
+  <div class="after">
+    <div class="try"><h3>해 볼 것</h3><ul>
+      <li>[팔 교차]에서 [동시에]로 계획해 보세요. 두 손이 기둥을 사이에 두고 높이를 달리해서 엇갈립니다. 한 손이 지나가는 동안 다른 손이 잠깐 들리거나 물러나는 순간을 찾아보세요.</li>
+      <li>같은 장면을 [한 팔씩 차례로]로 바꾸면 바로 실패합니다. 출발 자세로 서 있는 오른팔이 왼팔의 목표 자리를 차지하고 있어서, 오른팔이 비켜 주지 않는 한 왼팔은 들어갈 곳이 없거든요.</li>
+      <li>[선반 두 칸]과 [벽 넘기]는 한 팔씩 해도 풀립니다. 이때는 두 방식의 노드 수와 실행 시간을 비교해 보세요. 한 팔씩이 더 빨리 계획되지만, 두 팔이 동시에 움직이지 않아 실행은 더 오래 걸립니다.</li>
+      <li>아래 관절각 그래프에서 [경로 다듬기] 전후를 비교해 보세요. 다듬기 전에는 14개 선이 모두 덜컹거리고, 다듬은 뒤에는 몇 개의 곧은 구간만 남습니다.</li>
+    </ul></div>
+    <div class="key"><h3>핵심</h3><p>두 팔을 하나의 14차원 점으로 보면 ‘서로 비켜 주는’ 움직임이 저절로 나옵니다. 팔을 나눠 계획하면 빠르지만 풀 수 있는 문제를 놓칠 수 있어요. 다만 차원이 높을수록 계획이 어려워지니, 실제 시스템은 두 방식을 섞거나(먼저 따로 해 보고 안 되면 함께), 학습한 정책에게 이 부분을 맡기기도 합니다.</p></div>
+  </div>
+
+  <div class="mxsec">
+    <div class="prose">
+      <h3 class="sub-h"><span class="lens">행렬로 보기</span>14차원 공간의 점은 숫자 14개의 한 줄</h3>
+      <p>14차원은 그릴 수 없지만, 계산은 2차원과 똑같습니다. 점은 숫자 한 줄, 거리는 칸별 차이의 제곱합, 직선은 칸별로 같은 비율 섞기예요. RRT와 RRT-Connect가 하는 계산은 이 세 가지가 전부라서, 차원이 늘어도 코드는 그대로이고 <b>계산량과 공간의 넓이</b>만 늘어납니다.</p>
+    </div>
+    <div id="mx14"></div>
+  </div>
+</section>
+
+<section class="closing" id="end">
+  <h2>정리</h2>
+  <ol>
+    <li><b>순기구학은 변환을 차례로 곱하는 것이다.</b> 관절각 7개를 손 자세로 바꾸는 함수이고, 플래너는 이 함수를 수만 번 부른다.</li>
+    <li><b>충돌 검사는 C-space 장애물 안인지 묻는 예/아니오 질문이다.</b> 고차원에서는 장애물을 미리 그릴 수 없으니 필요할 때마다 팔을 놓아 보고, 빠르게 하려고 구로 근사한다.</li>
+    <li><b>IK는 오차를 줄이는 한 걸음의 반복이다.</b> 답이 여럿일 수 있고, 7관절 팔의 남는 자유도는 손을 그대로 둔 채 팔 모양을 바꾸는 데 쓴다.</li>
+    <li><b>RRT는 차원과 상관없이 같은 코드다.</b> 차원이 높아지면 양쪽에서 자라는 RRT-Connect와 다듬기 같은 후처리가 중요해진다.</li>
+    <li><b>두 팔은 하나의 14차원 점으로 볼 때 서로 비켜 줄 수 있다.</b> 나눠서 계획하면 빠르지만 풀 수 있는 문제를 놓친다.</li>
+  </ol>
+  <div class="pick">
+    <div><b>실제로 쓰는 도구</b>ROS 2의 MoveIt 2가 OMPL 라이브러리의 RRT-Connect 등 여러 플래너와 충돌 검사, 시간 최적화를 묶어 줍니다. GPU를 쓰는 cuRobo는 이 페이지처럼 구로 감싼 팔을 수천 개 자세로 한꺼번에 검사해요.</div>
+    <div><b>우리 가사 로봇으로</b>바퀴 달린 몸통에 7자유도 팔 두 개면, 몸통 위치까지 합쳐 17차원입니다. 접시를 집는 동안 몸통은 세워 두고 팔만 계획하는 식으로 차원을 나누는 게 흔한 출발점이에요.</div>
+    <div><b>LLM과 학습 정책 사이에서</b>LLM이 ‘접시를 들어 선반 아래 칸에’를 정하면, IK가 손 목표를 관절 목표로 바꾸고 플래너가 그 사이 길을 찾습니다. 문 손잡이처럼 접촉이 많은 동작은 RL이나 모방학습 정책이 맡고요.</div>
+  </div>
+  <p>2관절 RRT 실습에서 C-space 그림으로 본 모든 것, 장애물의 모양, 트리가 자라는 방식, 다듬기가 여기서도 그대로 일어나고 있습니다. 다만 우리 눈에 보이지 않을 뿐이에요. 직접 만든 MuJoCo 시뮬레이터에서는 충돌 검사를 MuJoCo에 맡기고(mj_forward 뒤 접촉 목록 확인) 이 페이지의 RRT-Connect 코드를 그대로 얹어 볼 수 있습니다.</p>
+</section>
+<script>
+/*ENGINE-START*/
+// ===================================================================
+// engine: Franka Panda kinematics, sphere collision, IK, RRT / RRT-Connect (no DOM)
+// units: metres, radians. world z up, both arms face +x.
+// ===================================================================
+const PI = Math.PI, TAU = 2 * PI;
+const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+
+// modified DH (Craig): T_i = RotX(alpha_{i-1}) · TransX(a_{i-1}) · RotZ(q_i) · TransZ(d_i)
+const PANDA_DH = [
+  [0, 0.333, 0], [0, 0, -PI / 2], [0, 0.316, PI / 2], [0.0825, 0, PI / 2],
+  [-0.0825, 0.384, -PI / 2], [0, 0, PI / 2], [0.088, 0, PI / 2],
+];
+const FLANGE_D = 0.107, HAND_D = 0.1034;
+const QMIN = [-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973];
+const QMAX = [2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973];
+const QREADY = [0, -PI / 4, 0, -3 * PI / 4, 0, PI / 2, PI / 4];
+const VMAX = [2.175, 2.175, 2.175, 2.175, 2.61, 2.61, 2.61];
+
+// 3x4 transforms as flat arrays [r00 r01 r02 px  r10 r11 r12 py  r20 r21 r22 pz]
+function tmul(A, B) {
+  const C = new Array(12);
+  for (let i = 0; i < 3; i++) {
+    const a0 = A[i * 4], a1 = A[i * 4 + 1], a2 = A[i * 4 + 2];
+    C[i * 4] = a0 * B[0] + a1 * B[4] + a2 * B[8];
+    C[i * 4 + 1] = a0 * B[1] + a1 * B[5] + a2 * B[9];
+    C[i * 4 + 2] = a0 * B[2] + a1 * B[6] + a2 * B[10];
+    C[i * 4 + 3] = a0 * B[3] + a1 * B[7] + a2 * B[11] + A[i * 4 + 3];
+  }
+  return C;
+}
+function dhT(a, d, al, q) {
+  const cq = Math.cos(q), sq = Math.sin(q), ca = Math.cos(al), sa = Math.sin(al);
+  return [cq, -sq, 0, a, sq * ca, cq * ca, -sa, -sa * d, sq * sa, cq * sa, ca, ca * d];
+}
+function baseT(x, y, z, yaw) { const c = Math.cos(yaw), s = Math.sin(yaw); return [c, -s, 0, x, s, c, 0, y, 0, 0, 1, z]; }
+const P = (T) => [T[3], T[7], T[11]];
+const ZAX = (T) => [T[2], T[6], T[10]];
+
+// full forward kinematics: frames[0] = base, frames[1..7] = joint frames, [8] = flange, [9] = TCP
+function fk(base, q) {
+  const F = [base]; let T = base;
+  for (let i = 0; i < 7; i++) { const [a, d, al] = PANDA_DH[i]; T = tmul(T, dhT(a, d, al, q[i])); F.push(T); }
+  T = tmul(T, dhT(0, FLANGE_D, 0, 0)); F.push(T);
+  T = tmul(T, dhT(0, HAND_D, 0, -PI / 4)); F.push(T);
+  return F;
+}
+
+// ---------- collision model: spheres along capsules between frame origins ----------
+// [from frame, to frame, radius]; frame 9 = TCP. base link (0→1) is skipped for table/arm checks.
+const CAPS = [[0, 1, 0.075], [1, 3, 0.065], [3, 4, 0.06], [4, 5, 0.06], [5, 7, 0.055], [7, 8, 0.05], [8, 9, 0.045]];
+function armSpheres(F, out) {
+  out = out || [];
+  out.length = 0;
+  for (let c = 0; c < CAPS.length; c++) {
+    const [i, j, r] = CAPS[c], a = P(F[i]), b = P(F[j]);
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), n = Math.max(1, Math.ceil(L / (r * 0.9)));
+    for (let k = 0; k <= n; k++) {
+      if (k === 0 && c > 0) continue;
+      const t = k / n; out.push({ x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t, z: a[2] + (b[2] - a[2]) * t, r, link: c });
+    }
+  }
+  return out;
+}
+function sphereBox(s, b) {
+  const dx = Math.max(b.min[0] - s.x, 0, s.x - b.max[0]), dy = Math.max(b.min[1] - s.y, 0, s.y - b.max[1]), dz = Math.max(b.min[2] - s.z, 0, s.z - b.max[2]);
+  return dx * dx + dy * dy + dz * dz < s.r * s.r;
+}
+
+// ---------- a world: arms + boxes ----------
+class World {
+  constructor(arms, boxes) {
+    this.arms = arms;            // [{name, base}]
+    this.boxes = boxes || [];
+    this.checks = 0;             // counts state-validity checks
+    this._sp = arms.map(() => []);
+  }
+  // detailed check for display: returns {free, hits:[{arm, idx, what}]}
+  inspect(qs) {
+    const S = this.arms.map((a, k) => armSpheres(fk(a.base, qs[k]), []));
+    const hits = new Set(), info = [];
+    S.forEach((sp, k) => sp.forEach((s, i) => {
+      if (s.link === 0) return;
+      if (s.z - s.r < 0.0) { hits.add(k + ':' + i); info.push('table'); }
+      for (const b of this.boxes) if (sphereBox(s, b)) { hits.add(k + ':' + i); info.push(b.name); }
+    }));
+    for (let a = 0; a < S.length; a++) for (let b = a + 1; b < S.length; b++)
+      for (let i = 0; i < S[a].length; i++) { const s = S[a][i]; if (s.link === 0) continue;
+        for (let j = 0; j < S[b].length; j++) { const t = S[b][j]; if (t.link === 0) continue;
+          const d = s.r + t.r; if ((s.x - t.x) ** 2 + (s.y - t.y) ** 2 + (s.z - t.z) ** 2 < d * d) { hits.add(a + ':' + i); hits.add(b + ':' + j); info.push('arm'); } } }
+    return { free: hits.size === 0, hits, info, spheres: S };
+  }
+  // fast boolean check
+  free(qs) {
+    this.checks++;
+    const S = this._sp;
+    for (let k = 0; k < this.arms.length; k++) {
+      const sp = armSpheres(fk(this.arms[k].base, qs[k]), S[k]);
+      for (let i = 0; i < sp.length; i++) {
+        const s = sp[i]; if (s.link === 0) continue;
+        if (s.z - s.r < 0) return false;
+        for (const b of this.boxes) if (sphereBox(s, b)) return false;
+      }
+    }
+    for (let a = 0; a < S.length; a++) for (let b = a + 1; b < S.length; b++) {
+      const A = S[a], B = S[b];
+      for (let i = 0; i < A.length; i++) { const s = A[i]; if (s.link === 0) continue;
+        for (let j = 0; j < B.length; j++) { const t = B[j]; if (t.link === 0) continue;
+          const d = s.r + t.r, dx = s.x - t.x, dy = s.y - t.y, dz = s.z - t.z;
+          if (dx * dx + dy * dy + dz * dz < d * d) return false; } }
+    }
+    return true;
+  }
+}
+
+// ---------- small linear algebra ----------
+function solve(A, b) {           // Gaussian elimination with partial pivoting; A n×n (array of rows), b n
+  const n = b.length, M = A.map((r, i) => r.concat([b[i]]));
+  for (let c = 0; c < n; c++) {
+    let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    [M[c], M[p]] = [M[p], M[c]];
+    const piv = M[c][c] || 1e-12;
+    for (let r = c + 1; r < n; r++) { const f = M[r][c] / piv; if (!f) continue; for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
+  }
+  const x = new Array(n).fill(0);
+  for (let r = n - 1; r >= 0; r--) { let s = M[r][n]; for (let k = r + 1; k < n; k++) s -= M[r][k] * x[k]; x[r] = s / (M[r][r] || 1e-12); }
+  return x;
+}
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+
+// geometric Jacobian of the TCP (6×7): rows 0-2 linear, 3-5 angular
+function jacobian(F) {
+  const pe = P(F[9]), J = [[], [], [], [], [], []];
+  for (let j = 0; j < 7; j++) {
+    const z = ZAX(F[j + 1]), o = P(F[j + 1]), r = [pe[0] - o[0], pe[1] - o[1], pe[2] - o[2]], v = cross(z, r);
+    J[0][j] = v[0]; J[1][j] = v[1]; J[2][j] = v[2]; J[3][j] = z[0]; J[4][j] = z[1]; J[5][j] = z[2];
+  }
+  return J;
+}
+
+// damped least squares IK: TCP position + approach axis (TCP z) ; optional null-space pull toward qPref
+function ik(base, q0, target, approach, o = {}) {
+  const q = q0.slice(), lam = o.lambda ?? 0.08, iters = o.iters ?? 150, kn = o.kNull ?? 0.3, w = o.wOri ?? 0.5;
+  let err = Infinity, ep = 0, eo = 0;
+  for (let it = 0; it < iters; it++) {
+    const F = fk(base, q), p = P(F[9]), z = ZAX(F[9]);
+    const e = [target[0] - p[0], target[1] - p[1], target[2] - p[2]];
+    const eoV = cross(z, approach);
+    ep = Math.hypot(e[0], e[1], e[2]); eo = Math.hypot(eoV[0], eoV[1], eoV[2]) + (z[0] * approach[0] + z[1] * approach[1] + z[2] * approach[2] < 0 ? 1 : 0);
+    err = ep + 0.1 * eo;
+    if (ep < 0.002 && eo < 0.01 && !o.qPref) break;
+    // step limit
+    const s = Math.min(1, 0.15 / Math.max(ep, 1e-9));
+    const E = [e[0] * s, e[1] * s, e[2] * s, eoV[0] * w, eoV[1] * w, eoV[2] * w];
+    if (z[0] * approach[0] + z[1] * approach[1] + z[2] * approach[2] < 0) { // pointing the wrong way: push hard
+      const perp = Math.abs(z[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0], ax = cross(z, perp); E[3] = ax[0]; E[4] = ax[1]; E[5] = ax[2];
+    }
+    const J = jacobian(F);
+    const JJt = J.map((ri) => J.map((rj) => ri.reduce((acc, v, k) => acc + v * rj[k], 0)));
+    for (let i = 0; i < 6; i++) JJt[i][i] += lam * lam;
+    const y = solve(JJt, E);
+    const dq = new Array(7).fill(0);
+    for (let k = 0; k < 7; k++) for (let i = 0; i < 6; i++) dq[k] += J[i][k] * y[i];
+    if (o.qPref) {
+      // null-space projection: (I − J⁺J) · kn (qPref − q), with J⁺ = Jᵀ (JJᵀ + λ²I)⁻¹
+      const g = q.map((v, k) => kn * (o.qPref[k] - v) * (o.prefW ? o.prefW[k] : 1));
+      const Jg = J.map((r) => r.reduce((acc, v, k) => acc + v * g[k], 0));
+      const yy = solve(JJt, Jg);
+      for (let k = 0; k < 7; k++) { let t = 0; for (let i = 0; i < 6; i++) t += J[i][k] * yy[i]; dq[k] += g[k] - t; }
+    }
+    for (let k = 0; k < 7; k++) q[k] = clamp(q[k] + dq[k], QMIN[k] + 1e-3, QMAX[k] - 1e-3);
+  }
+  const F = fk(base, q), p = P(F[9]), z = ZAX(F[9]);
+  ep = Math.hypot(target[0] - p[0], target[1] - p[1], target[2] - p[2]);
+  const c = z[0] * approach[0] + z[1] * approach[1] + z[2] * approach[2];
+  return { q, ok: ep < 0.005 && c > 0.995, ep, ang: Math.acos(clamp(c, -1, 1)) };
+}
+function randomQ(rng) { return QMIN.map((lo, k) => lo + (QMAX[k] - lo) * rng()); }
+// IK with random restarts; check(q) → bool decides whether a solution is acceptable (e.g. collision-free)
+function ikRestarts(base, seed, target, approach, check, rng, tries = 40) {
+  for (let t = 0; t < tries; t++) {
+    const q0 = t === 0 ? seed : t < 6 ? seed.map((v, k) => clamp(v + (rng() - 0.5) * 1.2, QMIN[k], QMAX[k])) : randomQ(rng);
+    const r = ik(base, q0, target, approach);
+    if (r.ok && (!check || check(r.q))) return r;
+  }
+  return null;
+}
+
+// ---------- seeded random ----------
+function mulberry(seed) { let a = seed >>> 0; return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+// ---------- planners over a D-dim joint vector (7 for one arm, 14 for two) ----------
+// space: {D, lo[], hi[], free(qflat) → bool}
+class Tree {
+  constructor(D, root) { this.D = D; this.q = [root.slice()]; this.par = [-1]; }
+  get n() { return this.q.length; }
+  nearest(x) {
+    let best = 0, bd = Infinity; const D = this.D;
+    for (let i = 0; i < this.q.length; i++) { const v = this.q[i]; let d = 0; for (let k = 0; k < D; k++) { const t = v[k] - x[k]; d += t * t; if (d >= bd) break; } if (d < bd) { bd = d; best = i; } }
+    return best;
+  }
+  add(q, p) { this.q.push(q); this.par.push(p); return this.q.length - 1; }
+  pathTo(i) { const out = []; while (i >= 0) { out.push(this.q[i]); i = this.par[i]; } return out.reverse(); }
+}
+function dist(a, b) { let d = 0; for (let k = 0; k < a.length; k++) d += (a[k] - b[k]) ** 2; return Math.sqrt(d); }
+function edgeFree(space, a, b, res) {
+  let m = 0; for (let k = 0; k < a.length; k++) m = Math.max(m, Math.abs(b[k] - a[k]));
+  const n = Math.max(1, Math.ceil(m / res)); const x = new Array(a.length);
+  for (let i = 1; i <= n; i++) { const t = i / n; for (let k = 0; k < a.length; k++) x[k] = a[k] + (b[k] - a[k]) * t; if (!space.free(x)) return false; }
+  return true;
+}
+function steer(a, b, eps) { const d = dist(a, b); if (d <= eps) return [b.slice(), true]; const t = eps / d; return [a.map((v, k) => v + (b[k] - v) * t), false]; }
+
+class Planner {
+  // kind: 'rrt' | 'connect'
+  constructor(space, start, goal, o = {}) {
+    this.space = space; this.kind = o.kind || 'connect'; this.eps = o.eps || 0.35; this.res = o.res || 0.04; this.bias = o.bias ?? 0.1;
+    this.rng = o.rng || Math.random; this.maxNodes = o.maxNodes || 12000;
+    this.A = new Tree(space.D, start); this.B = new Tree(space.D, goal); this.goal = goal;
+    this.Ais = 'start'; this.iters = 0; this.done = false; this.path = null; this.failed = false;
+    this.newEdges = [];   // [{tree:'start'|'goal', a, b}] since last drain, for drawing
+  }
+  sample() { const { lo, hi } = this.space; return lo.map((l, k) => l + (hi[k] - l) * this.rng()); }
+  extend(T, x, tname) {
+    const i = T.nearest(x), [qn, reached] = steer(T.q[i], x, this.eps);
+    if (!edgeFree(this.space, T.q[i], qn, this.res)) return { st: 'trapped' };
+    const j = T.add(qn, i); this.newEdges.push({ tree: tname, a: T.q[i], b: qn });
+    return { st: reached ? 'reached' : 'advanced', j };
+  }
+  step() {
+    if (this.done) return;
+    this.iters++;
+    if (this.kind === 'rrt') {
+      const x = this.rng() < this.bias ? this.goal : this.sample();
+      const r = this.extend(this.A, x, 'start');
+      if (r.st !== 'trapped') {
+        const q = this.A.q[r.j];
+        if (dist(q, this.goal) < this.eps && edgeFree(this.space, q, this.goal, this.res)) {
+          const g = this.A.add(this.goal.slice(), r.j); this.newEdges.push({ tree: 'start', a: q, b: this.goal });
+          this.path = this.A.pathTo(g); this.done = true;
+        }
+      }
+    } else {
+      const x = this.sample();
+      const r = this.extend(this.A, x, this.Ais);
+      if (r.st !== 'trapped') {
+        const qn = this.A.q[r.j], bn = this.Ais === 'start' ? 'goal' : 'start';
+        let c;
+        do { c = this.extend(this.B, qn, bn); } while (c.st === 'advanced');
+        if (c.st === 'reached') {
+          const pa = this.A.pathTo(r.j), pb = this.B.pathTo(c.j);
+          // pb ends with qn duplicate; join
+          const full = pa.concat(pb.reverse().slice(1));
+          this.path = this.Ais === 'start' ? full : full.reverse(); this.done = true;
+        }
+      }
+      [this.A, this.B] = [this.B, this.A]; this.Ais = this.Ais === 'start' ? 'goal' : 'start';
+    }
+    if (!this.done && this.A.n + this.B.n > this.maxNodes) { this.done = true; this.failed = true; }
+  }
+  get nodes() { return this.A.n + this.B.n - (this.kind === 'rrt' ? 1 : 0); }
+}
+// random shortcutting
+function shortcut(space, path, iters, res, rng) {
+  let p = path.map((q) => q.slice());
+  for (let it = 0; it < iters && p.length > 2; it++) {
+    let i = Math.floor(rng() * p.length), j = Math.floor(rng() * p.length);
+    if (i > j) [i, j] = [j, i]; if (j - i < 2) continue;
+    if (edgeFree(space, p[i], p[j], res)) p = p.slice(0, i + 1).concat(p.slice(j));
+  }
+  return p;
+}
+function pathLength(p) { let L = 0; for (let i = 1; i < p.length; i++) L += dist(p[i - 1], p[i]); return L; }
+// time-parameterise: each segment takes as long as its slowest joint needs at speed vmax·scale
+function timing(p, scale = 0.5) {
+  const t = [0];
+  for (let i = 1; i < p.length; i++) {
+    let s = 0; for (let k = 0; k < p[i].length; k++) s = Math.max(s, Math.abs(p[i][k] - p[i - 1][k]) / (VMAX[k % 7] * scale));
+    t.push(t[i - 1] + Math.max(s, 0.02));
+  }
+  return t;
+}
+function sampleAt(p, t, time) {
+  if (time <= 0) return p[0].slice(); const T = t[t.length - 1]; if (time >= T) return p[p.length - 1].slice();
+  let i = 1; while (t[i] < time) i++;
+  const u = (time - t[i - 1]) / (t[i] - t[i - 1]), s = u * u * (3 - 2 * u);   // ease each segment
+  return p[i].map((v, k) => p[i - 1][k] + (v - p[i - 1][k]) * s);
+}
+// a space over one or two arms of a World. active: which arms move; others stay at fixed[k]
+function makeSpace(world, active, fixed) {
+  const D = 7 * active.length, lo = [], hi = [];
+  for (let a = 0; a < active.length; a++) { lo.push(...QMIN); hi.push(...QMAX); }
+  const qs = fixed.map((q) => q.slice());
+  return {
+    D, lo, hi, world, active,
+    split(x) { const out = qs.map((q) => q.slice()); active.forEach((k, a) => { for (let j = 0; j < 7; j++) out[k][j] = x[a * 7 + j]; }); return out; },
+    free(x) { active.forEach((k, a) => { for (let j = 0; j < 7; j++) qs[k][j] = x[a * 7 + j]; }); return world.free(qs); },
+  };
+}
+/*ENGINE-END*/
+// ---------- scenes ----------
+const BASE_L = baseT(0, 0.32, 0, 0), BASE_R = baseT(0, -0.32, 0, 0);
+function box(name, x0, y0, z0, x1, y1, z1, kind) { return { name, min: [x0, y0, z0], max: [x1, y1, z1], kind: kind || 'solid' }; }
+function shelfBoxes(x0, depth, y0, y1, h1, h2) {
+  const x1 = x0 + depth, t = 0.025;
+  return [
+    box('선반 가운데 판', x0, y0, h1, x1, y1, h1 + t, 'shelf'),
+    box('선반 윗판', x0, y0, h2, x1, y1, h2 + t, 'shelf'),
+    box('선반 옆판', x0, y1, 0, x1, y1 + t, h2 + t, 'shelf'),
+    box('선반 옆판', x0, y0 - t, 0, x1, y0, h2 + t, 'shelf'),
+    box('선반 뒤판', x1, y0 - t, 0, x1 + t, y1 + t, h2 + t, 'shelf'),
+  ];
+}
+const SCENES = {
+  shelf: {
+    name: '선반 두 칸', boxes: shelfBoxes(0.56, 0.3, -0.48, 0.48, 0.3, 0.62).concat([box('칸막이', 0.56, -0.012, 0.325, 0.86, 0.012, 0.62, 'shelf')]),
+    start: [[0.32, 0.30, 0.42, [0, 0, -1]], [0.32, -0.30, 0.42, [0, 0, -1]]],
+    goal: [[0.72, 0.24, 0.46, [1, 0, 0]], [0.70, -0.20, 0.15, [1, 0, 0]]],
+    note: '왼손은 위 칸 왼쪽, 오른손은 아래 칸 오른쪽으로 손을 넣습니다.',
+  },
+  cross: {
+    name: '팔 교차', boxes: [box('기둥', 0.44, -0.05, 0, 0.54, 0.05, 0.42)],
+    start: [[0.40, 0.34, 0.16, [0, 0, -1]], [0.40, -0.34, 0.16, [0, 0, -1]]],
+    goal: [[0.42, -0.30, 0.16, [0, 0, -1]], [0.42, 0.30, 0.16, [0, 0, -1]]],
+    note: '두 손이 기둥 양쪽에서 자리를 맞바꿉니다. 서로 길을 내줘야 해요.',
+  },
+  wall: {
+    name: '벽 넘기', boxes: [box('벽', 0.46, -0.62, 0, 0.51, 0.62, 0.3)],
+    start: [[0.32, 0.26, 0.12, [0, 0, -1]], [0.32, -0.26, 0.12, [0, 0, -1]]],
+    goal: [[0.66, 0.22, 0.14, [0, 0, -1]], [0.66, -0.22, 0.14, [0, 0, -1]]],
+    note: '벽 앞에 있던 두 손을 벽 너머로 옮깁니다. 둘 다 벽을 넘어가야 해요.',
+  },
+};
+// solve start/goal joint configs for a scene once, deterministically
+function solveScene(sc, seed) {
+  const w = new World([{ base: BASE_L }, { base: BASE_R }], sc.boxes), wl = new World([{ base: BASE_L }], sc.boxes), rng = mulberry(seed || 7);
+  const out = {};
+  for (const key of ['start', 'goal']) {
+    let found = null;
+    for (let t = 0; t < 30 && !found; t++) {
+      const [l, r] = sc[key];
+      const ql = ikRestarts(BASE_L, QREADY, l.slice(0, 3), l[3], (q) => wl.free([q]), rng, 30);
+      if (!ql) continue;
+      const qr = ikRestarts(BASE_R, QREADY, r.slice(0, 3), r[3], (q) => w.free([ql.q, q]), rng, 40);
+      if (!qr) continue;
+      if (w.free([ql.q, qr.q])) found = [ql.q, qr.q];
+    }
+    out[key] = found;
+  }
+  return out;
+}
+
+// ===================================================================
+// view helpers
+// ===================================================================
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const FONT = '"IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif';
+const MONO = '"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace';
+const COL = {};
+const COL_KEYS = ['paper', 'panel', 'field', 'ink', 'ink2', 'ink3', 'line', 'wall', 'accent', 'accentSoft', 'onAccent', 'hit', 'ok', 'tree', 'tree2', 'grid', 'grid2', 'cobst', 'mud', 'fEKF', 'fMCL'];
+function readCols() { const cs = getComputedStyle(document.documentElement); for (const k of COL_KEYS) COL[k] = cs.getPropertyValue('--' + k).trim(); }
+function rgba(c, a) {
+  if (c && c[0] === '#') { const n = parseInt(c.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; }
+  return c;
+}
+function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+const deg = (r) => (r * 180) / PI, rad = (d) => (d * PI) / 180;
+function fit(cv) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = Math.max(1, Math.round(cv.clientWidth * dpr)), H = Math.max(1, Math.round(cv.clientHeight * dpr));
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const ctx = cv.getContext('2d'); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return { ctx, W, H, dpr };
+}
+// world (m, y up) → screen
+function makeView(W, H, cx, cy, s, ox = 0, oy = 0) {
+  return { W, H, cx, cy, s, X: (x) => ox + W / 2 + (x - cx) * s, Y: (y) => oy + H / 2 - (y - cy) * s };
+}
+function grid(ctx, v, step, col, lw, x0 = 0, y0 = 0, w = v.W, h = v.H) {
+  const xmin = v.cx - (w / 2) / v.s, xmax = v.cx + (w / 2) / v.s, ymin = v.cy - (h / 2) / v.s, ymax = v.cy + (h / 2) / v.s;
+  ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath();
+  for (let x = Math.ceil(xmin / step) * step; x <= xmax; x += step) { const X = Math.round(v.X(x)) + 0.5; ctx.moveTo(X, y0); ctx.lineTo(X, y0 + h); }
+  for (let y = Math.ceil(ymin / step) * step; y <= ymax; y += step) { const Y = Math.round(v.Y(y)) + 0.5; ctx.moveTo(x0, Y); ctx.lineTo(x0 + w, Y); }
+  ctx.stroke();
+}
+function arrow(ctx, x1, y1, x2, y2, col, lw, head) {
+  const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy); if (L < 1) return;
+  const ux = dx / L, uy = dy / L, hl = Math.min(head, L * 0.6);
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - ux * hl * 0.6, y2 - uy * hl * 0.6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x2 - ux * hl - uy * hl * 0.45, y2 - uy * hl + ux * hl * 0.45); ctx.lineTo(x2 - ux * hl + uy * hl * 0.45, y2 - uy * hl - ux * hl * 0.45); ctx.closePath(); ctx.fill();
+}
+function label(ctx, t, x, y, col, size, dpr, align = 'left', base = 'middle', weight = 500) {
+  ctx.fillStyle = col; ctx.font = `${weight} ${size * dpr}px ${FONT}`; ctx.textAlign = align; ctx.textBaseline = base; ctx.fillText(t, x, y);
+}
+function chip(ctx, t, x, y, dpr, col, bg) {
+  ctx.font = `600 ${11.5 * dpr}px ${FONT}`; const w = ctx.measureText(t).width + 12 * dpr, h = 20 * dpr;
+  ctx.fillStyle = bg || rgba(COL.panel, 0.88); ctx.beginPath(); ctx.roundRect(x, y, w, h, 5 * dpr); ctx.fill();
+  ctx.fillStyle = col || COL.ink; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(t, x + 6 * dpr, y + h / 2 + 0.5);
+  return w;
+}
+
+// ---------- controls ----------
+function slider(parent, o) {
+  const lab = el('label', 'slider'); lab.append(o.label);
+  const inp = el('input'); inp.type = 'range'; inp.min = o.min; inp.max = o.max; inp.step = o.step; inp.value = o.value;
+  const out = el('output'); lab.append(inp, out);
+  const show = () => { out.textContent = o.fmt ? o.fmt(+inp.value) : inp.value; };
+  inp.addEventListener('input', () => { show(); o.on(+inp.value); });
+  show(); parent.append(lab);
+  return { el: lab, inp, set(v) { inp.value = v; show(); } };
+}
+function seg(parent, opts, val, on, label) {
+  const wrap = el('span', 'field-label'); if (label) wrap.append(label);
+  const g = el('div', 'seg'); g.setAttribute('role', 'radiogroup'); if (label) g.setAttribute('aria-label', label);
+  const bs = opts.map(([k, t]) => {
+    const b = el('button', null, t); b.type = 'button'; b.setAttribute('role', 'radio'); b.dataset.k = k;
+    b.addEventListener('click', () => { set(k); on(k); }); g.append(b); return b;
+  });
+  function set(k) { for (const b of bs) b.setAttribute('aria-checked', String(b.dataset.k === String(k))); }
+  set(val); wrap.append(g); parent.append(wrap);
+  return { set };
+}
+function check(parent, text, val, on) {
+  const l = el('label', 'check'); const i = el('input'); i.type = 'checkbox'; i.checked = val;
+  i.addEventListener('change', () => on(i.checked)); l.append(i, text); parent.append(l);
+  return { set(v) { i.checked = v; }, inp: i };
+}
+function button(parent, text, on, cls = 'btn line') { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', on); parent.append(b); return b; }
+function counters(parent, rows) {
+  const box = el('div', 'counters'); const map = {};
+  for (const [k, t] of rows) { const d = el('div'); const s = el('span', null, t); const b = el('b', null, '–'); d.append(s, b); box.append(d); map[k] = b; }
+  parent.append(box); return map;
+}
+function pad(parent, onKey) {
+  const p = el('div', 'pad'); p.setAttribute('aria-label', '방향 버튼');
+  for (const [k, c, t] of [['up', 'u', '↑'], ['left', 'l', '←'], ['down', 'd', '↓'], ['right', 'r', '→']]) {
+    const b = el('button', c, t); b.type = 'button'; b.setAttribute('aria-label', { up: '위', down: '아래', left: '왼쪽', right: '오른쪽' }[k]);
+    const dn = (e) => { e.preventDefault(); b.classList.add('on'); onKey(k, true); };
+    const upf = () => { b.classList.remove('on'); onKey(k, false); };
+    b.addEventListener('pointerdown', dn); b.addEventListener('pointerup', upf); b.addEventListener('pointerleave', upf); b.addEventListener('pointercancel', upf);
+    p.append(b);
+  }
+  parent.append(p); return p;
+}
+// scaffold: canvas on the left, side panel on the right
+function scaffold(id, opts) {
+  const root = document.getElementById(id);
+  if (opts.title) root.append(el('h3', 'lab-h', opts.title));
+  if (opts.sub) root.append(el('p', 'sub', opts.sub));
+  const g = el('div', 'side-grid wide'); root.append(g);
+  const left = el('div'); const side = el('div', 'sidepanel'); g.append(left, side);
+  const cv = el('canvas', 'map ' + (opts.cls || '')); cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', opts.aria || '');
+  if (opts.aspect) cv.style.aspectRatio = opts.aspect;
+  left.append(cv);
+  const cap = el('div', 'vstat'); left.append(cap);
+  return { root, left, side, cv, cap };
+}
+
+const LABS = [];
+let activeKeyLab = null;
+const KEYS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right' };
+document.addEventListener('keydown', (e) => {
+  const k = KEYS[e.key]; if (!k || !activeKeyLab || !activeKeyLab.visible || !activeKeyLab.wantsKeys()) return;
+  const t = e.target; if (t && (t.tagName === 'INPUT' && t.type === 'range')) return;
+  e.preventDefault(); activeKeyLab.key(k, true);
+});
+document.addEventListener('keyup', (e) => { const k = KEYS[e.key]; if (k && activeKeyLab) activeKeyLab.key(k, false); });
+function claimKeys(L) { L.s.root.addEventListener('pointerdown', () => { activeKeyLab = L; }); }
+
+
+function drawChart(ctx, x0, y0, w, h, dpr, series, o) {
+  // series: [{data:[[t,v]], col, dash, lw}]; o: {tmin,tmax,vmin,vmax, ticks:[...], unit}
+  ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
+  const X = (t) => x0 + (t - o.tmin) / (o.tmax - o.tmin) * w, Y = (v) => y0 + h - (v - o.vmin) / (o.vmax - o.vmin) * h;
+  ctx.strokeStyle = COL.grid2; ctx.lineWidth = 1;
+  for (const tk of o.ticks || []) { ctx.beginPath(); ctx.moveTo(x0, Math.round(Y(tk)) + 0.5); ctx.lineTo(x0 + w, Math.round(Y(tk)) + 0.5); ctx.stroke(); }
+  for (const sr of series) {
+    if (!sr.data.length) continue;
+    ctx.strokeStyle = sr.col; ctx.lineWidth = (sr.lw || 2) * dpr; ctx.setLineDash(sr.dash ? sr.dash.map((d) => d * dpr) : []); ctx.lineJoin = 'round';
+    ctx.beginPath(); let first = true;
+    for (const [t, v] of sr.data) { if (t < o.tmin - 0.1) continue; const px = X(t), py = Y(clamp(v, o.vmin - (o.vmax - o.vmin), o.vmax + (o.vmax - o.vmin))); first ? ctx.moveTo(px, py) : ctx.lineTo(px, py); first = false; }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  ctx.restore();
+  ctx.font = `500 ${10.5 * dpr}px ${FONT}`; ctx.fillStyle = COL.ink3; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (const tk of o.ticks || []) ctx.fillText((o.fmt ? o.fmt(tk) : tk) + (o.unit || ''), x0 - 5 * dpr, Y(tk));
+}
+
+// ===================================================================
+// 3D view (three.js r128, z up)
+// ===================================================================
+const HAS3D = typeof THREE !== 'undefined';
+const VIEWS = [];
+let ROBOT = { link: '#C9D3DF', joint: '#2E425F', hand: '#2E425F', wood: '#B68C5C', post: '#7E93AD' };
+readCols();
+function themeRobot() {
+  const dark = (() => { const c = COL.paper || '#ffffff'; const n = parseInt(c.slice(1), 16); return ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255) < 300; })();
+  ROBOT = dark ? { link: '#D5DEE9', joint: '#5C7699', hand: '#5C7699', wood: '#A47C4E', post: '#6E86A6' }
+    : { link: '#C4CFDC', joint: '#2E425F', hand: '#2E425F', wood: '#B68C5C', post: '#8A9CB3' };
+}
+themeRobot();
+const GEO = HAS3D ? {
+  cyl: new THREE.CylinderGeometry(1, 1, 1, 22),
+  sph: new THREE.SphereGeometry(1, 18, 12),
+  box: new THREE.BoxGeometry(1, 1, 1),
+} : {};
+const Y_AXIS = HAS3D ? new THREE.Vector3(0, 1, 0) : null;
+function m4(T) { return new THREE.Matrix4().set(T[0], T[1], T[2], T[3], T[4], T[5], T[6], T[7], T[8], T[9], T[10], T[11], 0, 0, 0, 1); }
+function hex(c) { return new THREE.Color(c); }
+
+class View3D {
+  constructor(cv, o = {}) {
+    this.cv = cv; this.ok = HAS3D; this.dirty = true; this.visible = false; this.mats = [];
+    if (!this.ok) return;
+    try { this.r = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); } catch (e) { this.ok = false; return; }
+    this.r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    this.scene = new THREE.Scene();
+    this.cam = new THREE.PerspectiveCamera(32, 1.5, 0.02, 40); this.cam.up.set(0, 0, 1);
+    this.orb = { az: o.az ?? -2.35, el: o.el ?? 0.42, r: o.r ?? 2.6, tgt: new THREE.Vector3(...(o.tgt || [0.4, 0, 0.3])) };
+    this.hemi = new THREE.HemisphereLight(0xffffff, 0x556677, 0.85); this.hemi.position.set(0, 0, 1); this.scene.add(this.hemi);
+    const d = new THREE.DirectionalLight(0xffffff, 0.65); d.position.set(1.2, -1.6, 3); this.scene.add(d);
+    const d2 = new THREE.DirectionalLight(0xffffff, 0.25); d2.position.set(-2, 1, 1); this.scene.add(d2);
+    // table
+    this.tableMat = new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0 });
+    const tw = o.table || [1.5, 1.7], table = new THREE.Mesh(GEO.box, this.tableMat);
+    table.scale.set(tw[0], tw[1], 0.02); table.position.set(0.35, 0, -0.011); this.scene.add(table);
+    this.gridMat = new THREE.LineBasicMaterial({ transparent: true, opacity: 0.5 });
+    const gp = []; const x0 = 0.35 - tw[0] / 2, x1 = 0.35 + tw[0] / 2, y0 = -tw[1] / 2, y1 = tw[1] / 2;
+    for (let x = Math.ceil(x0 * 10) / 10; x <= x1 + 1e-9; x += 0.1) gp.push(x, y0, 0.0005, x, y1, 0.0005);
+    for (let y = Math.ceil(y0 * 10) / 10; y <= y1 + 1e-9; y += 0.1) gp.push(x0, y, 0.0005, x1, y, 0.0005);
+    const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3));
+    this.scene.add(new THREE.LineSegments(gg, this.gridMat));
+    this.boxGroup = new THREE.Group(); this.scene.add(this.boxGroup);
+    // orbit
+    let drag = null;
+    cv.style.touchAction = 'pan-y';
+    cv.addEventListener('pointerdown', (e) => { if (o.onPick && e.shiftKey) return; drag = { x: e.clientX, y: e.clientY, az: this.orb.az, el: this.orb.el, touch: e.pointerType === 'touch' }; cv.setPointerCapture(e.pointerId); });
+    cv.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      this.orb.az = drag.az - (e.clientX - drag.x) * 0.008;
+      if (!drag.touch) this.orb.el = clamp(drag.el + (e.clientY - drag.y) * 0.006, 0.03, 1.5);
+      this.dirty = true; this.userMoved = true;
+    });
+    const up = () => { drag = null; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    cv.addEventListener('wheel', (e) => { if (!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); this.orb.r = clamp(this.orb.r * Math.exp(e.deltaY * 0.0015), 0.8, 6); this.dirty = true; }, { passive: false });
+    VIEWS.push(this);
+    this.theme();
+  }
+  zoom(f) { this.orb.r = clamp(this.orb.r * f, 0.8, 6); this.dirty = true; }
+  theme() {
+    if (!this.ok) return;
+    this.scene.background = hex(COL.paper);
+    this.tableMat.color = hex(COL.field); this.gridMat.color = hex(COL.ink3);
+    for (const f of this.mats) f();
+    this.dirty = true;
+  }
+  setBoxes(boxes) {
+    if (!this.ok) return;
+    while (this.boxGroup.children.length) this.boxGroup.remove(this.boxGroup.children[0]);
+    for (const b of boxes) {
+      const mat = new THREE.MeshStandardMaterial({ color: hex(b.kind === 'shelf' ? ROBOT.wood : ROBOT.post), roughness: 0.8, transparent: true, opacity: 0.92 });
+      const m = new THREE.Mesh(GEO.box, mat);
+      m.scale.set(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
+      m.position.set((b.max[0] + b.min[0]) / 2, (b.max[1] + b.min[1]) / 2, (b.max[2] + b.min[2]) / 2);
+      this.boxGroup.add(m);
+    }
+    this.boxes = boxes; this.dirty = true;
+  }
+  render() {
+    if (!this.ok || !this.dirty) return;
+    const w = this.cv.clientWidth, h = this.cv.clientHeight; if (!w || !h) return;
+    const sz = this.r.getSize(new THREE.Vector2());
+    if (sz.x !== w || sz.y !== h) { this.r.setSize(w, h, false); this.cam.aspect = w / h; this.cam.updateProjectionMatrix(); }
+    const { az, el, r, tgt } = this.orb;
+    this.cam.position.set(tgt.x + r * Math.cos(el) * Math.cos(az), tgt.y + r * Math.cos(el) * Math.sin(az), tgt.z + r * Math.sin(el));
+    this.cam.lookAt(tgt);
+    this.r.render(this.scene, this.cam); this.dirty = false;
+  }
+}
+function themeAll() { themeRobot(); for (const v of VIEWS) { v.theme(); if (v.boxes) v.setBoxes(v.boxes); } }
+
+// ---------- a Panda drawn from its frames ----------
+class ArmViz {
+  constructor(view, o = {}) {
+    this.view = view; if (!view.ok) return;
+    this.g = new THREE.Group(); view.scene.add(this.g);
+    const ghost = !!o.ghost;
+    const mk = (key, extra = {}) => {
+      const m = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.05, transparent: true, opacity: ghost ? 0.22 : 1, depthWrite: !ghost, ...extra });
+      const pick = () => hex(o.tint && key === 'joint' && COL[o.tint] ? COL[o.tint] : ROBOT[key]);
+      view.mats.push(() => { m.color = pick(); }); m.color = pick(); return m;
+    };
+    this.mLink = mk('link'); this.mJoint = mk('joint');
+    this.links = CAPS.map(() => { const m = new THREE.Mesh(GEO.cyl, this.mLink); this.g.add(m); return m; });
+    this.joints = [1, 2, 3, 4, 5, 6, 7].map(() => { const m = new THREE.Mesh(GEO.cyl, this.mJoint); m.matrixAutoUpdate = false; this.g.add(m); return m; });
+    this.hand = new THREE.Group(); this.hand.matrixAutoUpdate = false; this.g.add(this.hand);
+    const palm = new THREE.Mesh(GEO.box, this.mJoint); palm.scale.set(0.05, 0.2, 0.06); palm.position.set(0, 0, -0.07); this.hand.add(palm);
+    for (const s of [-1, 1]) { const f = new THREE.Mesh(GEO.box, this.mJoint); f.scale.set(0.02, 0.016, 0.05); f.position.set(0, s * 0.028, -0.02); this.hand.add(f); }
+    this.base = new THREE.Mesh(GEO.cyl, this.mJoint); this.g.add(this.base);
+    if (o.frames) {
+      this.frames = [];
+      const cols = ['hit', 'ok', 'fEKF'];
+      for (let i = 0; i < 9; i++) {
+        const grp = new THREE.Group(); grp.matrixAutoUpdate = false;
+        cols.forEach((c, k) => {
+          const g = new THREE.BufferGeometry(); const L = i === 8 ? 0.12 : 0.09; const v = [0, 0, 0, k === 0 ? L : 0, k === 1 ? L : 0, k === 2 ? L : 0];
+          g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+          const m = new THREE.LineBasicMaterial({ depthTest: false }); view.mats.push(() => { m.color = hex(COL[c]); }); m.color = hex(COL[c]);
+          const ln = new THREE.Line(g, m); ln.renderOrder = 5; grp.add(ln);
+        });
+        this.g.add(grp); this.frames.push(grp);
+      }
+    }
+  }
+  visible(v) { if (this.g) { this.g.visible = v; this.view.dirty = true; } }
+  opacity(a) { if (!this.g) return; for (const m of [this.mLink, this.mJoint]) { m.opacity = a; m.depthWrite = a > 0.9; } this.view.dirty = true; }
+  showFrames(v) { if (this.frames) for (const f of this.frames) f.visible = v; this.view.dirty = true; }
+  set(F) {
+    if (!this.view.ok) return;
+    CAPS.forEach(([i, j, r], k) => {
+      const a = P(F[i]), b = P(F[j]), m = this.links[k];
+      const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), L = d.length();
+      if (k === CAPS.length - 1 || L < 1e-4) { m.visible = false; return; }
+      m.visible = true; m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+      m.quaternion.setFromUnitVectors(Y_AXIS, d.normalize()); m.scale.set(r * 0.82, L, r * 0.82);
+    });
+    const R = [0.075, 0.07, 0.065, 0.065, 0.06, 0.058, 0.05];
+    this.joints.forEach((m, k) => {
+      // cylinder along the joint's z axis: rotate the unit cylinder (y-axis) onto z
+      const M = m4(F[k + 1]).multiply(new THREE.Matrix4().makeRotationX(PI / 2)).multiply(new THREE.Matrix4().makeScale(R[k], R[k] * 2.3, R[k]));
+      m.matrix.copy(M);
+    });
+    const b = P(F[0]); this.base.position.set(b[0], b[1], 0.04); this.base.quaternion.setFromUnitVectors(Y_AXIS, new THREE.Vector3(0, 0, 1)); this.base.scale.set(0.1, 0.08, 0.1);
+    this.hand.matrix.copy(m4(F[9]));
+    if (this.frames) this.frames.forEach((g, i) => { g.matrix.copy(m4(F[i === 8 ? 9 : i])); });
+    this.view.dirty = true;
+  }
+}
+// collision spheres
+class SphereViz {
+  constructor(view) {
+    this.view = view; if (!view.ok) return;
+    const mk = (c, op) => { const m = new THREE.MeshStandardMaterial({ transparent: true, opacity: op, depthWrite: false, roughness: 0.6 }); view.mats.push(() => { m.color = hex(COL[c]); }); m.color = hex(COL[c]); return m; };
+    this.ok = new THREE.InstancedMesh(GEO.sph, mk('tree', 0.28), 200); this.bad = new THREE.InstancedMesh(GEO.sph, mk('hit', 0.75), 200);
+    this.ok.count = 0; this.bad.count = 0; view.scene.add(this.ok, this.bad);
+  }
+  set(spheresByArm, hits, skipBase) {
+    if (!this.view.ok) return;
+    let a = 0, b = 0; const M = new THREE.Matrix4();
+    spheresByArm.forEach((sp, k) => sp.forEach((s, i) => {
+      if (skipBase && s.link === 0) return;
+      M.makeScale(s.r, s.r, s.r).setPosition(s.x, s.y, s.z);
+      if (hits && hits.has(k + ':' + i)) this.bad.setMatrixAt(b++, M); else this.ok.setMatrixAt(a++, M);
+    }));
+    this.ok.count = a; this.bad.count = b; this.ok.instanceMatrix.needsUpdate = true; this.bad.instanceMatrix.needsUpdate = true; this.view.dirty = true;
+  }
+  visible(v) { if (this.ok) { this.ok.visible = v; this.bad.visible = v; this.view.dirty = true; } }
+}
+// growing line-segment buffer (tree edges projected to the hand)
+class SegViz {
+  constructor(view, colKey, max = 60000, op = 0.8) {
+    this.view = view; this.max = max; this.n = 0; if (!view.ok) return;
+    this.pos = new Float32Array(max * 6);
+    this.geo = new THREE.BufferGeometry(); this.attr = new THREE.BufferAttribute(this.pos, 3); this.attr.setUsage(THREE.DynamicDrawUsage); this.geo.setAttribute('position', this.attr);
+    this.geo.setDrawRange(0, 0);
+    const m = new THREE.LineBasicMaterial({ transparent: true, opacity: op }); view.mats.push(() => { m.color = hex(COL[colKey]); }); m.color = hex(COL[colKey]);
+    this.line = new THREE.LineSegments(this.geo, m); this.line.frustumCulled = false; view.scene.add(this.line);
+  }
+  add(a, b) { if (!this.view.ok || this.n >= this.max) return; const o = this.n * 6; this.pos.set(a, o); this.pos.set(b, o + 3); this.n++; }
+  flush() { if (!this.view.ok) return; this.geo.setDrawRange(0, this.n * 2); this.attr.needsUpdate = true; this.view.dirty = true; }
+  reset() { this.n = 0; this.flush(); }
+}
+class PolyViz {
+  constructor(view, colKey, onTop = false) {
+    this.view = view; if (!view.ok) return;
+    this.geo = new THREE.BufferGeometry(); this.geo.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
+    const m = new THREE.LineBasicMaterial({ depthTest: !onTop, transparent: onTop }); view.mats.push(() => { m.color = hex(COL[colKey]); }); m.color = hex(COL[colKey]);
+    this.line = new THREE.Line(this.geo, m); this.line.frustumCulled = false; this.line.renderOrder = 3; view.scene.add(this.line);
+  }
+  set(pts) { if (!this.view.ok) return; this.geo.setAttribute('position', new THREE.Float32BufferAttribute(pts.flat(), 3)); this.view.dirty = true; }
+}
+class TargetViz {
+  constructor(view, colKey) {
+    this.view = view; if (!view.ok) return;
+    const m = new THREE.MeshStandardMaterial({ roughness: 0.4 }); view.mats.push(() => { m.color = hex(COL[colKey]); this.ar && this.ar.setColor(hex(COL[colKey])); }); m.color = hex(COL[colKey]);
+    this.s = new THREE.Mesh(GEO.sph, m); this.s.scale.setScalar(0.018); view.scene.add(this.s);
+    this.ar = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(), 0.12, hex(COL[colKey]).getHex(), 0.035, 0.022); view.scene.add(this.ar);
+  }
+  set(p, dir) {
+    if (!this.view.ok) return;
+    this.s.position.set(p[0], p[1], p[2]);
+    const d = new THREE.Vector3(dir[0], dir[1], dir[2]);
+    this.ar.position.set(p[0] - d.x * 0.13, p[1] - d.y * 0.13, p[2] - d.z * 0.13); this.ar.setDirection(d); this.view.dirty = true;
+  }
+  visible(v) { if (this.s) { this.s.visible = v; this.ar.visible = v; this.view.dirty = true; } }
+}
+function no3d(L) { if (!L.view.ok) { L.s.cv.replaceWith(el('div', 'side-note', '이 브라우저에서 WebGL을 쓸 수 없어 3D 그림을 그리지 못했습니다. 계산과 수치는 그대로 동작해요.')); } }
+function hint() { return '드래그하면 돌아가고, Ctrl(⌘)을 누른 채 휠을 굴리거나 [확대]·[축소] 버튼으로 크기를 바꿀 수 있어요.'; }
+function zoomBtns(parent, view) { const c = el('div', 'controls'); button(c, '확대', () => view.zoom(0.85)); button(c, '축소', () => view.zoom(1.18)); parent.append(c); }
+const fmtV = (v, n = 3) => '(' + v.map((x) => x.toFixed(n)).join(', ') + ')';
+
+// ===================================================================
+// lab 1: forward kinematics
+// ===================================================================
+const lab1 = (() => {
+  const s = scaffold('lab1', { title: 'Franka Panda 한 대', sub: '슬라이더 일곱 개가 관절각 q₁~q₇입니다. 관절마다 짙은 원통이 회전축이에요. 좌표계를 켜면 각 관절의 x(빨강), y(초록), z(파랑) 축이 보입니다. ' + hint(), aria: '7자유도 로봇팔 3D 모델과 관절 좌표계', aspect: '3 / 2' });
+  const view = new View3D(s.cv, { az: -0.95, el: 0.3, r: 2.4, tgt: [0.2, 0, 0.42] });
+  const L = { s, view, q: QREADY.slice(), frames: true };
+  no3d(L);
+  const base = baseT(0, 0, 0, 0), arm = new ArmViz(view, { frames: true });
+  const ctl = el('div', 'controls'); s.side.append(ctl);
+  const sl = [];
+  for (let k = 0; k < 7; k++) {
+    const x = slider(ctl, { label: 'q', min: deg(QMIN[k]).toFixed(0), max: deg(QMAX[k]).toFixed(0), step: 1, value: deg(L.q[k]).toFixed(0), fmt: (v) => v.toFixed(0) + '°', on: (v) => { L.q[k] = rad(v); upd(); } });
+    x.el.insertBefore(el('sub', null, String(k + 1)), x.inp); sl.push(x);
+  }
+  const pr = el('div', 'presets'); pr.append(el('span', null, '자세')); s.side.append(pr);
+  const setQ = (q) => { L.q = q.slice(); sl.forEach((x, k) => x.set(Math.round(deg(L.q[k])))); upd(); };
+  button(pr, '준비 자세', () => setQ(QREADY));
+  button(pr, '모두 0', () => setQ([0, 0, 0, -0.0698, 0, 0, 0]));
+  button(pr, '무작위', () => setQ(randomQ(Math.random)));
+  const c2 = el('div', 'controls'); s.side.append(c2);
+  check(c2, '관절 좌표계', true, (v) => arm.showFrames(v));
+  const C = counters(s.side, [['p', '손끝 위치 (m)'], ['z', '손이 향하는 방향'], ['reach', '어깨에서 손끝까지']]);
+  const bars = el('canvas', 'chart'); bars.style.aspectRatio = '5 / 2.4'; bars.style.marginTop = '14px'; bars.setAttribute('aria-label', '관절 일곱 개의 각도를 관절 한계 안에서 막대로 표시'); s.side.append(bars);
+  function upd() {
+    const F = fk(base, L.q); arm.set(F);
+    const p = P(F[9]), z = ZAX(F[9]), sh = P(F[2]);
+    C.p.textContent = fmtV(p); C.z.textContent = fmtV(z, 2);
+    C.reach.textContent = Math.hypot(p[0] - sh[0], p[1] - sh[1], p[2] - sh[2]).toFixed(3) + ' m';
+    s.cap.innerHTML = `C-space의 점 하나: q = (${L.q.map((v) => deg(v).toFixed(0) + '°').join(', ')})`;
+    drawBars();
+  }
+  function drawBars() {
+    const { ctx, W, H, dpr } = fit(bars); ctx.fillStyle = COL.paper; ctx.fillRect(0, 0, W, H);
+    const x0 = 30 * dpr, w = W - x0 - 10 * dpr, rh = H / 7;
+    for (let k = 0; k < 7; k++) {
+      const y = k * rh + rh * 0.25, h = rh * 0.5, t = (L.q[k] - QMIN[k]) / (QMAX[k] - QMIN[k]);
+      ctx.fillStyle = COL.field; ctx.fillRect(x0, y, w, h);
+      const z = (0 - QMIN[k]) / (QMAX[k] - QMIN[k]);
+      if (z > 0 && z < 1) { ctx.fillStyle = COL.ink3; ctx.fillRect(x0 + z * w - 0.5 * dpr, y - 2 * dpr, 1 * dpr, h + 4 * dpr); }
+      ctx.fillStyle = t < 0.04 || t > 0.96 ? COL.hit : COL.accent; ctx.fillRect(x0 + t * w - 3 * dpr, y - 2 * dpr, 6 * dpr, h + 4 * dpr);
+      label(ctx, 'q' + (k + 1), 4 * dpr, y + h / 2, COL.ink2, 11.5, dpr);
+    }
+  }
+  zoomBtns(s.side, view);
+  L.tick = () => view.render();
+  L.theme = () => drawBars();
+  upd(); LABS.push(L); return L;
+})();
+
+// ===================================================================
+// lab 2: collision spheres
+// ===================================================================
+const lab2 = (() => {
+  const s = scaffold('lab2', { title: '구슬로 감싼 두 팔과 선반', sub: '관절이 청록색인 왼팔을 움직여 선반, 책상, 오른팔에 부딪혀 보세요. 부딪힌 구가 빨갛게 바뀝니다. 바닥에 붙은 받침대 구슬은 검사에서 뺐어요. ' + hint(), aria: '두 로봇팔과 충돌 검사용 구, 선반', aspect: '3 / 2' });
+  const view = new View3D(s.cv, { az: -2.15, el: 0.62, r: 2.8, tgt: [0.45, 0, 0.25] });
+  const L = { s, view, q: QREADY.slice(), arms: true };
+  no3d(L);
+  const sc = SCENES.shelf, world = new World([{ base: BASE_L }, { base: BASE_R }], sc.boxes);
+  view.setBoxes(sc.boxes);
+  const aL = new ArmViz(view, { tint: 'tree' }), aR = new ArmViz(view, { tint: 'tree2' }), sv = new SphereViz(view);
+  aL.opacity(0.35); aR.opacity(0.35);
+  const ctl = el('div', 'controls'); s.side.append(ctl);
+  const sl = [];
+  for (let k = 0; k < 7; k++) {
+    const x = slider(ctl, { label: 'q', min: deg(QMIN[k]).toFixed(0), max: deg(QMAX[k]).toFixed(0), step: 1, value: deg(L.q[k]).toFixed(0), fmt: (v) => v.toFixed(0) + '°', on: (v) => { L.q[k] = rad(v); upd(); } });
+    x.el.insertBefore(el('sub', null, String(k + 1)), x.inp); sl.push(x);
+  }
+  const pr = el('div', 'presets'); pr.append(el('span', null, '예시')); s.side.append(pr);
+  const setQ = (q) => { L.q = q.slice(); sl.forEach((x, k) => x.set(Math.round(deg(L.q[k])))); upd(); };
+  button(pr, '준비 자세', () => setQ(QREADY));
+  button(pr, '선반 판에 닿기', () => setQ([-0.05, 0.365, -0.117, -1.571, 0.04, 1.937, 0.603]));
+  button(pr, '오른팔에 닿기', () => setQ([-0.356, 0.4, -1.196, -1.215, 0.378, 1.384, -0.625]));
+  button(pr, '책상에 닿기', () => setQ([0.02, 0.411, 0.035, -2.525, -0.039, 2.936, 0.882]));
+  const c2 = el('div', 'controls'); s.side.append(c2);
+  check(c2, '충돌 구', true, (v) => { sv.visible(v); aL.opacity(v ? 0.35 : 1); aR.opacity(v ? 0.35 : 1); });
+  check(c2, '팔 모양', true, (v) => { aL.visible(v); aR.visible(v); });
+  const C = counters(s.side, [['n', '구 개수'], ['ops', '한 번 검사의 거리 계산'], ['st', '결과'], ['what', '부딪힌 것']]);
+  const nS = armSpheres(fk(BASE_L, QREADY)).filter((x) => x.link !== 0).length;
+  function upd() {
+    const FL = fk(BASE_L, L.q), FR = fk(BASE_R, QREADY);
+    aL.set(FL); aR.set(FR);
+    const r = world.inspect([L.q, QREADY]);
+    sv.set(r.spheres, r.hits, true);
+    C.n.textContent = `팔마다 ${nS}개`;
+    C.ops.textContent = `약 ${(nS * 2 * (sc.boxes.length + 1) + nS * nS).toLocaleString()}번`;
+    C.st.innerHTML = r.free ? '<span class="ok">자유</span>' : '<span class="bad">충돌</span>';
+    const names = [...new Set(r.info.map((x) => x === 'table' ? '책상' : x === 'arm' ? '오른팔' : x))];
+    C.what.textContent = names.length ? names.join(', ') : '없음';
+    s.cap.innerHTML = r.free ? '이 자세는 <b>자유 공간</b>에 있습니다. C-space에서 이 점은 장애물 밖이에요.' : `이 자세는 <b>충돌</b>입니다. 빨간 구 ${r.hits.size}개가 ${names.join(', ')}과 겹쳐요.`;
+  }
+  zoomBtns(s.side, view);
+  L.tick = () => view.render();
+  upd(); LABS.push(L); return L;
+})();
+
+// ===================================================================
+// lab 3: inverse kinematics with null space
+// ===================================================================
+const lab3 = (() => {
+  const s = scaffold('lab3', { title: '손이 갈 곳을 정하면 관절이 따라온다', sub: '주황 공과 화살표가 목표 손 위치와 방향입니다. 관절각은 매 프레임 감쇠 최소제곱 한 걸음씩 목표로 다가가요. ' + hint(), aria: '역기구학으로 목표 위치에 손을 맞추는 로봇팔', aspect: '3 / 2' });
+  const view = new View3D(s.cv, { az: -0.9, el: 0.36, r: 2.4, tgt: [0.3, 0, 0.36] });
+  const L = { s, view, q: QREADY.slice(), tgt: [0.6, 0, 0.2], dir: [0, 0, -1], sw: 0, speed: 1, it: 0, trail: [] };
+  no3d(L);
+  const base = baseT(0, 0, 0, 0), arm = new ArmViz(view), tv = new TargetViz(view, 'accent'), elb = new PolyViz(view, 'tree', true);
+  const ctl = el('div', 'controls'); s.side.append(ctl);
+  const reset = () => { L.it = 0; L.trail = []; };
+  slider(ctl, { label: '목표 x', min: 0.15, max: 0.85, step: 0.01, value: L.tgt[0], fmt: (v) => v.toFixed(2) + ' m', on: (v) => { L.tgt[0] = v; reset(); } });
+  slider(ctl, { label: '목표 y', min: -0.6, max: 0.6, step: 0.01, value: L.tgt[1], fmt: (v) => v.toFixed(2) + ' m', on: (v) => { L.tgt[1] = v; reset(); } });
+  slider(ctl, { label: '목표 z', min: 0.03, max: 0.9, step: 0.01, value: L.tgt[2], fmt: (v) => v.toFixed(2) + ' m', on: (v) => { L.tgt[2] = v; reset(); } });
+  const c1 = el('div', 'controls'); s.side.append(c1);
+  seg(c1, [['down', '아래로'], ['fwd', '앞으로']], 'down', (k) => { L.dir = k === 'down' ? [0, 0, -1] : [1, 0, 0]; reset(); }, '손 방향');
+  const c2 = el('div', 'controls'); s.side.append(c2);
+  const ssw = slider(c2, { label: '팔꿈치 돌리기', min: -150, max: 150, step: 1, value: 0, fmt: (v) => v.toFixed(0) + '°', on: (v) => { L.sw = rad(v); L.it = 0; } });
+  seg(c2, [[1, '한 걸음씩'], [25, '빠르게']], 1, (k) => { L.speed = +k; }, '반복');
+  const c3 = el('div', 'controls'); s.side.append(c3);
+  button(c3, '다른 해 찾기 (무작위 출발)', () => { L.q = randomQ(Math.random); reset(); }, 'btn');
+  button(c3, '준비 자세에서 다시', () => { L.q = QREADY.slice(); reset(); ssw.set(0); L.sw = 0; });
+  const C = counters(s.side, [['ep', '위치 오차'], ['eo', '방향 오차'], ['it', '반복 횟수'], ['q3', '팔꿈치 관절 q₃']]);
+  const note = el('div', 'side-note', ''); s.side.append(note);
+  zoomBtns(s.side, view);
+  const W = [0.15, 0.15, 1, 0.15, 0.15, 0.15, 0.15];
+  L.tick = () => {
+    for (let i = 0; i < L.speed; i++) {
+      const pref = QREADY.slice(); pref[2] = L.sw;
+      L.q = ik(base, L.q, L.tgt, L.dir, { iters: 1, qPref: pref, prefW: W, kNull: 0.25 }).q; L.it++;
+    }
+    const F = fk(base, L.q), p = P(F[9]), z = ZAX(F[9]);
+    arm.set(F); tv.set(L.tgt, L.dir);
+    const e4 = P(F[4]); L.trail.push(e4); if (L.trail.length > 240) L.trail.shift(); elb.set(L.trail);
+    const ep = Math.hypot(L.tgt[0] - p[0], L.tgt[1] - p[1], L.tgt[2] - p[2]), eo = Math.acos(clamp(z[0] * L.dir[0] + z[1] * L.dir[1] + z[2] * L.dir[2], -1, 1));
+    C.ep.innerHTML = ep < 0.003 ? '<span class="ok">' + (ep * 1000).toFixed(1) + ' mm</span>' : (ep * 100).toFixed(1) + ' cm';
+    C.eo.textContent = deg(eo).toFixed(1) + '°'; C.it.textContent = L.it; C.q3.textContent = deg(L.q[2]).toFixed(0) + '°';
+    const lim = L.q.some((v, k) => v < QMIN[k] + 0.01 || v > QMAX[k] - 0.01);
+    note.innerHTML = ep > 0.01 && L.it > 300 ? (Math.hypot(L.tgt[0], L.tgt[1], L.tgt[2] - 0.333) > 0.93 ? '<b>닿지 않는 곳</b>입니다. 팔을 다 펴도 어깨에서 손끝까지 약 0.9 m가 한계예요. 오차가 줄다 멈춘 것은 최소제곱이 “가장 가까운 자세”를 찾았기 때문입니다.' : '오차가 더 줄지 않습니다. 관절 한계에 걸렸거나 특이 자세 근처예요. [다른 해 찾기]로 다른 출발점에서 시작해 보세요.')
+      : ep < 0.003 ? '손은 목표에 있습니다. 이제 <b>팔꿈치 돌리기</b>를 움직여 보세요. 남는 자유도 하나로 손을 그대로 둔 채 팔꿈치만 원을 그리며 돕니다(청록 선).'
+      : '목표를 향해 관절을 조금씩 움직이는 중입니다. 한 번에 최대 15 cm만 다가가도록 걸음을 제한했어요.';
+    if (lim) note.innerHTML += ' 일부 관절이 한계에 닿아 있습니다.';
+    s.cap.innerHTML = `목표 ${fmtV(L.tgt, 2)}, 현재 손끝 ${fmtV(p, 3)}`;
+    view.render();
+  };
+  LABS.push(L); return L;
+})();
+
+// ===================================================================
+// planning lab factory (used for the 7-D and 14-D chapters)
+// ===================================================================
+function tcpOf(base, q) { return P(fk(base, q)[9]); }
+function planLab(id, o) {
+  const s = scaffold(id, { title: o.title, sub: o.sub + ' ' + hint(), aria: o.aria, aspect: '3 / 2' });
+  const view = new View3D(s.cv, o.cam);
+  const L = { s, view, speed: 'slow', kind: 'connect', eps: 0.35, scene: o.sceneKeys[0], mode: '14', state: 'idle', playT: 0, path: null, raw: null, msg: '' };
+  no3d(L);
+  let chart = null;
+  if (o.chart) { chart = el('canvas', 'chart'); chart.style.aspectRatio = '5 / 1.5'; chart.setAttribute('aria-label', '시간에 따른 관절각 그래프'); s.left.insertBefore(chart, s.cap); }
+  const arms = o.arms.map((a, k) => new ArmViz(view, o.arms.length > 1 ? { tint: k ? 'tree2' : 'tree' } : {}));
+  const ghosts = o.arms.map(() => new ArmViz(view, { ghost: true }));
+  const tStart = new SegViz(view, 'tree', 60000, 0.5), tGoal = new SegViz(view, 'tree2', 60000, 0.5);
+  const traces = o.arms.map(() => new PolyViz(view, 'accent'));
+  const targets = o.arms.map(() => new TargetViz(view, 'accent'));
+  const ctl = el('div', 'controls'); s.side.append(ctl);
+  if (o.sceneKeys.length > 1) seg(ctl, o.sceneKeys.map((k) => [k, SCENES[k].name]), L.scene, (k) => { L.scene = k; setup(); }, '장면');
+  if (o.goals) seg(ctl, o.goals.map((g, i) => [i, g.name]), 0, (k) => { L.goalIdx = +k; setup(); }, '목표');
+  if (o.modes) seg(ctl, [['14', '동시에 (14차원)'], ['seq', '한 팔씩 차례로']], '14', (k) => { L.mode = k; resetPlan(); }, '방식');
+  if (o.algos) seg(ctl, [['rrt', 'RRT (목표 편향 10%)'], ['connect', 'RRT-Connect']], 'connect', (k) => { L.kind = k; resetPlan(); }, '알고리즘');
+  const c2 = el('div', 'controls'); s.side.append(c2);
+  slider(c2, { label: '한 걸음 ε', min: 0.1, max: 0.8, step: 0.05, value: L.eps, fmt: (v) => v.toFixed(2) + ' rad', on: (v) => { L.eps = v; } });
+  seg(c2, [['slow', '천천히'], ['fast', '빠르게'], ['now', '한 번에']], 'slow', (k) => { L.speed = k; }, '속도');
+  const c3 = el('div', 'controls'); s.side.append(c3);
+  const bPlan = button(c3, '계획 시작', () => startPlan(), 'btn');
+  const bCut = button(c3, '경로 다듬기', () => doShortcut());
+  const bPlay = button(c3, '다시 재생', () => { if (L.path) { L.state = 'play'; L.playT = 0; } });
+  const c4 = el('div', 'controls'); s.side.append(c4);
+  check(c4, '탐색 트리', true, (v) => { tStart.line && (tStart.line.visible = v, tGoal.line.visible = v); view.dirty = true; });
+  check(c4, '목표 자세(반투명)', true, (v) => ghosts.forEach((g) => g.visible(v)));
+  const C = counters(s.side, [['it', '반복'], ['nodes', '트리 노드'], ['chk', '충돌 검사'], ['len', '경로 길이 (관절 공간)'], ['dur', '실행 시간'], ['st', '상태']]);
+  const note = el('div', 'side-note', ''); s.side.append(note);
+  zoomBtns(s.side, view);
+  let world, conf, phases, pi;
+  function setup() {
+    const sc = SCENES[L.scene];
+    world = new World(o.arms.map((b) => ({ base: b })), sc.boxes);
+    view.setBoxes(sc.boxes);
+    if (o.goals) {
+      const g = o.goals[L.goalIdx || 0];
+      if (!g.q) { const r = ikRestarts(o.arms[0], QREADY, g.p, g.d, (q) => world.free([q]), mulberry(9), 80); g.q = r ? r.q : QREADY.slice(); }
+      conf = { start: [QREADY.slice()], goal: [g.q] }; L.targets = [[g.p, g.d]];
+    } else {
+      if (!sc.solved) sc.solved = solveScene(sc, 7);
+      conf = sc.solved; L.targets = sc.goal.map((t) => [t.slice(0, 3), t[3]]);
+    }
+    ghosts.forEach((g, k) => g.set(fk(o.arms[k], conf.goal[k])));
+    targets.forEach((t, k) => t.set(L.targets[k][0], L.targets[k][1]));
+    note.innerHTML = o.goals ? o.goals[L.goalIdx || 0].note : sc.note;
+    resetPlan();
+  }
+  function resetPlan() {
+    L.state = 'idle'; L.path = null; L.raw = null; L.pl = null; L.cut = false; phases = null; L.cur = conf.start.map((q) => q.slice());
+    tStart.reset(); tGoal.reset(); traces.forEach((t) => t.set([])); L.checks0 = world.checks; L.msg = '';
+    arms.forEach((a, k) => a.set(fk(o.arms[k], L.cur[k]))); bCut.disabled = true; bPlay.disabled = true; bPlan.textContent = '계획 시작';
+    drawChart2(); refresh();
+  }
+  function startPlan() {
+    resetPlan();
+    const n = o.arms.length, rng = mulberry(Math.floor(Math.random() * 1e9));
+    const mk = (active, fixed, a, b) => { const sp = makeSpace(world, active, fixed); return { sp, pl: new Planner(sp, a, b, { kind: L.kind, eps: L.eps, res: 0.04, rng, maxNodes: o.maxNodes || 8000 }), active }; };
+    if (n === 1) phases = [mk([0], conf.start, conf.start[0], conf.goal[0])];
+    else if (L.mode === '14') phases = [mk([0, 1], conf.start, conf.start[0].concat(conf.start[1]), conf.goal[0].concat(conf.goal[1]))];
+    else phases = [mk([0], [conf.start[0], conf.start[1]], conf.start[0], conf.goal[0]), null];
+    pi = 0; L.state = 'plan'; L.t0 = performance.now(); bPlan.textContent = '다시 계획';
+    blockedGoal(phases[0], 0);
+  }
+  // in sequential mode the goal itself may be blocked by the arm that stands still
+  function blockedGoal(ph, which) {
+    if (ph.sp.free(ph.pl.goal)) return false;
+    L.state = 'fail';
+    L.msg = which === 0 ? '<b>왼팔의 목표 자세 자체가 막혀 있습니다.</b> 출발 자세로 서 있는 오른팔과 겹쳐요. 오른팔이 비켜 주지 않는 한 어떤 경로도 없습니다.'
+      : '<b>오른팔의 목표 자세 자체가 막혀 있습니다.</b> 먼저 도착한 왼팔과 겹쳐요.';
+    refresh(); return true;
+  }
+  function drainEdges(ph) {
+    const pl = ph.pl, sp = ph.sp;
+    for (const e of pl.newEdges) {
+      const A = sp.split(e.a), B = sp.split(e.b);
+      for (const k of ph.active) {
+        const T = o.arms.length > 1 ? (k === 0 ? tStart : tGoal) : e.tree === 'start' ? tStart : tGoal;   // two arms: colour by arm
+        T.add(tcpOf(o.arms[k], A[k]), tcpOf(o.arms[k], B[k]));
+      }
+    }
+    pl.newEdges.length = 0; tStart.flush(); tGoal.flush();
+  }
+  function finishPlanning() {
+    // build full path over all arms
+    const full = [];
+    if (phases.length === 1) for (const x of phases[0].pl.path) full.push(phases[0].sp.split(x));
+    else {
+      for (const x of phases[0].pl.path) full.push(phases[0].sp.split(x));
+      for (const x of phases[1].pl.path) full.push(phases[1].sp.split(x));
+    }
+    L.raw = full.map((qs) => qs.flat()); setPath(L.raw);
+    bCut.disabled = false; bPlay.disabled = false;
+  }
+  function setPath(flatPath) {
+    L.path = flatPath; L.times = timing(flatPath, 0.5);
+    // dense hand traces
+    const n = o.arms.length, pts = o.arms.map(() => []), T = L.times[L.times.length - 1];
+    for (let i = 0; i <= 160; i++) { const q = sampleAt(flatPath, L.times, T * i / 160); for (let k = 0; k < n; k++) pts[k].push(tcpOf(o.arms[k], q.slice(k * 7, k * 7 + 7))); }
+    traces.forEach((t, k) => t.set(pts[k]));
+    L.state = 'play'; L.playT = 0; drawChart2();
+  }
+  function doShortcut() {
+    if (!L.raw) return;
+    const n = o.arms.length, sp = makeSpace(world, n === 1 ? [0] : [0, 1], conf.start);
+    const c0 = world.checks;
+    const p = shortcut(sp, L.raw, 200, 0.04, mulberry(Math.floor(Math.random() * 1e9)));
+    L.cutChecks = world.checks - c0; L.cut = true;
+    setPath(p); bCut.disabled = true;
+  }
+  function drawChart2() {
+    if (!chart) return;
+    const { ctx, W, H, dpr } = fit(chart); ctx.fillStyle = COL.paper; ctx.fillRect(0, 0, W, H);
+    const x0 = 44 * dpr, w = W - x0 - 10 * dpr, y0 = 8 * dpr, h = H - 16 * dpr;
+    if (!L.path) { label(ctx, '계획이 끝나면 관절 14개의 각도를 시간에 따라 그립니다', W / 2, H / 2, COL.ink3, 12, dpr, 'center'); return; }
+    const T = L.times[L.times.length - 1], series = [];
+    for (let k = 0; k < L.path[0].length; k++) {
+      const col = k < 7 ? COL.tree : COL.tree2;
+      series.push({ data: L.path.map((q, i) => [L.times[i], q[k]]), col: rgba(col, 0.75), lw: 1.4 });
+    }
+    drawChart(ctx, x0, y0, w, h, dpr, series, { tmin: 0, tmax: T, vmin: -3.2, vmax: 3.8, ticks: [-3, 0, 3], unit: '' });
+    const tx = x0 + Math.min(1, L.playT / T) * w; ctx.strokeStyle = COL.accent; ctx.lineWidth = 2 * dpr; ctx.beginPath(); ctx.moveTo(tx, y0); ctx.lineTo(tx, y0 + h); ctx.stroke();
+    label(ctx, '관절각 (rad): 왼팔 7개 (청록), 오른팔 7개 (주황빨강)', x0 + 8 * dpr, y0 + 10 * dpr, COL.ink2, 11.5, dpr, 'left', 'middle', 600);
+    L.chartT = L.playT;
+  }
+  function refresh() {
+    const ph = phases && (phases[pi] || phases[pi - 1]);
+    const its = phases ? phases.filter(Boolean).reduce((a, p) => a + p.pl.iters, 0) : 0, nodes = phases ? phases.filter(Boolean).reduce((a, p) => a + p.pl.nodes, 0) : 0;
+    C.it.textContent = its.toLocaleString(); C.nodes.textContent = nodes.toLocaleString();
+    C.chk.textContent = (world.checks - L.checks0).toLocaleString();
+    C.len.textContent = L.path ? pathLength(L.path).toFixed(2) + ' rad' + (L.cut ? ' (다듬음)' : '') : '–';
+    C.dur.textContent = L.path ? L.times[L.times.length - 1].toFixed(1) + ' s' : '–';
+    const st = { idle: '대기', plan: '계획 중', play: '실행', fail: '실패', done: '완료' }[L.state];
+    C.st.innerHTML = L.state === 'fail' ? '<span class="bad">실패</span>' : L.state === 'play' || L.state === 'done' ? '<span class="ok">' + st + '</span>' : st;
+    s.cap.innerHTML = L.msg || (L.state === 'idle' ? (o.arms.length > 1 ? '[계획 시작]을 누르세요. 트리의 노드마다 왼손 위치를 청록 선으로, 오른손 위치를 주황빨강 선으로 이어 그립니다. 14차원 노드 하나가 3D에 점 두 개로 찍히는 셈이에요.' : '[계획 시작]을 누르세요. 청록 선은 출발 쪽 트리, 주황빨강 선은 목표 쪽 트리를 <b>손끝 위치</b>로 옮겨 그린 것입니다.') : '');
+  }
+  L.tick = (dt) => {
+    if (L.state === 'plan') {
+      const ph = phases[pi], pl = ph.pl, t0 = performance.now();
+      const budget = L.speed === 'slow' ? 0 : L.speed === 'fast' ? 12 : 1500;
+      do { pl.step(); } while (!pl.done && performance.now() - t0 < budget);
+      drainEdges(ph);
+      if (pl.done) {
+        if (pl.failed) {
+          L.state = 'fail';
+          L.msg = phases.length === 2 ? (pi === 0 ? '<b>왼팔이 길을 찾지 못했습니다.</b> 오른팔이 출발 자세에 그대로 서 있으면 왼팔 목표로 가는 길이 막혀 있어요.' : '<b>오른팔이 길을 찾지 못했습니다.</b> 먼저 도착한 왼팔이 길을 막고 있어요.')
+            : `<b>노드 ${pl.nodes.toLocaleString()}개를 넘겨 멈췄습니다.</b> 이 문제에서 이 설정으로는 길을 찾지 못했어요.`;
+        } else if (phases.length === 2 && pi === 0) {
+          const p0 = phases[0];
+          phases[1] = (() => { const sp = makeSpace(world, [1], [conf.goal[0], conf.start[1]]); return { sp, pl: new Planner(sp, conf.start[1], conf.goal[1], { kind: L.kind, eps: L.eps, res: 0.04, rng: mulberry(Math.floor(Math.random() * 1e9)), maxNodes: o.maxNodes || 8000 }), active: [1] }; })();
+          pi = 1; blockedGoal(phases[1], 1);
+        } else { pi++; L.msg = `계획 완료: ${((performance.now() - L.t0) / 1000).toFixed(2)}초. 손끝이 지나가는 길을 주황 선으로 그렸어요.`; finishPlanning(); }
+      }
+      refresh();
+    } else if (L.state === 'play' && L.path) {
+      L.playT += dt; const T = L.times[L.times.length - 1];
+      const q = sampleAt(L.path, L.times, L.playT);
+      arms.forEach((a, k) => a.set(fk(o.arms[k], q.slice(k * 7, k * 7 + 7))));
+      if (L.playT >= T + 0.6) { L.state = 'done'; }
+      if (chart) drawChart2();
+      refresh();
+    }
+    view.render();
+  };
+  L.theme = () => drawChart2();
+  L.setup = setup;
+  setup();
+  LABS.push(L); return L;
+}
+
+const lab4 = planLab('lab4', {
+  title: '팔 하나, 7차원 탐색',
+  sub: '반투명 팔이 목표 자세입니다. 탐색은 관절 공간(7차원)에서 일어나고, 그림의 선은 각 노드의 손끝 위치를 이은 그림자예요.',
+  aria: '선반 안으로 손을 넣는 7자유도 팔의 RRT 탐색 트리', cam: { az: -2.2, el: 0.55, r: 2.4, tgt: [0.5, 0.18, 0.25] },
+  arms: [BASE_L], sceneKeys: ['shelf'], algos: true, maxNodes: 6000,
+  goals: [
+    { name: '아래 칸', p: [0.70, 0.24, 0.15], d: [1, 0, 0], note: '위에서 내려다보던 손을 선반 아래 칸 안으로, 앞을 보게 넣습니다. 가운데 판 밑의 좁은 틈을 통과해야 해요.' },
+    { name: '위 칸', p: [0.72, 0.24, 0.46], d: [1, 0, 0], note: '위 칸은 입구가 넓어서 비교적 쉬운 문제입니다. 아래 칸과 노드 수를 비교해 보세요.' },
+  ],
+});
+const lab5 = planLab('lab5', {
+  title: '팔 두 개, 14차원 탐색',
+  sub: '두 팔의 관절각 14개를 한 점으로 묶어 계획하거나, 한 팔씩 차례로 계획합니다. 아래 그래프는 실행되는 동안의 관절각이에요.',
+  aria: '두 로봇팔이 장애물을 피해 동시에 움직이는 14차원 경로 계획', cam: { az: -2.0, el: 0.75, r: 2.8, tgt: [0.45, 0, 0.2] },
+  arms: [BASE_L, BASE_R], sceneKeys: ['cross', 'shelf', 'wall'], modes: true, chart: true, maxNodes: 10000,
+});
+
+// ===================================================================
+// hero: two arms swap places around a post, planned at load time
+// ===================================================================
+const hero = (() => {
+  const cv = document.getElementById('hero');
+  const view = new View3D(cv, { az: -0.8, el: 0.5, r: 2.15, tgt: [0.3, 0, 0.25] });
+  const H = { view, visible: true, t: 0 };
+  if (!view.ok) { H.tick = () => {}; return H; }
+  const sc = SCENES.cross; view.setBoxes(sc.boxes);
+  if (!sc.solved) sc.solved = solveScene(sc, 7);
+  const w = new World([{ base: BASE_L }, { base: BASE_R }], sc.boxes), conf = sc.solved;
+  const arms = [new ArmViz(view, { tint: 'tree' }), new ArmViz(view, { tint: 'tree2' })], tr = [new PolyViz(view, 'tree'), new PolyViz(view, 'tree2')];
+  const sp = makeSpace(w, [0, 1], conf.start), a = conf.start[0].concat(conf.start[1]), b = conf.goal[0].concat(conf.goal[1]);
+  let path = null;
+  for (let seed = 3; seed < 12 && !path; seed++) { const pl = new Planner(sp, a, b, { rng: mulberry(seed), maxNodes: 6000 }); while (!pl.done) pl.step(); if (!pl.failed) path = shortcut(sp, pl.path, 200, 0.04, mulberry(5)); }
+  if (!path) path = [a, a];
+  const fwd = path.map((q) => sp.split(q).flat()), loop = fwd.concat(fwd.slice().reverse().slice(1)), times = timing(loop, 0.4), T = times[times.length - 1];
+  const pts = [[], []]; for (let i = 0; i <= 120; i++) { const q = sampleAt(fwd, timing(fwd, 0.4), timing(fwd, 0.4).slice(-1)[0] * i / 120); pts[0].push(tcpOf(BASE_L, q.slice(0, 7))); pts[1].push(tcpOf(BASE_R, q.slice(7))); }
+  tr[0].set(pts[0]); tr[1].set(pts[1]);
+  H.tick = (dt) => {
+    H.t = (H.t + dt) % (T + 1.2);
+    const q = sampleAt(loop, times, Math.min(H.t, T));
+    arms[0].set(fk(BASE_L, q.slice(0, 7))); arms[1].set(fk(BASE_R, q.slice(7)));
+    if (!RM && !view.userMoved) { view.orb.az = -0.8 + 0.25 * Math.sin(H.t * 0.15); view.dirty = true; }
+    view.render();
+  };
+  return H;
+})();
+
+
+// ===================================================================
+// typeset math (MathJax SVG) with numbered highlight boxes
+// ===================================================================
+let MJ_P = null, MJ_STYLED = false;
+function mjReady() {
+  if (!MJ_P) MJ_P = (window.MathJax && MathJax.startup && MathJax.startup.promise) ? MathJax.startup.promise.then(() => !!MathJax.tex2svg, () => false) : Promise.resolve(false);
+  return MJ_P;
+}
+function texNode(src, display = true) {
+  if (!(window.MathJax && MathJax.tex2svg)) { const f = el('code', 'tex-fb'); f.textContent = src; return f; }
+  try {
+    const n = MathJax.tex2svg(src, { display });
+    if (n.querySelector('[data-mjx-error], merror')) throw new Error('tex');
+    return n;
+  } catch (e) { const f = el('code', 'tex-fb'); f.textContent = src; return f; }
+}
+function mjStyle() { if (MJ_STYLED || !(window.MathJax && MathJax.startup && MathJax.startup.document)) return; MJ_STYLED = true; try { MathJax.startup.document.updateDocument(); } catch (e) {} }
+const ANN = (src) => src.replace(/\\A(\d)\{/g, '\\class{a$1}{');
+class MathStage {
+  constructor(host, tex) {
+    this.wrap = el('div', 'mstage'); host.append(this.wrap);
+    this.layer = el('div', 'mboxes'); this.wrap.append(this.layer);
+    this.groups = []; this.tex = tex; this.node = null; this.dimSet = null;
+    mjReady().then(() => this.render());
+    if (window.ResizeObserver) new ResizeObserver(() => this.layout()).observe(this.wrap);
+  }
+  setTex(tex) { if (tex === this.tex && this.node) return; this.tex = tex; mjReady().then(() => this.render()); }
+  render() {
+    if (this.node) this.node.remove();
+    this.node = texNode(this.tex, true); this.wrap.insertBefore(this.node, this.layer); mjStyle();
+    this.applyDim(); this.layout();
+  }
+  // groups: [{cls:['a1',...], col:'h1', n:1|null, each:true|false, faint:false}]
+  show(groups, dim) { this.groups = groups || []; this.dimSet = dim || null; this.applyDim(); this.layout(); }
+  applyDim() {
+    if (!this.node || !this.node.querySelectorAll) return;
+    const svg = this.node.querySelector('svg') || this.node;
+    const all = svg.querySelectorAll('[class*="ce"]');
+    for (const e of all) { const c = [...e.classList].find((x) => /^ce\d/.test(x)); if (!c) continue; e.style.opacity = this.dimSet && !this.dimSet.has(c) ? '0.3' : ''; }
+  }
+  layout() {
+    this.layer.innerHTML = '';
+    if (!this.node || !this.node.querySelectorAll) return;
+    const R = this.wrap.getBoundingClientRect(); if (!R.width) return;
+    const ox = -R.left + this.wrap.scrollLeft, oy = -R.top + this.wrap.scrollTop;
+    const svg = this.node.querySelector('svg'); if (!svg) return;
+    for (const g of this.groups) {
+      const els = g.cls.flatMap((c) => [...svg.querySelectorAll('.' + c)]);
+      const rs = els.map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 || r.height > 0);
+      if (!rs.length) continue;
+      const boxes = g.each ? rs : [rs.reduce((a, r) => ({ left: Math.min(a.left, r.left), top: Math.min(a.top, r.top), right: Math.max(a.right, r.right), bottom: Math.max(a.bottom, r.bottom) }), { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity })];
+      boxes.forEach((r, i) => {
+        const p = 4, d = el('div', 'mbox ' + (g.col || 'h1') + (g.faint ? ' faint' : ''));
+        d.style.left = (r.left + ox - p) + 'px'; d.style.top = (r.top + oy - p) + 'px';
+        d.style.width = (r.right - r.left + 2 * p) + 'px'; d.style.height = (r.bottom - r.top + 2 * p) + 'px';
+        if (g.n && i === 0) d.append(el('span', 'mbadge', String(g.n)));
+        this.layer.append(d);
+      });
+    }
+  }
+}
+// static key equations written in the page
+const KEQ_COL = ['h1', 'h2', 'h3', 'h4', 'h5'];
+let KEQ_N = 0;
+function initKeqs() {
+  for (const k of document.querySelectorAll('.keq')) {
+    const src = k.querySelector('script[type="text/tex"]'); if (!src) continue;
+    const no = ++KEQ_N;
+    const row = el('div', 'keq-row'); src.replaceWith(row);
+    const st = new MathStage(row, ANN(src.textContent.trim()).replace(/\\\\[ \t]*\n/g, '\\\\[7pt]\n'));
+    row.append(el('span', 'keq-no', `(${no})`));
+    const lis = [...k.querySelectorAll('.keq-leg li')];
+    const groups = lis.map((li, i) => ({ cls: ['a' + (i + 1)], col: KEQ_COL[i % 5], n: i + 1, each: true }));
+    lis.forEach((li, i) => {
+      const sp = el('span'); while (li.firstChild) sp.append(li.firstChild); li.append(sp);
+      li.insertBefore(el('i', 'kb ' + KEQ_COL[i % 5], String(i + 1)), li.firstChild);
+      li.addEventListener('pointerenter', () => st.show(groups.map((g, j) => ({ ...g, faint: j !== i }))));
+      li.addEventListener('pointerleave', () => st.show(groups));
+    });
+    st.show(groups);
+  }
+}
+
+// ===================================================================
+// matrix lens: big matrices whose cells can be highlighted step by step
+// ===================================================================
+function mxTerm(parent, name, rows, cols, o = {}) {
+  const t = el('div', 'mx-term'); const g = el('div', 'mx' + (o.sm ? ' sm' : '')); g.style.gridTemplateColumns = `repeat(${cols}, auto)`;
+  const cells = [];
+  for (let r = 0; r < rows; r++) { const row = []; for (let c = 0; c < cols; c++) { const x = el('span', 'mx-c'); g.append(x); row.push(x); } cells.push(row); }
+  t.append(g); if (name) t.append(el('div', 'mx-name', name)); parent.append(t);
+  const T = {
+    el: t, cells, rows, cols,
+    set(r, c, main, sub) { const x = cells[r][c]; x.innerHTML = main + (sub != null ? `<small>${sub}</small>` : ''); },
+    tip(r, c, text) { const x = cells[r][c]; x.dataset.tip = text; x.classList.add('tip'); x.tabIndex = 0; },
+    all() { return cells.flat(); },
+    row(r) { return cells[r]; },
+    col(c) { return cells.map((row) => row[c]); },
+  };
+  return T;
+}
+function mxOp(parent, s) { parent.append(el('span', 'mx-op', s)); }
+function mxLine(parent, lbl) { const d = el('div', 'mx-eq'); if (lbl) d.append(el('span', 'mx-lbl', lbl)); parent.append(d); return d; }
+const HL = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'dim'];
+function mxClear(terms) { for (const t of terms) for (const x of t.all()) x.classList.remove(...HL); }
+// marks: [[cells[], 'h1', label?], ...]; numeric cells get classes, the typeset formula gets boxes + numbered legend
+function mxMark(terms, marks, dimRest = true) {
+  mxClear(terms); const on = new Set();
+  for (const [cs, cls] of marks) for (const x of cs) { x.classList.remove(...HL); x.classList.add(cls); on.add(x); }
+  if (dimRest && marks.length) for (const t of terms) for (const x of t.all()) if (!on.has(x)) x.classList.add('dim');
+  const S = terms._S; if (!S || !S.stages) return;
+  const per = new Map(); S.stages.forEach((st) => per.set(st, { groups: [], keep: new Set() }));
+  let n = 0; const legend = [];
+  marks.forEach(([cs, cls, lab]) => {
+    const num = lab && cls !== 'dim' ? ++n : null; if (num) legend.push([num, cls, lab]);
+    const by = new Map();
+    for (const x of cs) { const m = x._mj; if (!m) continue; const key = m.st.id + ':' + m.t; if (!by.has(key)) by.set(key, { st: m.st, set: new Set() }); by.get(key).set.add(m.c); }
+    let first = true;
+    for (const { st, set } of by.values()) { const P = per.get(st); if (!P || cls === 'dim') continue; set.forEach((c) => P.keep.add(c)); P.groups.push({ cls: [...set], col: cls, n: first ? num : null }); first = false; }
+  });
+  for (const [st, P] of per) st.show(P.groups, dimRest && marks.length ? P.keep : null);
+  if (S.leg) S.leg.innerHTML = legend.map(([k, cls, lab]) => `<li><i class="kb ${cls}">${k}</i><span>${lab}</span></li>`).join('');
+}
+const f3 = (v, n = 3) => (Math.abs(v) < 0.5 * 10 ** -n ? 0 : v).toFixed(n);
+const sg = (v, n = 3) => (v < 0 ? '− ' + f3(-v, n) : '+ ' + f3(v, n));
+// a lens section: equations on top, canvas + stepper below
+function lens(id, o) {
+  const root = document.getElementById(id);
+  root.classList.add('lab');
+  const box = el('div', 'mx-eqs'); root.append(box);
+  box.append(el('div', 'mx-bh', '<b>식으로</b> 각 칸이 무슨 뜻인지'));
+  const eqsSym = el('div', 'mx-blk sym'); box.append(eqsSym);
+  const leg = el('ol', 'keq-leg mx-leg'); box.append(leg);
+  box.append(el('div', 'mx-bh', '<b>숫자로</b> 지금 값을 넣으면'));
+  const eqs = el('div', 'mx-blk num'); box.append(eqs);
+  const hover = el('div', 'mx-hover', '칸에 마우스를 올리면 그 칸이 무슨 뜻인지 보여요.'); root.append(hover);
+  const body = el('div', 'mx-body'); root.append(body);
+  const left = el('div'); const side = el('div', 'mx-side sidepanel'); body.append(left, side);
+  let cv = null, cap = null;
+  if (!o.noCanvas) {
+    cv = el('canvas', 'map'); cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', o.aria || ''); if (o.aspect) cv.style.aspectRatio = o.aspect; left.append(cv);
+  }
+  const calcSym = el('div', 'mx-calc sym'); left.append(calcSym);
+  const calc = el('div', 'mx-calc num'); left.append(calc);
+  cap = el('div', 'vstat'); left.append(cap);
+  const ol = el('ol', 'phases'); side.append(ol);
+  const nav = el('div', 'mx-nav'); side.append(nav);
+  const note = el('div', 'side-note'); side.append(note);
+  const ctl = el('div', 'controls'); side.append(ctl);
+  const S = { root, eqs, eqsSym, leg, calcSym, hover, left, side, cv, cap, calc, note, ctl, step: 0, n: o.steps.length, onStep: null, s: { root } };
+  const lis = o.steps.map((t, i) => {
+    const li = el('li', null, `<b>${t}</b>`); li.tabIndex = 0; li.setAttribute('role', 'button');
+    li.addEventListener('click', () => S.go(i));
+    li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); S.go(i); } });
+    ol.append(li); return li;
+  });
+  const prev = button(nav, '이전', () => S.go(Math.max(0, S.step - 1)));
+  const next = button(nav, '다음 단계', () => S.go(Math.min(S.n - 1, S.step + 1)), 'btn');
+  S.go = (i) => { S.step = i; lis.forEach((li, k) => li.classList.toggle('on', k === i)); prev.disabled = i === 0; next.disabled = i === S.n - 1; S.dirty = true; if (S.syms) symCalc(S, i); if (S.onStep) S.onStep(i); };
+  root.addEventListener('pointerover', (e) => { const c = e.target.closest && e.target.closest('.mx-c'); if (c && c.dataset.tip) hover.innerHTML = c.dataset.tip; });
+  root.addEventListener('focusin', (e) => { const c = e.target.closest && e.target.closest('.mx-c'); if (c && c.dataset.tip) hover.innerHTML = c.dataset.tip; });
+  return S;
+}
+
+const SUBD = (n) => String(n).split('').map((d) => '₀₁₂₃₄₅₆₇₈₉'[+d]).join('');
+function symCalc(S, i) {
+  const [tex, note] = S.syms[i] || ['', ''];
+  const box = S.calcSym; box.innerHTML = '';
+  if (!tex && !note) return;
+  const mspan = el('span', 'cmath'); box.append(mspan);
+  if (note) box.append(el('span', 'cnote', '← ' + note));
+  mjReady().then(() => { if (S.step !== i) return; mspan.innerHTML = ''; mspan.append(texNode('\\displaystyle ' + tex, false)); mjStyle(); });
+}
+// build a typeset copy of every numeric line; each numeric cell is linked to its entry in the formula
+let STAGE_ID = 0;
+function mxTex(S, terms, specs, extra = {}) {
+  terms._S = S; S.stages = []; S.specs = specs;
+  terms.forEach((t, i) => { if (t.el) t.el.dataset.ti = i; });
+  const entry = (i, r, c) => { const sp = S.specs[i]; return typeof sp === 'function' ? sp(r, c) : sp[r][c]; };
+  const termTex = (i) => {
+    const t = terms[i], rows = [];
+    for (let r = 0; r < t.rows; r++) { const cs = []; for (let c = 0; c < t.cols; c++) cs.push(`\\class{ce${i}x${r}x${c}}{${entry(i, r, c)}}`); rows.push(cs.join(' & ')); }
+    return `\\begin{bmatrix} ${rows.join(' \\\\[3pt] ')} \\end{bmatrix}`;
+  };
+  for (const line of [...S.eqs.children]) {
+    if (!line.classList.contains('mx-eq')) continue;
+    const sl = el('div', 'mx-eq'); const lb = line.querySelector('.mx-lbl'); if (lb) sl.append(lb.cloneNode(true));
+    S.eqsSym.append(sl);
+    if (line.dataset.symonly) { line.remove(); const st = new MathStage(sl, extra.chainTex); st.id = ++STAGE_ID; S.stages.push(st); if (extra.onChain) extra.onChain(st); continue; }
+    const parts = [...line.children].filter((ch) => !ch.classList.contains('mx-lbl'));
+    const build = () => parts.map((ch) => {
+      if (ch.classList.contains('mx-op')) { const o = ch.textContent.trim(); return o === '·' ? '\\,' : o; }
+      if (ch.dataset.ti != null) return termTex(+ch.dataset.ti);
+      return '';
+    }).join(' ');
+    const st = new MathStage(sl, build()); st.id = ++STAGE_ID; st.build = build; S.stages.push(st);
+    for (const ch of parts) if (ch.dataset.ti != null) { const i = +ch.dataset.ti, t = terms[i]; t.cells.forEach((row, r) => row.forEach((x, c) => { x._mj = { st, t: i, c: `ce${i}x${r}x${c}` }; })); }
+  }
+  S.retex = () => { for (const st of S.stages) if (st.build) st.setTex(st.build()); };
+}
+function mxName(t, text) { t.el.querySelector('.mx-name').textContent = text; }
+
+// ===================================================================
+// thick arrows / markers for the lenses (always drawn on top)
+// ===================================================================
+const CONE = HAS3D ? new THREE.ConeGeometry(1, 1, 18) : null;
+class ThickArrow {
+  constructor(view, colKey, o = {}) {
+    this.view = view; this.r = o.r || 0.006; this.head = o.head ?? 0.035; if (!view.ok) return;
+    const m = new THREE.MeshBasicMaterial({ depthTest: false, transparent: true, opacity: o.op ?? 1 });
+    view.mats.push(() => { m.color = hex(COL[colKey]); }); m.color = hex(COL[colKey]); this.mat = m;
+    this.shaft = new THREE.Mesh(GEO.cyl, m); this.cone = new THREE.Mesh(CONE, m);
+    this.shaft.renderOrder = 10; this.cone.renderOrder = 10;
+    view.scene.add(this.shaft, this.cone); this.hide();
+  }
+  hide() { if (!this.shaft) return; this.shaft.visible = false; this.cone.visible = false; this.view.dirty = true; }
+  set(o, v) {
+    if (!this.shaft) return;
+    const L = Math.hypot(v[0], v[1], v[2]); if (L < 1e-4) { this.hide(); return; }
+    const d = new THREE.Vector3(v[0] / L, v[1] / L, v[2] / L), h = Math.min(this.head, L * 0.45), sl = L - h;
+    const q = new THREE.Quaternion().setFromUnitVectors(Y_AXIS, d);
+    this.shaft.visible = sl > 1e-4; this.shaft.quaternion.copy(q); this.shaft.scale.set(this.r, Math.max(sl, 1e-4), this.r);
+    this.shaft.position.set(o[0] + d.x * sl / 2, o[1] + d.y * sl / 2, o[2] + d.z * sl / 2);
+    this.cone.visible = h > 0; this.cone.quaternion.copy(q); this.cone.scale.set(this.r * 2.6, h, this.r * 2.6);
+    this.cone.position.set(o[0] + d.x * (sl + h / 2), o[1] + d.y * (sl + h / 2), o[2] + d.z * (sl + h / 2));
+    this.view.dirty = true;
+  }
+}
+class Dot {
+  constructor(view, colKey, r = 0.014) {
+    this.view = view; if (!view.ok) return;
+    const m = new THREE.MeshBasicMaterial({ depthTest: false }); view.mats.push(() => { m.color = hex(COL[colKey]); }); m.color = hex(COL[colKey]);
+    this.m = new THREE.Mesh(GEO.sph, m); this.m.scale.setScalar(r); this.m.renderOrder = 11; view.scene.add(this.m);
+  }
+  set(p) { if (!this.m) return; this.m.visible = true; this.m.position.set(p[0], p[1], p[2]); this.view.dirty = true; }
+  hide() { if (this.m) { this.m.visible = false; this.view.dirty = true; } }
+}
+function frameArrows(view, r = 0.006, op = 1) { return ['hit', 'ok', 'fEKF'].map((c) => new ThickArrow(view, c, { r, op, head: 0.03 })); }
+function setFrame(arrs, T, L) { const o = P(T); for (let k = 0; k < 3; k++) arrs[k].set(o, [T[k] * L, T[4 + k] * L, T[8 + k] * L]); }
+function hideAll(xs) { for (const x of xs) x.hide(); }
+const AX = ['h3', 'h4', 'h5'];
+
+// ===================================================================
+// lens 1: forward kinematics as a chain of 4×4 matrices
+// ===================================================================
+const lensFK = (() => {
+  const S = lens('mxfk', {
+    aria: '로봇팔과 선택한 관절 좌표계의 세 축, 원점까지의 선',
+    steps: ['4×4 행렬 한 장 = 좌표계 하나', '넷째 열 = 원점의 위치', '관절 하나의 행렬: q는 두 열에만', '곱하기 = 이어 붙이기', '끝까지 곱하면 손'],
+  });
+  const view = new View3D(S.cv, { az: -0.95, el: 0.32, r: 1.75, tgt: [0.2, 0, 0.42] }); S.view = view;
+  if (!view.ok) S.cv.replaceWith(el('div', 'side-note', '이 브라우저에서 WebGL을 쓸 수 없어 3D 그림을 그리지 못했습니다. 행렬 계산은 그대로 동작해요.'));
+  const base = baseT(0, 0, 0, 0), arm = new ArmViz(view);
+  arm.opacity(0.55);
+  const fk1 = frameArrows(view, 0.008), fk0 = frameArrows(view, 0.004, 0.45), toO = new ThickArrow(view, 'accent', { r: 0.005, head: 0.03 }), dot = new Dot(view, 'accent');
+  const st = { q: [0.35, -0.6, 0.25, -2.1, 0.15, 1.7, 0.8], k: 5 };
+  const C0 = mxLine(S.eqs, '전체 사슬'); C0.dataset.symonly = '1';
+  const chainNames = ['T<sub>받침</sub>', 'T₁(q₁)', 'T₂(q₂)', 'T₃(q₃)', 'T₄(q₄)', 'T₅(q₅)', 'T₆(q₆)', 'T₇(q₇)', 'T<sub>손</sub>'];
+  const chain = { cells: [[]], all() { return this.cells[0]; } };
+  chainNames.forEach((t, i) => { if (i) C0.append(el('span', 'mx-op', '·')); const c = el('span', 'mx-c', t); c.style.minWidth = '2.9em'; c.style.fontSize = '14px'; c.style.padding = '4px 5px'; C0.append(c); chain.cells[0].push(c); });
+  C0.append(el('span', 'mx-op', '=')); const handC = el('span', 'mx-c', '손의 자세'); C0.append(handC); chain.cells[0].push(handC);
+  const A = mxLine(S.eqs, '한 단계');
+  const Tr = mxTerm(A, '지금까지 곱한 결과', 4, 4, { sm: true }); mxOp(A, '='); const Tp = mxTerm(A, '바로 앞까지 곱한 결과', 4, 4, { sm: true }); mxOp(A, '·'); const Tl = mxTerm(A, '이번 관절 하나의 행렬', 4, 4, { sm: true });
+  const TERMS = [chain, Tr, Tp, Tl];
+  const XYZ = 'xyz';
+  const accSpec = (pr) => (r, c) => (r === 3 ? (c === 3 ? '1' : '0') : c < 3 ? `R${pr}_{${r + 1}${c + 1}}` : `\\mathbf p${pr}_{${XYZ[r]}}`);
+  const DH_SYM = [[String.raw`\cos q`, String.raw`-\sin q`, '0', 'a'], [String.raw`\sin q\cos\alpha`, String.raw`\cos q\cos\alpha`, String.raw`-\sin\alpha`, String.raw`-d\sin\alpha`],
+    [String.raw`\sin q\sin\alpha`, String.raw`\cos q\sin\alpha`, String.raw`\cos\alpha`, String.raw`d\cos\alpha`], ['0', '0', '0', '1']];
+  const HAND_SYM = [[String.raw`\cos 45^\circ`, String.raw`\sin 45^\circ`, '0', '0'], [String.raw`-\sin 45^\circ`, String.raw`\cos 45^\circ`, '0', '0'], ['0', '0', '1', String.raw`d_{\text{손}}`], ['0', '0', '0', '1']];
+  const CHN = [String.raw`T_{\text{받침}}`, 'T_1(q_1)', 'T_2(q_2)', 'T_3(q_3)', 'T_4(q_4)', 'T_5(q_5)', 'T_6(q_6)', 'T_7(q_7)', String.raw`T_{\text{손}}`];
+  const chainTex = CHN.map((t, k) => `\\class{ce99x0x${k}}{${t}}`).join(String.raw`\,\cdot\,`) + String.raw` = \class{ce99x0x9}{T_{\text{끝}}}`;
+  mxTex(S, TERMS, [null, accSpec(''), accSpec("'"), DH_SYM], { chainTex, onChain: (stg) => chain.cells[0].forEach((x, k) => { x._mj = { st: stg, t: 99, c: `ce99x0x${k}` }; }) });
+  let lastSymK = false;
+  S.syms = [
+    [String.raw`T = \begin{bmatrix} \class{t3}{\mathbf x} & \class{t4}{\mathbf y} & \class{t5}{\mathbf z} & \class{t1}{\mathbf p} \\ 0 & 0 & 0 & 1 \end{bmatrix}`, '3×3은 세 축(x, y, z)의 방향, 넷째 열은 원점의 위치'],
+    [String.raw`\class{t1}{\mathbf p = (p_x,\; p_y,\; p_z)}`, '받침대에서 본 이 좌표계 원점의 위치'],
+    [String.raw`T_k(q) = \mathrm{RotX}(\alpha)\,\mathrm{TransX}(a)\,\class{t2}{\mathrm{RotZ}(q)}\,\mathrm{TransZ}(d)`, 'q는 RotZ 하나에만, 나머지는 링크 모양 상수'],
+    [String.raw`\begin{bmatrix} R' & \mathbf p' \\ 0 & 1 \end{bmatrix}\begin{bmatrix} R_k & \mathbf p_k \\ 0 & 1 \end{bmatrix} = \begin{bmatrix} R'R_k & \class{t4}{\mathbf p'} + \class{t2}{R'}\,\class{t1}{\mathbf p_k} \\ 0 & 1 \end{bmatrix}`, '새 원점 = 이전 원점 + 이전 축으로 잰 이번 링크'],
+    [String.raw`T_{\text{끝}} = T_{\text{받침}}\,T_1(q_1)\cdots T_7(q_7)\,T_{\text{손}} = \begin{bmatrix} \cdot & \cdot & \class{t5}{\mathbf z} & \class{t1}{\mathbf p} \\ 0 & 0 & 0 & 1 \end{bmatrix}`, 'p는 손끝 위치, z는 손이 향하는 방향'],
+  ];
+  const nameK = (k) => (k === 8 ? '손끝' : '관절 ' + k);
+  const ctl = S.ctl;
+  const sk = slider(ctl, { label: '고른 좌표계', min: 1, max: 8, step: 1, value: st.k, fmt: (v) => nameK(v), on: (v) => { st.k = v; syncQ(); S.dirty = true; } });
+  const sq = slider(ctl, { label: '그 관절의 q', min: -166, max: 166, step: 1, value: 0, fmt: (v) => v.toFixed(0) + '°', on: (v) => { if (st.k <= 7) { st.q[st.k - 1] = rad(v); S.dirty = true; } } });
+  function syncQ() {
+    if (st.k <= 7) { const k = st.k - 1; sq.inp.min = deg(QMIN[k]).toFixed(0); sq.inp.max = deg(QMAX[k]).toFixed(0); sq.set(Math.round(deg(st.q[k]))); sq.inp.disabled = false; sq.el.style.opacity = 1; }
+    else { sq.inp.disabled = true; sq.el.style.opacity = 0.4; }
+  }
+  syncQ();
+  const NOTES = [
+    '로봇팔의 각 관절에는 작은 좌표계(x, y, z 축)가 붙어 있고, 그 좌표계 하나를 <b>4×4 행렬 한 장</b>으로 씁니다. 왼쪽 위 3×3의 <b>세 열은 세 축이 세계에서 가리키는 방향</b>이에요. 첫째 열(빨강)이 x축, 둘째 열(초록)이 y축, 셋째 열(파랑)이 z축. 그림의 굵은 화살표 세 개가 바로 이 세 열입니다. “고른 좌표계”를 바꿔 보세요.',
+    '<b>넷째 열은 그 좌표계의 원점이 어디 있는지</b>, 즉 위치 (x, y, z)입니다. 그림에서 받침대 중심에서 원점까지 이은 주황 화살표예요. 맨 아랫줄 (0, 0, 0, 1)은 계산을 한 번의 곱셈으로 묶으려고 붙인 자리라서 늘 같습니다.',
+    '관절 하나의 행렬은 대부분 <b>링크 모양으로 정해진 상수</b>(파랑)이고, 관절각 q는 <b>첫째·둘째 열에만</b>(cos q, sin q의 꼴로) 들어갑니다. q 슬라이더를 움직이면 이 칸들만 바뀌어요. 넷째 열에는 q가 없습니다. 그래서 관절 k를 돌려도 <b>관절 k의 원점은 제자리</b>이고, 그 뒤에 붙은 것들만 움직여요.',
+    '앞까지 곱한 결과에 이번 행렬을 곱하는 건 <b>이전 좌표계 위에 다음 링크를 이어 붙이는 것</b>입니다. 새 원점 = 이전 원점 + (이전 좌표계의 축 방향으로 잰 이번 링크의 길이). 그림의 옅은 축이 이전 좌표계, 굵은 축이 새 좌표계예요. 아래 계산이 넷째 열 하나를 실제로 곱한 과정입니다.',
+    '이렇게 아홉 장을 끝까지 곱한 결과가 <b>손의 자세</b>입니다. 넷째 열은 손끝 위치, <b>셋째 열(z축)은 손이 향하는 방향</b>이에요. 역기구학(3장)은 바로 이 두 열이 원하는 값이 되도록 q를 찾는 문제이고, 경로 계획기는 충돌 검사를 할 때마다 이 곱셈을 처음부터 다시 합니다.',
+  ];
+  S.onStep = (i) => { if (i === 4) { st.k = 8; sk.set(8); syncQ(); } S.dirty = true; };
+  const fmtM = (T, term, subs) => { for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) term.set(r, c, f3(T[r * 4 + c], 2), subs ? subs[r][c] : null); for (let c = 0; c < 4; c++) term.set(3, c, c === 3 ? '1' : '0', subs ? '' : null); };
+  const colSub = [['x축', 'y축', 'z축', '위치 x'], ['x축', 'y축', 'z축', '위치 y'], ['x축', 'y축', 'z축', '위치 z']];
+  function localSubs(k) {
+    if (k === 8) return [['', '', '', '0'], ['', '', '', '0'], ['', '', '', '손 길이']];
+    const [a, d, al] = PANDA_DH[k - 1], ca = Math.round(Math.cos(al)), sa = Math.round(Math.sin(al));
+    const t = (s, f) => (s === 0 ? '0' : s > 0 ? f : '−' + f);
+    return [['cos q', '−sin q', '0', a ? (a > 0 ? 'a' : '−|a|') : '0'], [t(ca, 'sin q'), t(ca, 'cos q'), t(-sa, '1'), d ? t(-sa, 'd') : '0'], [t(sa, 'sin q'), t(sa, 'cos q'), t(ca, '1'), d ? t(ca, 'd') : '0']];
+  }
+  function draw() {
+    const i = S.step, k = st.k, F = fk(base, st.q); arm.set(F);
+    const Tres = k === 8 ? F[9] : F[k], Tprev = k === 8 ? F[7] : F[k - 1];
+    const Tloc = k === 8 ? tmul(dhT(0, FLANGE_D, 0, 0), dhT(0, HAND_D, 0, -PI / 4)) : dhT(PANDA_DH[k - 1][0], PANDA_DH[k - 1][1], PANDA_DH[k - 1][2], st.q[k - 1]);
+    fmtM(Tres, Tr, colSub); fmtM(Tprev, Tp, colSub); fmtM(Tloc, Tl, localSubs(k));
+    if (lastSymK !== (k === 8)) { lastSymK = k === 8; S.specs[3] = k === 8 ? HAND_SYM : DH_SYM; S.retex(); }
+    mxName(Tr, k === 8 ? '손의 자세 (모두 곱한 결과)' : `받침대 → 관절 ${k}`);
+    mxName(Tp, k === 8 ? '받침대 → 관절 7' : k === 1 ? '받침대 (단위 행렬)' : `받침대 → 관절 ${k - 1}`);
+    mxName(Tl, k === 8 ? '플랜지와 손 (상수)' : `관절 ${k} 하나: T${'₁₂₃₄₅₆₇'[k - 1]}(q${'₁₂₃₄₅₆₇'[k - 1]})`);
+    const used = chain.cells[0].slice(0, k === 8 ? 10 : k + 1);
+    const AXL = ['첫째 열 = x축이 가리키는 방향', '둘째 열 = y축이 가리키는 방향', '셋째 열 = z축이 가리키는 방향'];
+    const rot = (T) => [0, 1, 2].map((c) => [T.col(c).slice(0, 3), AX[c], AXL[c]]);
+    const mk = [
+      [[used, 'h1', `받침대부터 ${nameK(k)}까지 곱한 결과가 왼쪽 행렬`], ...rot(Tr)],
+      [[used, 'h1', `받침대부터 ${nameK(k)}까지 곱한 결과`], [Tr.col(3).slice(0, 3), 'h1', '넷째 열 = 원점의 위치 (p<sub>x</sub>, p<sub>y</sub>, p<sub>z</sub>)']],
+      [[[chain.cells[0][k === 8 ? 8 : k]], 'h2', '이번 관절 하나의 행렬'], ...(k === 8 ? [] : [[[0, 1].flatMap((c) => Tl.col(c).slice(0, 3)), 'h2', 'q가 들어가는 칸: cos q, sin q의 꼴']]), [[2, 3].flatMap((c) => Tl.col(c).slice(0, 3)), 'h5', '링크 모양으로 정해진 상수 (a, d, α)']],
+      [[used, 'h1'], [[0, 1, 2].flatMap((c) => Tp.col(c).slice(0, 3)), 'h2', '이전 좌표계의 축 R′'], [Tp.col(3).slice(0, 3), 'h4', '이전 원점 p′'], [Tl.col(3).slice(0, 3), 'h1', '이번 링크 p<sub>k</sub> (이전 축 기준으로 잰 길이)'], [Tr.col(3).slice(0, 3), 'h1', '새 원점 = p′ + R′ p<sub>k</sub>']],
+      [[chain.all(), 'h1', '받침대부터 손까지 아홉 장을 모두 곱한다'], [Tr.col(2).slice(0, 3), 'h5', '셋째 열 = 손이 향하는 방향'], [Tr.col(3).slice(0, 3), 'h1', '넷째 열 = 손끝 위치']],
+    ][i];
+    mxMark(TERMS, mk);
+    S.note.innerHTML = NOTES[i];
+    const p = P(Tres), pp = P(Tprev), t = [Tloc[3], Tloc[7], Tloc[11]];
+    const Rt = [0, 1, 2].map((r) => Tprev[r * 4] * t[0] + Tprev[r * 4 + 1] * t[1] + Tprev[r * 4 + 2] * t[2]);
+    S.calc.innerHTML = i === 0 ? `x축 = <span class="t3">(${f3(Tres[0], 2)}, ${f3(Tres[4], 2)}, ${f3(Tres[8], 2)})</span>   y축 = <span class="t4">(${f3(Tres[1], 2)}, ${f3(Tres[5], 2)}, ${f3(Tres[9], 2)})</span>   z축 = <span class="t5">(${f3(Tres[2], 2)}, ${f3(Tres[6], 2)}, ${f3(Tres[10], 2)})</span>\n세 열은 모두 길이 1이고 서로 수직입니다.`
+      : i === 1 ? `${nameK(k)}의 원점 = <span class="t1">(${f3(p[0])}, ${f3(p[1])}, ${f3(p[2])})</span> m,   받침대에서 ${Math.hypot(...p).toFixed(3)} m`
+      : i === 2 ? (k === 8 ? '손은 관절이 아니라서 q가 없습니다. 전부 상수예요. [고른 좌표계]를 관절로 바꿔 보세요.' : `q${'₁₂₃₄₅₆₇'[k - 1]} = <span class="t2">${deg(st.q[k - 1]).toFixed(0)}°</span>  →  cos q = <span class="t2">${f3(Math.cos(st.q[k - 1]), 2)}</span>, sin q = <span class="t2">${f3(Math.sin(st.q[k - 1]), 2)}</span>        링크 상수 a = ${PANDA_DH[k - 1][0]}, d = ${PANDA_DH[k - 1][1]}, α = ${deg(PANDA_DH[k - 1][2]).toFixed(0)}°`)
+      : i === 3 ? `새 원점 = <span class="t4">이전 원점</span> + <span class="t2">이전 축</span> × <span class="t1">이번 링크</span>\n       = <span class="t4">(${f3(pp[0])}, ${f3(pp[1])}, ${f3(pp[2])})</span> + <span class="t2">R</span> × <span class="t1">(${f3(t[0])}, ${f3(t[1])}, ${f3(t[2])})</span>\n       = <span class="t4">(${f3(pp[0])}, ${f3(pp[1])}, ${f3(pp[2])})</span> + (${f3(Rt[0])}, ${f3(Rt[1])}, ${f3(Rt[2])}) = <b>(${f3(p[0])}, ${f3(p[1])}, ${f3(p[2])})</b>`
+      : `손끝 위치 = <span class="t1">(${f3(p[0])}, ${f3(p[1])}, ${f3(p[2])})</span>   손이 향하는 방향 = <span class="t5">(${f3(Tres[2], 2)}, ${f3(Tres[6], 2)}, ${f3(Tres[10], 2)})</span>`;
+    // 3D
+    setFrame(fk1, Tres, k === 8 ? 0.2 : 0.17);
+    if (i === 3) setFrame(fk0, Tprev, 0.11); else hideAll(fk0);
+    if (i === 1 || i === 3 || i === 4) { toO.set(i === 3 ? pp : [0, 0, 0], i === 3 ? [p[0] - pp[0], p[1] - pp[1], p[2] - pp[2]] : p); dot.set(p); } else { toO.hide(); dot.hide(); }
+    S.cap.innerHTML = `${nameK(k)} 좌표계를 보고 있어요. 그림의 굵은 화살표: 빨강 x축, 초록 y축, 파랑 z축. ${hint()}`;
+  }
+  S.visible = false; S.dirty = true;
+  S.tick = () => { if (S.dirty) { S.dirty = false; draw(); } view.render(); };
+  zoomBtns(S.side, view);
+  S.go(0); LABS.push(S); return S;
+})();
+
+// ===================================================================
+// lens 2: Jacobian columns, the IK step, and the null space
+// ===================================================================
+const lensJ = (() => {
+  const S = lens('mxj', {
+    aria: '로봇팔, 고른 관절의 회전축, 손끝 속도 화살표, 목표점',
+    steps: ['열 j = 관절 j만 돌렸을 때', '위 세 줄은 이동, 아래 세 줄은 회전', '곱하기 = 열 일곱 개의 가중합', '거꾸로: 오차 e에서 Δq로', '남는 방향: J·n = 0'],
+  });
+  const view = new View3D(S.cv, { az: -0.75, el: 0.35, r: 1.8, tgt: [0.32, 0.05, 0.32] }); S.view = view;
+  if (!view.ok) S.cv.replaceWith(el('div', 'side-note', '이 브라우저에서 WebGL을 쓸 수 없어 3D 그림을 그리지 못했습니다. 행렬 계산은 그대로 동작해요.'));
+  const base = baseT(0, 0, 0, 0), arm = new ArmViz(view), tv = new TargetViz(view, 'hit');
+  arm.opacity(0.6);
+  const axisA = new ThickArrow(view, 'fEKF', { r: 0.005, head: 0 }), colA = new ThickArrow(view, 'accent', { r: 0.007 }), eA = new ThickArrow(view, 'hit', { r: 0.007 }), totA = new ThickArrow(view, 'accent', { r: 0.008 });
+  const parts = [0, 1, 2, 3, 4, 5, 6].map((k) => new ThickArrow(view, k % 2 ? 'tree2' : 'tree', { r: 0.0045, head: 0.02 }));
+  const elbowDot = new Dot(view, 'tree', 0.02), elb = new PolyViz(view, 'tree', true);
+  const Q0 = [0.25, -0.35, 0.2, -2.25, 0.1, 1.95, 0.9];
+  const st = { q: Q0.slice(), j: 1, tgt: [0.55, 0.22, 0.22], dir: [0, 0, -1], ns: 0, qN: null, trail: [] };
+  const A = mxLine(S.eqs, '속도 관계');
+  const V = mxTerm(A, '손의 속도', 6, 1, { sm: true }); mxOp(A, '='); const J = mxTerm(A, '야코비안 J (6×7)', 6, 7, { sm: true }); mxOp(A, '·'); const QD = mxTerm(A, '관절 속도 q̇', 7, 1, { sm: true });
+  const lineA = A;
+  const B = mxLine(S.eqs, 'IK 한 걸음');
+  const DQ = mxTerm(B, '관절을 돌릴 양 Δq', 7, 1, { sm: true }); mxOp(B, '='); const JP = mxTerm(B, 'J⁺ = Jᵀ(JJᵀ + λ²I)⁻¹ (7×6)', 7, 6, { sm: true }); mxOp(B, '·'); const E = mxTerm(B, '손의 오차 e', 6, 1, { sm: true });
+  const TERMS = [V, J, QD, DQ, JP, E];
+  const AXN = ['x', 'y', 'z'];
+  mxTex(S, TERMS, [
+    (r) => [String.raw`\dot x`, String.raw`\dot y`, String.raw`\dot z`, String.raw`\omega_x`, String.raw`\omega_y`, String.raw`\omega_z`][r],
+    (r, c) => (r < 3 ? String.raw`(\mathbf z_{${c + 1}}{\times}\mathbf r_{${c + 1}})_{${AXN[r]}}` : `z_{${c + 1},${AXN[r - 3]}}`),
+    (r) => String.raw`\dot q_{${r + 1}}`,
+    (r) => String.raw`\Delta q_{${r + 1}}`,
+    (r, c) => `J^{+}_{${r + 1}${c + 1}}`,
+    (r) => ['e_x', 'e_y', 'e_z', String.raw`e_{\omega x}`, String.raw`e_{\omega y}`, String.raw`e_{\omega z}`][r],
+  ]);
+  S.syms = [
+    [String.raw`J_{:,j} = \begin{bmatrix} \class{t1}{\mathbf z_j \times \mathbf r_j} \\ \class{t5}{\mathbf z_j} \end{bmatrix}`, 'z<sub>j</sub>는 관절 j의 회전축, r<sub>j</sub>는 관절 j에서 손끝까지의 화살표'],
+    [String.raw`\begin{bmatrix} \dot{\mathbf p} \\ \boldsymbol\omega \end{bmatrix} = \begin{bmatrix} \class{t1}{\mathbf z_j \times \mathbf r_j} \\ \class{t5}{\mathbf z_j} \end{bmatrix} \dot q_j`, '축에서 멀수록(r이 길수록) 손이 빨리 움직인다'],
+    [String.raw`J\dot{\mathbf q} = \class{t1}{\dot q_1}\,J_{:,1} + \class{t1}{\dot q_2}\,J_{:,2} + \cdots + \class{t1}{\dot q_7}\,J_{:,7}`, '행렬 × 벡터 = 열들의 가중합'],
+    [String.raw`\class{t1}{\Delta\mathbf q} = \class{t2}{J^{+}}\,\class{t3}{\mathbf e}, \qquad J^{+} = J^{\mathsf T}\,(JJ^{\mathsf T} + \lambda^2 I)^{-1}`, 'J·Δq ≈ e 를 만족하는 가장 작은 Δq'],
+    [String.raw`\class{t4}{\mathbf n} = (I - J^{+}J)\,\mathbf u \;\Rightarrow\; J\,\class{t4}{\mathbf n} \approx \mathbf 0`, '관절 7개로 6개 값을 맞추고 남는 한 방향'],
+  ];
+  const rowN = ['손 x 속도', '손 y 속도', '손 z 속도', 'x축 회전', 'y축 회전', 'z축 회전'];
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) J.tip(r, c, `<b>${rowN[r]} ÷ q${'₁₂₃₄₅₆₇'[c]} 속도</b>: 관절 ${c + 1}만 1 rad/s로 돌릴 때 ${rowN[r]}가 얼마인지.` + (r >= 3 ? ' 아래 세 줄은 관절 축의 방향 그 자체예요.' : ''));
+  for (let r = 0; r < 7; r++) for (let c = 0; c < 6; c++) JP.tip(r, c, `<b>J⁺의 ${r + 1}행</b>: 손 오차 e를 보고 관절 ${r + 1}을 얼마나 돌릴지 정하는 공식의 계수.`);
+  const ctl = S.ctl;
+  const sj = slider(ctl, { label: '고른 관절 j', min: 1, max: 7, step: 1, value: st.j, fmt: (v) => 'q' + '₁₂₃₄₅₆₇'[v - 1], on: (v) => { st.j = v; S.dirty = true; } });
+  const c2 = el('div', 'controls'); S.side.append(c2);
+  const bStep = button(c2, 'Δq만큼 움직이기', () => { applyStep(); }, 'btn');
+  button(c2, '처음 자세로', () => { st.q = Q0.slice(); st.qN = null; st.ns = 0; sns.set(0); st.trail = []; S.dirty = true; });
+  const sns = slider(c2, { label: 'n 방향으로', min: -1.2, max: 1.2, step: 0.02, value: 0, fmt: (v) => v.toFixed(2) + ' rad', on: (v) => { st.ns = v; S.dirty = true; } });
+  function applyStep() { const r = calc(st.q); const s = r.dq; st.q = st.q.map((v, k) => clamp(v + s[k], QMIN[k] + 1e-3, QMAX[k] - 1e-3)); st.qN = null; st.ns = 0; sns.set(0); S.dirty = true; }
+  function calc(q) {
+    const F = fk(base, q), p = P(F[9]), z = ZAX(F[9]), Jm = jacobian(F);
+    const ep = [st.tgt[0] - p[0], st.tgt[1] - p[1], st.tgt[2] - p[2]], n = Math.hypot(...ep), s = Math.min(1, 0.15 / Math.max(n, 1e-9));
+    const eo = cross(z, st.dir), e = [ep[0] * s, ep[1] * s, ep[2] * s, eo[0] * 0.5, eo[1] * 0.5, eo[2] * 0.5];
+    const lam = 0.08, M = Jm.map((ri) => Jm.map((rj) => ri.reduce((a, v, k) => a + v * rj[k], 0))); for (let i = 0; i < 6; i++) M[i][i] += lam * lam;
+    const Minv = [0, 1, 2, 3, 4, 5].map((c) => solve(M, [0, 1, 2, 3, 4, 5].map((r) => (r === c ? 1 : 0))));   // columns of M⁻¹
+    const Jp = [0, 1, 2, 3, 4, 5, 6].map((r) => [0, 1, 2, 3, 4, 5].map((c) => { let t = 0; for (let k = 0; k < 6; k++) t += Jm[k][r] * Minv[c][k]; return t; }));
+    const dq = Jp.map((row) => row.reduce((a, v, c) => a + v * e[c], 0));
+    // null direction: (I − J⁺J) u, u = joint 3 direction
+    const u = [0, 0, 1, 0, 0, 0, 0], Ju = Jm.map((row) => row.reduce((a, v, k) => a + v * u[k], 0));
+    let nv = u.map((v, r) => v - Jp[r].reduce((a, w, c) => a + w * Ju[c], 0)); const nn = Math.hypot(...nv); nv = nv.map((v) => v / nn);
+    return { F, p, z, J: Jm, e, ep: n, Jp, dq, nv };
+  }
+  function qAlongNull(q0, s) {
+    let q = q0.slice(); const F0 = fk(base, q0), p0 = P(F0[9]), z0 = ZAX(F0[9]); const N = Math.ceil(Math.abs(s) / 0.03);
+    for (let i = 0; i < N; i++) {
+      const r = calc(q); q = q.map((v, k) => clamp(v + r.nv[k] * (s / N), QMIN[k] + 1e-3, QMAX[k] - 1e-3));
+      q = ik(base, q, p0, z0, { iters: 3 }).q;
+    }
+    return q;
+  }
+  const NOTES = [
+    '야코비안 J는 <b>“관절을 조금 돌리면 손이 얼마나, 어느 쪽으로 움직이나”를 적은 표</b>입니다. 열 하나가 관절 하나예요. 지금 고른 관절 j의 열에 q̇ = (0, …, 1, …, 0)을 곱하면 그 열만 그대로 뽑혀 나오고, 그림의 주황 화살표가 그 열의 위 세 칸, 손이 움직이는 방향입니다. 파란 막대는 관절 j의 회전축이에요.',
+    '여섯 줄 중 <b>위 세 줄은 손끝이 움직이는 속도</b>(x, y, z), <b>아래 세 줄은 손이 도는 속도</b>입니다. 아래 세 칸은 관절 j의 회전축 방향과 똑같아요. 회전축에서 멀리 있는 관절일수록 위 세 칸이 큽니다. 같은 각도를 돌아도 손이 더 멀리 휘둘리니까요(속도 = 축 × 거리).',
+    '여러 관절을 한꺼번에 돌리면 손의 속도는 <b>각 열에 그 관절 속도를 곱해 모두 더한 것</b>입니다. 그림에서 청록·주황 짧은 화살표 일곱 개가 열 하나씩의 몫이고, 그것들을 이어 붙인 끝이 굵은 화살표(합)예요. 여기서 쓴 q̇는 아래 IK 한 걸음이 계산한 Δq입니다.',
+    'IK는 이걸 <b>거꾸로</b> 합니다. 손이 가야 할 오차 e(빨강, 한 번에 최대 15 cm)가 있을 때, J⁺를 곱해 관절을 얼마나 돌릴지 Δq를 얻어요. J⁺의 행 k는 “e를 보고 관절 k를 얼마나 돌릴지”의 공식입니다. [Δq만큼 움직이기]를 몇 번 눌러 보세요. 빨간 화살표가 줄어들며 손이 목표에 붙습니다. λ²I는 팔이 다 펴졌을 때 Δq가 폭주하지 않게 막는 작은 쿠션이에요.',
+    '열은 일곱 개인데 손의 속도는 여섯 숫자라서, 열들을 섞어 <b>정확히 0을 만드는 조합 n</b>이 하나 있습니다. 위 식의 q̇ 자리에 n을 넣으면 결과가 거의 0이죠. 이 방향으로 관절을 움직이면 손은 그대로 두고 팔꿈치만 움직입니다. 슬라이더를 움직여 보세요(청록 점이 팔꿈치). 3장의 “팔꿈치 돌리기”가 바로 이것이에요.',
+  ];
+  S.onStep = (i) => { if (i === 4 && !st.qN) { st.qN = st.q.slice(); st.trail = []; } S.dirty = true; };
+  const L4 = (v) => f3(v, 2);
+  function draw() {
+    const i = S.step;
+    if (i === 4) { if (!st.qN) st.qN = st.q.slice(); }
+    const q = i === 4 ? qAlongNull(st.qN, st.ns) : st.q;
+    const r = calc(q); arm.set(r.F); tv.set(st.tgt, st.dir);
+    const j = st.j - 1;
+    for (let a = 0; a < 6; a++) for (let b = 0; b < 7; b++) J.set(a, b, L4(r.J[a][b]));
+    const qd = i <= 1 ? [0, 1, 2, 3, 4, 5, 6].map((k) => (k === j ? 1 : 0)) : i === 4 ? r.nv : r.dq;
+    for (let k = 0; k < 7; k++) QD.set(k, 0, L4(qd[k]), 'q̇' + '₁₂₃₄₅₆₇'[k]);
+    const v = r.J.map((row) => row.reduce((a, x, k) => a + x * qd[k], 0));
+    const vn = ['ẋ', 'ẏ', 'ż', 'ω<sub>x</sub>', 'ω<sub>y</sub>', 'ω<sub>z</sub>'];
+    for (let k = 0; k < 6; k++) V.set(k, 0, L4(v[k]), vn[k]);
+    for (let a = 0; a < 7; a++) for (let b = 0; b < 6; b++) JP.set(a, b, L4(r.Jp[a][b]));
+    for (let k = 0; k < 7; k++) DQ.set(k, 0, L4(r.dq[k]), 'Δq' + '₁₂₃₄₅₆₇'[k]);
+    const en = ['x', 'y', 'z', '방향', '방향', '방향'];
+    for (let k = 0; k < 6; k++) E.set(k, 0, L4(r.e[k]), en[k]);
+    let big = 0; r.dq.forEach((x, k) => { if (Math.abs(x) > Math.abs(r.dq[big])) big = k; });
+    const mk = [
+      [[J.col(j), 'h1', `${j + 1}열: 관절 ${j + 1}만 돌릴 때 손의 속도와 회전`], [[QD.cells[j][0]], 'h1', `q̇ = (0, …, 1, …, 0): ${j + 1}번째만 1`], [V.all(), 'h1', '결과 = 그 열이 그대로 나온다']],
+      [[J.col(j).slice(0, 3), 'h1', '위 세 칸 z × r: 손이 움직이는 방향 (축에서 멀수록 크다)'], [J.col(j).slice(3), 'h5', '아래 세 칸 z: 관절 축 = 손이 도는 축'], [V.all().slice(0, 3), 'h1'], [V.all().slice(3), 'h5'], [[QD.cells[j][0]], 'h1']],
+      [[J.all(), 'h2', '열 일곱 개 (관절 하나에 한 열)'], [QD.all(), 'h1', '각 열에 곱할 무게 = 관절 속도'], [V.all().slice(0, 3), 'h1', '가중합 = 손의 속도']],
+      [[E.all(), 'h3', '손이 가야 할 오차 e'], [JP.all(), 'h2', 'J⁺: 오차를 관절 변화로 바꾸는 표'], [DQ.all(), 'h1', '관절을 돌릴 양 Δq'], [JP.row(big), 'h1', `가장 많이 돌릴 관절 ${big + 1}을 정하는 줄`]],
+      [[QD.all(), 'h4', 'n: 손을 움직이지 않는 관절 조합'], [J.all(), 'h2'], [V.all(), 'h4', 'J · n ≈ 0: 손의 속도가 거의 0']],
+    ][i];
+    lineA.hidden = i === 3; B.hidden = i !== 3;
+    if (S.stages && S.stages.length === 2) { S.stages[0].wrap.parentElement.hidden = i === 3; S.stages[1].wrap.parentElement.hidden = i !== 3; }
+    mxMark(TERMS, mk);
+    S.note.innerHTML = NOTES[i];
+    if (i === 0 || i === 1) S.calc.innerHTML = `관절 ${st.j}만 1 rad/s → 손 속도 = <span class="t1">(${L4(r.J[0][j])}, ${L4(r.J[1][j])}, ${L4(r.J[2][j])})</span> m/s,  회전 = <span class="t5">(${L4(r.J[3][j])}, ${L4(r.J[4][j])}, ${L4(r.J[5][j])})</span> = 관절 축 방향`;
+    else if (i === 2) {
+      const ord = [0, 1, 2, 3, 4, 5, 6].sort((a, b) => Math.abs(qd[b]) * Math.hypot(r.J[0][b], r.J[1][b], r.J[2][b]) - Math.abs(qd[a]) * Math.hypot(r.J[0][a], r.J[1][a], r.J[2][a]));
+      S.calc.innerHTML = `손 속도 = ` + ord.slice(0, 3).map((k) => `<span class="t1">${L4(qd[k])}</span> × 열${k + 1}`).join(' + ') + ` + … (나머지 넷)\n       = <b>(${L4(v[0])}, ${L4(v[1])}, ${L4(v[2])})</b>   가장 큰 몫: 관절 ${ord[0] + 1}`;
+    } else if (i === 3) S.calc.innerHTML = `손 오차 = <span class="t3">${(r.ep * 100).toFixed(1)} cm</span>   →   가장 많이 돌릴 관절: <span class="t1">${big + 1}번 (${deg(r.dq[big]).toFixed(1)}°)</span>\nJ · Δq = (${L4(r.J[0].reduce((a, x, k) => a + x * r.dq[k], 0))}, ${L4(r.J[1].reduce((a, x, k) => a + x * r.dq[k], 0))}, ${L4(r.J[2].reduce((a, x, k) => a + x * r.dq[k], 0))})  ≈  e의 위 세 칸 (${L4(r.e[0])}, ${L4(r.e[1])}, ${L4(r.e[2])})`;
+    else S.calc.innerHTML = `J · n = (${v.map((x) => L4(x)).join(', ')})  ≈  0     n = (${r.nv.map((x) => L4(x)).join(', ')})`;
+    // 3D
+    const pe = r.p, oj = P(r.F[j + 1]), zj = ZAX(r.F[j + 1]);
+    hideAll([axisA, colA, eA, totA, ...parts]); elbowDot.hide();
+    if (i <= 1) {
+      axisA.set([oj[0] - zj[0] * 0.15, oj[1] - zj[1] * 0.15, oj[2] - zj[2] * 0.15], [zj[0] * 0.3, zj[1] * 0.3, zj[2] * 0.3]);
+      colA.set(pe, [r.J[0][j] * 0.35, r.J[1][j] * 0.35, r.J[2][j] * 0.35]);
+    } else if (i === 2) {
+      let o = pe.slice(); const K = 1.6;
+      for (let k = 0; k < 7; k++) { const d = [r.J[0][k] * qd[k] * K, r.J[1][k] * qd[k] * K, r.J[2][k] * qd[k] * K]; parts[k].set(o, d); o = [o[0] + d[0], o[1] + d[1], o[2] + d[2]]; }
+      totA.set(pe, [o[0] - pe[0], o[1] - pe[1], o[2] - pe[2]]);
+    } else if (i === 3) {
+      eA.set(pe, [r.e[0], r.e[1], r.e[2]]);
+      const jv = [0, 1, 2].map((a) => r.J[a].reduce((s2, x, k) => s2 + x * r.dq[k], 0)); colA.set([pe[0], pe[1], pe[2] + 0.004], jv);
+    } else {
+      const e4 = P(r.F[4]); elbowDot.set(e4); st.trail.push(e4); if (st.trail.length > 300) st.trail.shift(); elb.set(st.trail);
+    }
+    if (i !== 4) elb.set([]);
+    bStep.disabled = i !== 3; sns.el.style.opacity = i === 4 ? 1 : 0.4; sns.inp.disabled = i !== 4; sj.el.style.opacity = i <= 1 ? 1 : 0.4;
+    S.cap.innerHTML = i === 3 ? `빨강: 손 오차 e, 주황: J·Δq (Δq만큼 돌렸을 때 손이 갈 방향). ${hint()}` : i === 4 ? `손끝 오차 ${(Math.hypot(...[0, 1, 2].map((a) => P(fk(base, st.qN)[9])[a] - r.p[a])) * 1000).toFixed(1)} mm를 유지한 채 팔꿈치(청록 점)만 움직입니다.` : hint();
+  }
+  S.visible = false; S.dirty = true;
+  S.tick = () => { if (S.dirty) { S.dirty = false; draw(); } view.render(); };
+  zoomBtns(S.side, view);
+  S.go(0); LABS.push(S); return S;
+})();
+
+// ===================================================================
+// lens 3: fourteen numbers in a row
+// ===================================================================
+const lens14 = (() => {
+  const S = lens('mx14', {
+    aria: '두 로봇팔이 출발 자세와 목표 자세 사이의 직선 위 한 점에 있는 모습, 충돌 구',
+    steps: ['숫자 14개가 점 하나', '두 점 사이의 거리', '직선으로 잇기: q(t)', '충돌 검사는 몇 번?', '한 걸음 ε만큼'],
+  });
+  const view = new View3D(S.cv, { az: -2.3, el: 0.6, r: 2.6, tgt: [0.4, 0, 0.2] }); S.view = view;
+  if (!view.ok) S.cv.replaceWith(el('div', 'side-note', '이 브라우저에서 WebGL을 쓸 수 없어 3D 그림을 그리지 못했습니다. 행렬 계산은 그대로 동작해요.'));
+  const aL = new ArmViz(view, { tint: 'tree' }), aR = new ArmViz(view, { tint: 'tree2' }), gL = new ArmViz(view, { ghost: true }), gR = new ArmViz(view, { ghost: true }), sv = new SphereViz(view);
+  const st = { scene: 'cross', t: 0.5, eps: 0.35 };
+  let sc, world, qa, qb;
+  function setup() {
+    sc = SCENES[st.scene]; if (!sc.solved) sc.solved = solveScene(sc, 7);
+    world = new World([{ base: BASE_L }, { base: BASE_R }], sc.boxes); view.setBoxes(sc.boxes);
+    qa = sc.solved.start[0].concat(sc.solved.start[1]); qb = sc.solved.goal[0].concat(sc.solved.goal[1]);
+    gL.set(fk(BASE_L, sc.solved.goal[0])); gR.set(fk(BASE_R, sc.solved.goal[1]));
+    S.dirty = true;
+  }
+  const lines = [['q<sub>출발</sub>', 'qa'], ['q<sub>목표</sub>', 'qb'], ['Δq = q<sub>목표</sub> − q<sub>출발</sub>', 'dq'], ['q(t) = (1−t)·q<sub>출발</sub> + t·q<sub>목표</sub>', 'qt']];
+  const T = {};
+  for (const [lbl, key] of lines) { const d = mxLine(S.eqs, ''); const lb = el('span', 'mx-lbl', lbl); lb.style.width = '10.5em'; d.append(lb); T[key] = mxTerm(d, null, 1, 14, { sm: true }); }
+  const TERMS = Object.values(T);
+  const side = (c) => (c < 7 ? '왼' : '오') + (c % 7 + 1);
+  mxTex(S, TERMS, [(r, c) => `a_{${c + 1}}`, (r, c) => `b_{${c + 1}}`, (r, c) => String.raw`\Delta_{${c + 1}}`, (r, c) => `q_{${c + 1}}(t)`]);
+  S.syms = [
+    [String.raw`\mathbf q = (\,\class{t2}{q^{L}_1, \dots, q^{L}_7},\; \class{t3}{q^{R}_1, \dots, q^{R}_7}\,) \in \mathbb R^{14}`, '14차원 공간의 점 하나'],
+    [String.raw`\lVert \Delta\mathbf q \rVert = \sqrt{\Delta_1^2 + \Delta_2^2 + \cdots + \Delta_{14}^2}`, '피타고라스를 14칸으로 늘린 것'],
+    [String.raw`\class{t1}{\mathbf q(t)} = \class{t4}{\mathbf q_{\text{출발}}} + t\,\Delta\mathbf q \qquad q_k(t) = a_k + t\,\Delta_k, \quad 0 \le t \le 1`, '칸마다 같은 비율로 따로 섞는다'],
+    [String.raw`n = \left\lceil \frac{\class{t3}{\max_k |\Delta_k|}}{0.04} \right\rceil`, '가장 많이 움직이는 칸이 검사 횟수를 정한다'],
+    [String.raw`\class{t1}{\mathbf q_{\text{새}}} = \mathbf q_{\text{출발}} + \varepsilon\,\frac{\Delta\mathbf q}{\lVert \Delta\mathbf q \rVert}`, '방향은 그대로, 길이만 ε로'],
+  ];
+  for (const key of Object.keys(T)) for (let c = 0; c < 14; c++) T[key].tip(0, c, `<b>${c < 7 ? '왼팔' : '오른팔'} 관절 ${c % 7 + 1}</b>의 각도(rad). 14개 중 ${c + 1}번째 칸.`);
+  const strip = el('div', 'mx-strip'); S.left.insertBefore(strip, S.calcSym);
+  const ctl = S.ctl;
+  seg(ctl, [['cross', '팔 교차'], ['shelf', '선반 두 칸'], ['wall', '벽 넘기']], st.scene, (k) => { st.scene = k; setup(); }, '장면');
+  const stt = slider(ctl, { label: 't', min: 0, max: 1, step: 0.01, value: st.t, fmt: (v) => v.toFixed(2), on: (v) => { st.t = v; S.dirty = true; } });
+  const se = slider(ctl, { label: '한 걸음 ε', min: 0.1, max: 1.5, step: 0.05, value: st.eps, fmt: (v) => v.toFixed(2) + ' rad', on: (v) => { st.eps = v; S.dirty = true; } });
+  const NOTES = [
+    '두 팔의 자세는 <b>숫자 14개를 한 줄로 늘어놓은 것</b>입니다. 앞 7칸이 왼팔(청록), 뒤 7칸이 오른팔(주황빨강). 플래너에게는 이 한 줄이 14차원 공간의 <b>점 하나</b>예요. 그림의 진한 팔이 q(t), 옅은 팔이 목표 자세입니다. t 슬라이더로 점을 옮겨 보세요.',
+    '두 점 사이 거리는 <b>칸마다 차이를 빼서 제곱하고 모두 더한 뒤 루트</b>를 씌운 것입니다. 2차원 피타고라스를 14칸으로 늘린 것뿐이에요. RRT가 “가장 가까운 노드”를 고를 때 이 계산을 노드마다 합니다. 강조된 칸이 거리에 가장 크게 기여하는 관절들이에요.',
+    '두 점을 잇는 직선 위의 점은 <b>칸마다 따로 섞으면</b> 됩니다. t = 0이면 출발, t = 1이면 목표, 그 사이면 비율대로. 14칸이 모두 같은 t로 움직이니 두 팔이 동시에 같은 비율로 움직여요. 팔 교차 장면에서 t를 0.5 근처로 두면 두 팔이 부딪혀 빨간 구가 생깁니다. 직선이 안 되니 계획이 필요한 거죠.',
+    '직선 구간이 안전한지 보려면 그 위의 여러 점을 검사합니다. 몇 점을 볼지는 <b>가장 많이 움직이는 칸 하나</b>가 정해요. 그 칸이 0.04 rad씩 움직일 때마다 한 번. 아래 띠가 검사하는 점들이고, 빨간 칸이 충돌한 점입니다. 14칸 중 하나만 크게 움직여도 검사 횟수가 늘어요.',
+    'RRT는 멀리 있는 점까지 한 번에 가지 않고, 그 방향으로 <b>ε만큼만</b> 갑니다. Δq를 자기 길이로 나눠 길이 1로 만든 뒤 ε를 곱해 더하는 거예요. 14칸이 같은 비율로 줄어드니 방향은 그대로입니다. ε를 키우면 트리가 빨리 뻗지만, 한 걸음마다 검사할 점도 많아지고 막힐 확률도 커져요.',
+  ];
+  S.onStep = (i) => { if (i === 4) { st.t = Math.min(1, st.eps / dist(qa, qb)); stt.set(st.t); } S.dirty = true; };
+  const f2 = (x) => f3(x, 2);
+  function draw() {
+    const i = S.step, d = qb.map((v, k) => v - qa[k]), D = Math.hypot(...d);
+    const t = i === 4 ? Math.min(1, st.eps / D) : st.t;
+    if (i === 4) stt.set(t);
+    const q = qa.map((v, k) => v + d[k] * t);
+    for (let c = 0; c < 14; c++) { T.qa.set(0, c, f2(qa[c])); T.qb.set(0, c, f2(qb[c])); T.dq.set(0, c, f2(d[c])); T.qt.set(0, c, f2(q[c])); }
+    const qL = q.slice(0, 7), qR = q.slice(7);
+    aL.set(fk(BASE_L, qL)); aR.set(fk(BASE_R, qR));
+    const ins = world.inspect([qL, qR]); sv.set(ins.spheres, ins.hits, true);
+    const ord = [...Array(14).keys()].sort((a, b) => Math.abs(d[b]) - Math.abs(d[a]));
+    const halves = (term) => [[term.all().slice(0, 7), 'h2'], [term.all().slice(7), 'h6']];
+    const mk = [
+      [[T.qt.all().slice(0, 7), 'h2', '왼팔 관절 일곱 개'], [T.qt.all().slice(7), 'h6', '오른팔 관절 일곱 개']],
+      [[T.dq.all(), 'h2', '칸마다의 차이 Δ'], [ord.slice(0, 3).map((k) => T.dq.cells[0][k]), 'h3', '거리에 가장 크게 보태는 칸 세 개']],
+      [[T.qa.all(), 'h4', '출발점 a'], [T.qb.all(), 'h5', '목표점 b'], [T.qt.all(), 'h1', '둘을 t 비율로 섞은 점 q(t)'], [[T.qt.cells[0][ord[0]]], 'h3', '가장 많이 움직이는 관절']],
+      [[T.dq.all(), 'h2'], [[T.dq.cells[0][ord[0]]], 'h3', '가장 큰 |Δ|가 검사 횟수를 정한다']],
+      [[T.dq.all(), 'h2', '가는 방향 Δq'], [T.qa.all(), 'h4', '출발점'], [T.qt.all(), 'h1', 'ε만큼 간 새 점']],
+    ][i];
+    mxMark(TERMS, mk);
+    S.note.innerHTML = NOTES[i];
+    const n = Math.max(1, Math.ceil(Math.abs(d[ord[0]]) / 0.04));
+    const k0 = ord[0], nm = (k) => `${k < 7 ? '왼팔' : '오른팔'} 관절 ${k % 7 + 1}`;
+    S.calc.innerHTML = i === 0 ? `q(t) = (<span class="t2">${q.slice(0, 7).map(f2).join(', ')}</span>,\n        <span class="t3">${q.slice(7).map(f2).join(', ')}</span>)`
+      : i === 1 ? `|Δq| = √(${ord.slice(0, 3).map((k) => `<span class="t3">${f2(d[k])}</span>²`).join(' + ')} + … 11칸 더) = √${(D * D).toFixed(2)} = <b>${D.toFixed(2)} rad</b>`
+      : i === 2 ? `${nm(k0)}: q(${t.toFixed(2)}) = (1 − ${t.toFixed(2)}) × <span class="t4">${f2(qa[k0])}</span> + ${t.toFixed(2)} × <span class="t5">${f2(qb[k0])}</span> = <span class="t1">${f2(q[k0])}</span>   →   ${ins.free ? '<span class="t4">자유</span>' : '<span class="t3">충돌</span>'}`
+      : i === 3 ? `검사할 점 수 = ⌈ 가장 큰 |Δq| / 0.04 ⌉ = ⌈ <span class="t3">${Math.abs(d[k0]).toFixed(2)}</span> / 0.04 ⌉ = <b>${n}번</b>  (${nm(k0)} 기준)`
+      : `한 걸음 = q<sub>출발</sub> + ε × Δq / |Δq| = q<sub>출발</sub> + ${st.eps.toFixed(2)} × Δq / ${D.toFixed(2)}   →   t = <b>${t.toFixed(3)}</b>  ${ins.free ? '<span class="t4">자유</span>' : '<span class="t3">충돌</span>'}`;
+    // strip of collision checks
+    if (i === 3 || i === 2) {
+      if (strip.dataset.key !== st.scene + ':' + n) {
+        strip.innerHTML = ''; strip.dataset.key = st.scene + ':' + n;
+        for (let s = 0; s <= n; s++) { const tt = s / n, qq = qa.map((v, k) => v + d[k] * tt), sp = el('span'); sp.dataset.t = tt; if (!world.free([qq.slice(0, 7), qq.slice(7)])) sp.className = 'bad'; strip.append(sp); }
+      }
+      strip.hidden = false;
+      const sp = strip.children, cur = Math.round(t * n); for (let s = 0; s < sp.length; s++) sp[s].classList.toggle('cur', s === cur);
+    } else strip.hidden = true;
+    S.cap.innerHTML = `${SCENES[st.scene].name}: 진한 팔 = q(t), 옅은 팔 = 목표 자세. ${hint()}`;
+  }
+  S.visible = false;
+  S.tick = () => { if (S.dirty) { S.dirty = false; draw(); } view.render(); };
+  zoomBtns(S.side, view);
+  setup(); S.go(0); LABS.push(S); return S;
+})();
+
+initKeqs();
+// ===================================================================
+// code blocks, loop, visibility, theme
+// ===================================================================
+for (const pre of document.querySelectorAll('pre.src')) {
+  const box = el('div', 'code');
+  for (const raw of pre.textContent.split('\n')) {
+    const ln = el('div', 'ln'); const ci = raw.indexOf('#');
+    const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    if (ci >= 0) ln.innerHTML = esc(raw.slice(0, ci)) + '<i>' + esc(raw.slice(ci)) + '</i>'; else ln.textContent = raw;
+    if (/^\s*(def|class) /.test(raw)) ln.classList.add('head');
+    box.append(ln);
+  }
+  pre.replaceWith(box);
+}
+readCols(); themeAll();
+const io = new IntersectionObserver((ents) => {
+  for (const en of ents) {
+    for (const L of LABS) if (L.s.root === en.target) { L.visible = en.isIntersecting; if (L.visible && L.view) L.view.dirty = true; }
+    if (en.target.id === 'hero') hero.visible = en.isIntersecting;
+  }
+}, { rootMargin: '120px 0px' });
+for (const L of LABS) io.observe(L.s.root);
+io.observe(document.getElementById('hero'));
+const links = [...document.querySelectorAll('.nav a')];
+const navIo = new IntersectionObserver((ents) => {
+  for (const en of ents) if (en.isIntersecting) links.forEach((a) => a.classList.toggle('on', a.getAttribute('href') === '#' + en.target.id));
+}, { rootMargin: '-45% 0px -50% 0px' });
+document.querySelectorAll('.chapter, .closing').forEach((x) => navIo.observe(x));
+function refreshTheme() { readCols(); themeAll(); for (const L of LABS) L.theme && L.theme(); }
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', refreshTheme);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(refreshTheme);
+window.addEventListener('resize', () => { for (const v of VIEWS) v.dirty = true; for (const L of LABS) L.theme && L.theme(); });
+let lastT = performance.now();
+function frame(now) {
+  const dt = clamp((now - lastT) / 1000, 0, 0.05); lastT = now;
+  for (const L of LABS) if (L.visible) L.tick(dt);
+  if (hero.visible) hero.tick(RM ? 0 : dt);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+</script>
+</body>
+</html>

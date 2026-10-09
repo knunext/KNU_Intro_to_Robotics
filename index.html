@@ -1,0 +1,1057 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Introduction to Robotics (Aero-Drone Algorithm)</title>
+<meta name="description" content="경북대학교 컴퓨터학부 로보틱스 수업: 경로 계획, 운동 모델, 로봇팔 모션 플래닝, 베이즈 필터, 피드백 제어">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!--
+  각 장의 링크는 아래 a 태그의 href="chapters/..." 부분만 바꾸면 됩니다.
+  (한 장에 그림 링크와 제목 링크, 두 군데가 있습니다.)
+-->
+<style>
+:root{
+  --paper:#EDF0F3; --plate:#F9FAFB; --ink:#16203A; --ink2:#4C5770; --rule:#C7CFD9; --grid:#DFE4EA;
+  --teal:#0E7C80; --magenta:#C92F64; --violet:#6347C6; --amber:#D98A08; --blue:#2E67D1; --obst:#B5BFCB;
+  --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Noto Sans CJK KR",sans-serif;
+  --cond:"IBM Plex Sans Condensed","IBM Plex Sans KR","Arial Narrow",sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#131B2B; --plate:#192337; --ink:#E4E9F1; --ink2:#9CA8BB; --rule:#2F3B54; --grid:#232F47;
+    --teal:#3DBFBC; --magenta:#FF6F9D; --violet:#A68DFF; --amber:#FFB43A; --blue:#6FA3FF; --obst:#3A4762;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#131B2B; --plate:#192337; --ink:#E4E9F1; --ink2:#9CA8BB; --rule:#2F3B54; --grid:#232F47;
+  --teal:#3DBFBC; --magenta:#FF6F9D; --violet:#A68DFF; --amber:#FFB43A; --blue:#6FA3FF; --obst:#3A4762;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%;background:var(--paper)}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.75 var(--sans);word-break:keep-all;overflow-wrap:break-word}
+a{color:inherit}
+a:focus-visible{outline:2px solid var(--blue);outline-offset:4px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+
+/* ---------- hero ---------- */
+.hero{padding-top:76px;padding-bottom:8px}
+.org{margin:0 0 20px;font-size:15px;font-weight:500;color:var(--ink2)}
+h1{margin:0;font-size:clamp(2.6rem,6.6vw,5rem);line-height:1.06;font-weight:700;letter-spacing:-.03em}
+.lead{margin:30px 0 12px;max-width:38em;font-size:1.18rem;line-height:1.8}
+.prereq{margin:0;max-width:38em;color:var(--ink2)}
+
+.route-scroll{margin:52px -28px 0;padding:0 28px;overflow-x:auto;scrollbar-width:thin}
+.route{position:relative;height:196px;min-width:780px}
+.route svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.route .grid line{stroke:var(--grid);stroke-width:1}
+.route .trace{fill:none;stroke:var(--teal);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.stop{position:absolute;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;
+  display:grid;place-items:center;text-decoration:none;
+  background:var(--plate);border:2px solid var(--ink);color:var(--ink);
+  font:600 15px/1 var(--cond);font-variant-numeric:tabular-nums;transition:background-color .15s,color .15s}
+.stop:hover{background:var(--ink);color:var(--plate)}
+.stop.first{background:var(--ink);color:var(--plate)}
+.stop.last{border-color:var(--magenta);box-shadow:0 0 0 4px var(--paper),0 0 0 5.5px var(--magenta)}
+.stop span{position:absolute;top:44px;left:50%;transform:translateX(-50%);white-space:nowrap;
+  font:500 13px/1.3 var(--sans);color:var(--ink2);pointer-events:none;background:var(--paper);padding:0 5px}
+
+/* ---------- parts & chapters ---------- */
+.part{margin-top:88px}
+.part:first-child{margin-top:56px}
+.part-head{display:grid;grid-template-columns:5.5rem minmax(0,1fr);column-gap:20px;align-items:baseline;border-top:2px solid var(--ink);padding-top:16px}
+.part-no{font:600 1.05rem/1 var(--cond);color:var(--ink2)}
+.part-title{margin:0;font-size:1.9rem;line-height:1.3;font-weight:700;letter-spacing:-.015em}
+.part-desc{grid-column:2;margin:6px 0 0;color:var(--ink2)}
+
+.ch{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:48px;align-items:center;padding:48px 0;border-bottom:1px solid var(--rule)}
+.part .ch:last-child{border-bottom:0}
+.fig{display:block;text-decoration:none}
+.plate{position:relative;aspect-ratio:3/2;background:var(--plate);outline:1px solid var(--rule);transition:outline-color .15s}
+.plate::after{content:"";position:absolute;inset:-7px;pointer-events:none;
+  --k:linear-gradient(var(--ink),var(--ink));
+  background:var(--k) 0 0/12px 1.5px no-repeat, var(--k) 0 0/1.5px 12px no-repeat,
+             var(--k) 100% 0/12px 1.5px no-repeat, var(--k) 100% 0/1.5px 12px no-repeat,
+             var(--k) 0 100%/12px 1.5px no-repeat, var(--k) 0 100%/1.5px 12px no-repeat,
+             var(--k) 100% 100%/12px 1.5px no-repeat, var(--k) 100% 100%/1.5px 12px no-repeat}
+.fig:hover .plate,.fig:focus-visible .plate{outline-color:var(--ink)}
+.plate canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:pointer}
+.hint{display:none;margin:12px 0 0;font-size:.86rem;color:var(--ink2)}
+@media (hover:hover) and (pointer:fine){.hint{display:block}}
+
+.ch-no{margin:0 0 14px;font:600 3.6rem/1 var(--cond);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.ch h3{margin:0;font-size:1.62rem;line-height:1.38;font-weight:700;letter-spacing:-.015em}
+.ch h3 a{text-decoration:none;background:linear-gradient(currentColor,currentColor) 0 100%/0 2px no-repeat;transition:background-size .2s}
+.ch h3 a:hover,.ch h3 a:focus-visible{background-size:100% 2px}
+.case{display:block;font-size:1rem;font-weight:600;color:var(--ink2);margin-bottom:2px}
+.en{margin:8px 0 18px;font:500 1.04rem/1.45 var(--cond);color:var(--ink2)}
+.desc{margin:0;max-width:33em}
+
+footer{margin-top:96px;padding:28px 0 56px;border-top:1px solid var(--rule);color:var(--ink2);font-size:.92rem}
+
+@media (max-width:860px){
+  .wrap{padding:0 20px}
+  .route-scroll{margin:44px -20px 0;padding:0 20px}
+  .hero{padding-top:52px}
+  .part:first-child{margin-top:40px}
+  .ch{grid-template-columns:minmax(0,1fr);gap:22px;padding:36px 0}
+  .ch-no{font-size:2.8rem;margin-bottom:10px}
+  .ch h3{font-size:1.42rem}
+  .part{margin-top:64px}
+  .part-head{grid-template-columns:minmax(0,1fr)}
+  .part-no{margin-bottom:6px}
+  .part-desc{grid-column:1}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="hero wrap">
+  <p class="org">경북대학교 컴퓨터학부 + 첨단기술융합대학 자율시스템</p>
+  <h1>Introduction to Robotics (Physical AI)</h1>
+  <h2>Aero-Drone Algorithm</h2>
+  <p class="lead">수업 자료를 보충하기 위한 추가적인 인터랙티브 기반 학습자료입니다.</p>
+  <p class="prereq">자료구조와 알고리즘, 기초 선형대수, 확률과 통계만 알면 출발할 수 있습니다.</p>
+  <div class="route-scroll">
+    <nav class="route" id="route" aria-label="장 목록">
+      <svg aria-hidden="true"><g class="grid"></g><path class="trace"></path></svg>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+<section class="part" aria-labelledby="part1">
+  <header class="part-head"><p class="part-no">1부</p><h2 class="part-title" id="part1">길 찾기</h2><p class="part-desc">지도 위의 점 하나를 목표까지 옮기는 문제부터 시작합니다.</p></header>
+  <article class="ch" id="ch01" data-short="격자 탐색">
+    <div>
+      <a class="fig" href="ch1_path_planning.html" aria-label="1장 열기: 격자 위의 길 찾기"><div class="plate"><canvas data-viz="astar" role="img" aria-label="격자 위의 길 찾기을(를) 보여 주는 움직이는 그림"></canvas></div></a>
+      <p class="hint">마우스를 올린 칸이 목표가 됩니다. 옅은 칸은 A*가 확장한 칸입니다.</p>
+    </div>
+    <div>
+      <p class="ch-no" aria-hidden="true">01</p>
+      <h3><a href="ch1_path_planning.html">격자 위의 길 찾기</a></h3>
+      <p class="en">Path Planning: BFS, Dijkstra, A*</p>
+      <p class="desc">지도를 칸으로 나누면 길 찾기는 그래프 탐색 문제가 됩니다. BFS에서 출발해 Dijkstra와 A*까지 구현하면서, 휴리스틱 하나가 살펴봐야 할 칸의 수를 얼마나 줄이는지 직접 비교합니다.</p>
+    </div>
+  </article>
+  <article class="ch" id="ch02" data-short="RRT">
+    <div>
+      <a class="fig" href="ch2_RRT_variants.html" aria-label="2장 열기: 무작위 샘플로 키우는 탐색 나무"><div class="plate"><canvas data-viz="rrt" role="img" aria-label="무작위 샘플로 키우는 탐색 나무을(를) 보여 주는 움직이는 그림"></canvas></div></a>
+      <p class="hint">마우스를 멈춘 곳이 새 목표가 되고, 나무를 처음부터 다시 키웁니다.</p>
+    </div>
+    <div>
+      <p class="ch-no" aria-hidden="true">02</p>
+      <h3><a href="ch2_RRT_variants.html">무작위 샘플로 키우는 탐색 나무</a></h3>
+      <p class="en">Sampling-Based Planning: RRT and Its Variants</p>
+      <p class="desc">공간이 넓거나 차원이 높아 격자를 만들 수 없을 때는 무작위로 점을 뽑아 나무를 키웁니다. RRT의 기본 구조를 만들고 양쪽에서 키우는 RRT-Connect, 경로를 점점 줄여 가는 RRT*, 지름길 단축까지 이어 갑니다.</p>
+    </div>
+  </article>
+</section>
+<section class="part" aria-labelledby="part2">
+  <header class="part-head"><p class="part-no">2부</p><h2 class="part-title" id="part2">움직임의 모델</h2><p class="part-desc">실제 로봇은 아무 방향으로나 움직일 수 없습니다.</p></header>
+  <article class="ch" id="ch03" data-short="운동 모델">
+    <div>
+      <a class="fig" href="ch3_Motion_models.html" aria-label="3장 열기: 로봇은 어떻게 움직이는가"><div class="plate"><canvas data-viz="motion" role="img" aria-label="로봇은 어떻게 움직이는가을(를) 보여 주는 움직이는 그림"></canvas></div></a>
+      <p class="hint">칸 안에 마우스를 올리면 그 기체의 목표점이 마우스를 따라옵니다.</p>
+    </div>
+    <div>
+      <p class="ch-no" aria-hidden="true">03</p>
+      <h3><a href="ch3_Motion_models.html">로봇은 어떻게 움직이는가</a></h3>
+      <p class="en">Motion Models: From Wheels to Wings</p>
+      <p class="desc">같은 목표를 향해도 바퀴 두 개짜리 로봇, 자동차, 쿼드로터, 제트기는 전혀 다른 궤적을 그립니다. 각 기체의 운동을 상태와 입력으로 적어 보고, 제자리 회전이나 정지 비행처럼 어떤 움직임이 되고 안 되는지 비교합니다.</p>
+    </div>
+  </article>
+</section>
+<section class="part" aria-labelledby="part3">
+  <header class="part-head"><p class="part-no">3부</p><h2 class="part-title" id="part3">로봇팔 모션 플래닝</h2><p class="part-desc">점 하나 대신 여러 관절을 함께 계획합니다.</p></header>
+  <article class="ch" id="ch04" data-short="팔 2D">
+    <div>
+      <a class="fig" href="ch4_motion_planning_2D.html" aria-label="4장 열기: 두 관절 팔과 구성 공간"><div class="plate"><canvas data-viz="arm2d" role="img" aria-label="두 관절 팔과 구성 공간을(를) 보여 주는 움직이는 그림"></canvas></div></a>
+      <p class="hint">왼쪽에서는 손끝을, 오른쪽에서는 관절 각도를 직접 움직여 보세요. 부딪히면 빨갛게 바뀝니다.</p>
+    </div>
+    <div>
+      <p class="ch-no" aria-hidden="true">04</p>
+      <h3><a href="ch4_motion_planning_2D.html">두 관절 팔과 구성 공간</a></h3>
+      <p class="en">Arm Motion Planning I: Planar Arms and C-Space</p>
+      <p class="desc">관절 각도를 좌표로 삼으면 팔 전체가 점 하나가 되고, 장애물은 구성 공간(C-space)의 금지 구역이 됩니다. 순기구학과 역기구학을 익힌 뒤, 1장의 격자 탐색으로 충돌 없는 팔 동작을 계획합니다.</p>
+    </div>
+  </article>
+  <article class="ch" id="ch05" data-short="팔 3D">
+    <div>
+      <a class="fig" href="ch5_Robot_motion_planning_3D.html" aria-label="5장 열기: 공간으로 뻗는 팔"><div class="plate"><canvas data-viz="arm3d" role="img" aria-label="공간으로 뻗는 팔을(를) 보여 주는 움직이는 그림"></canvas></div></a>
+      <p class="hint">마우스를 움직여 시점을 돌려 보세요.</p>
+    </div>
+    <div>
+      <p class="ch-no" aria-hidden="true">05</p>
+      <h3><a href="ch5_Robot_motion_planning_3D.html">공간으로 뻗는 팔</a></h3>
+      <p class="en">Arm Motion Planning II: Spatial Arms, FK and IK</p>
+      <p class="desc">관절이 늘고 공간이 3차원이 되면 좌표 변환을 차례로 곱해 손끝을 구합니다. 동차 변환으로 손끝의 위치와 자세를 계산하고, 원하는 자세를 만드는 관절값을 수치 최적화로 찾습니다.</p>
+    </div>
+  </article>
+  <article class="ch" id="ch06" data-short="집고 옮기기">
+    <div>
+      <a class="fig" href="ch6_Robot_motion_planning_3D_2.html" aria-label="6장 열기: 집고, 옮기고, 내려놓기"><div class="plate"><canvas data-viz="pick" role="img" aria-label="집고, 옮기고, 내려놓기을(를) 보여 주는 움직이는 그림"></canvas></div></a>
+      <p class="hint">마우스를 위아래로 움직이면 다음 계획에 쓸 벽 높이가 바뀝니다.</p>
+    </div>
+    <div>
+      <p class="ch-no" aria-hidden="true">06</p>
+      <h3><a href="ch6_Robot_motion_planning_3D_2.html">집고, 옮기고, 내려놓기</a></h3>
+      <p class="en">Arm Motion Planning III: Pick-and-Place with RRT Variants</p>
+      <p class="desc">물체를 쥔 팔은 물체까지 포함해 충돌을 피해야 합니다. 관절 공간에서 RRT-Connect로 경로를 찾고 지름길로 다듬은 뒤, 실제로 집어 옮기는 동작까지 완성합니다.</p>
+    </div>
+  </article>
+</section>
+<section class="part" aria-labelledby="part4">
+  <header class="part-head"><p class="part-no">4부</p><h2 class="part-title" id="part4">확률로 추정하기</h2><p class="part-desc">센서도 움직임도 정확하지 않을 때 로봇은 자기 위치를 어떻게 알까요.</p></header>
+  <article class="ch" id="ch07" data-short="베이즈 필터">
+    <div>
+      <a class="fig" href="ch7-8_Bayesian_filters.html" aria-label="7장 열기: 믿음을 갱신하는 법"><div class="plate"><canvas data-viz="bayes" role="img" aria-label="믿음을 갱신하는 법을(를) 보여 주는 움직이는 그림"></canvas></div></a>
+      <p class="hint">마우스가 있는 쪽으로 로봇이 움직입니다. 문이 비슷하게 생겨 처음에는 여러 곳을 의심합니다.</p>
+    </div>
+    <div>
+      <p class="ch-no" aria-hidden="true">07</p>
+      <h3><a href="ch7-8_Bayesian_filters.html">믿음을 갱신하는 법</a></h3>
+      <p class="en">Bayesian Filters: Predict, Sense, Update</p>
+      <p class="desc">로봇은 자기 위치를 확신할 수 없으니 위치에 대한 확률 분포, 곧 믿음(belief)을 들고 다닙니다. 움직이면 흐려지고 관측하면 선명해지는 두 단계를 복도 로봇의 히스토그램 필터로 구현합니다.</p>
+    </div>
+  </article>
+  <article class="ch" id="ch08" data-short="로봇 청소기">
+    <div>
+      <a class="fig" href="ch7-8_Bayesian_filters.html" aria-label="8장 열기: 로봇 청소기는 자기 위치를 어떻게 알까"><div class="plate"><canvas data-viz="vacuum" role="img" aria-label="로봇 청소기는 자기 위치를 어떻게 알까을(를) 보여 주는 움직이는 그림"></canvas></div></a>
+      <p class="hint">마우스 쪽으로 청소기가 방향을 틉니다. 보라색 점이 위치 가설입니다.</p>
+    </div>
+    <div>
+      <p class="ch-no" aria-hidden="true">08</p>
+      <h3><a href="ch7-8_Bayesian_filters.html"><span class="case">사례 연구 1</span>로봇 청소기는 자기 위치를 어떻게 알까</a></h3>
+      <p class="en">Case Study: Localizing a Robot Vacuum Cleaner</p>
+      <p class="desc">집 안 지도와 라이다 거리값만으로 청소기의 위치를 찾습니다. 수백 개의 위치 가설을 입자로 뿌려 두고, 관측과 잘 맞는 입자만 살아남게 하는 파티클 필터(Monte Carlo Localization)를 만듭니다.</p>
+    </div>
+  </article>
+  <article class="ch" id="ch09" data-short="자율주행">
+    <div>
+      <a class="fig" href="ch9_Bayesian_filters_FSD.html" aria-label="9장 열기: GPS가 끊긴 터널 속 자율주행차"><div class="plate"><canvas data-viz="kalman" role="img" aria-label="GPS가 끊긴 터널 속 자율주행차을(를) 보여 주는 움직이는 그림"></canvas></div></a>
+      <p class="hint">도로 위에 마우스를 올리면 터널이 그곳으로 옮겨집니다.</p>
+    </div>
+    <div>
+      <p class="ch-no" aria-hidden="true">09</p>
+      <h3><a href="ch9_Bayesian_filters_FSD.html"><span class="case">사례 연구 2</span>GPS가 끊긴 터널 속 자율주행차</a></h3>
+      <p class="en">Case Study: Autonomous Vehicles</p>
+      <p class="desc">GPS가 들어올 때와 끊길 때 차의 위치 불확실성은 어떻게 달라질까요. 칼만 필터로 운동 모델과 GPS 측정을 합치고, 불확실성 타원이 터널 안에서 커졌다가 밖에서 다시 줄어드는 과정을 따라갑니다.</p>
+    </div>
+  </article>
+</section>
+<section class="part" aria-labelledby="part5">
+  <header class="part-head"><p class="part-no">5부</p><h2 class="part-title" id="part5">제어</h2><p class="part-desc">계획한 대로 실제로 움직이게 만듭니다.</p></header>
+  <article class="ch" id="ch10" data-short="PID">
+    <div>
+      <a class="fig" href="ch10_PID.html" aria-label="10장 열기: 오차를 보고 힘을 정한다"><div class="plate"><canvas data-viz="pid" role="img" aria-label="오차를 보고 힘을 정한다을(를) 보여 주는 움직이는 그림"></canvas></div></a>
+      <p class="hint">마우스를 좌우로 움직이면 목표 위치가 바뀝니다. 꾸준한 외란은 I 항이 상쇄합니다.</p>
+    </div>
+    <div>
+      <p class="ch-no" aria-hidden="true">10</p>
+      <h3><a href="ch10_PID.html">오차를 보고 힘을 정한다</a></h3>
+      <p class="en">Feedback Control: PID</p>
+      <p class="desc">목표와 현재 상태의 차이를 보고 매 순간 힘을 정하는 것이 되먹임 제어입니다. 비례, 적분, 미분 항이 각각 무엇을 고치는지 보고, 게인을 바꾸며 진동과 정상상태 오차, 적분 와인드업을 다룹니다.</p>
+    </div>
+  </article>
+  <article class="ch" id="ch11" data-short="MKV">
+    <div>
+      <a class="fig" href="ch11_PID_MKV.html" aria-label="11장 열기: 켜고 끄는 추력기로 공중에 멈추기"><div class="plate"><canvas data-viz="mkv" role="img" aria-label="켜고 끄는 추력기로 공중에 멈추기을(를) 보여 주는 움직이는 그림"></canvas></div></a>
+      <p class="hint">마우스 위치가 호버링 목표가 됩니다.</p>
+    </div>
+    <div>
+      <p class="ch-no" aria-hidden="true">11</p>
+      <h3><a href="ch11_PID_MKV.html"><span class="case">사례 연구</span>켜고 끄는 추력기로 공중에 멈추기</a></h3>
+      <p class="en">Case Study: Hovering a Multiple Kill Vehicle (MKV)</p>
+      <p class="desc">추력기를 켜거나 끄는 것밖에 못 하는 비행체를 중력 속에 띄워 두려면 어떻게 해야 할까요. PD 법칙을 위상 평면의 스위칭 선으로 바꾸고, 데드밴드와 최소 분사 시간이 만드는 떨림을 관찰합니다.</p>
+    </div>
+  </article>
+</section>
+</main>
+
+<footer class="wrap">경북대학교 컴퓨터학부 로보틱스 수업 자료</footer>
+
+<script>
+// ===================== shared helpers =====================
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const wrapAng = a => Math.atan2(Math.sin(a), Math.cos(a));
+const smooth = t => t * t * (3 - 2 * t);
+function rng(seed) { let a = seed >>> 0; return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gauss(r) { let u = 0, v = 0; while (u === 0) u = r(); while (v === 0) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); }
+function segPtDist(ax, ay, bx, by, px, py) {
+  const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy;
+  let t = L > 0 ? ((px - ax) * dx + (py - ay) * dy) / L : 0; t = clamp(t, 0, 1);
+  return Math.hypot(ax + t * dx - px, ay + t * dy - py);
+}
+function ptRectDist(px, py, R) { const dx = Math.max(R.x0 - px, 0, px - R.x1), dy = Math.max(R.y0 - py, 0, py - R.y1); return Math.hypot(dx, dy); }
+function segRectHit(ax, ay, bx, by, r, R) {
+  // exact: segment intersects AABB, or any endpoint/corner within r
+  let t0 = 0, t1 = 1; const dx = bx - ax, dy = by - ay, P = [-dx, dx, -dy, dy], Qv = [ax - R.x0, R.x1 - ax, ay - R.y0, R.y1 - ay]; let inter = true;
+  for (let i = 0; i < 4; i++) { if (P[i] === 0) { if (Qv[i] < 0) { inter = false; break; } } else { const t = Qv[i] / P[i]; if (P[i] < 0) { if (t > t1) { inter = false; break; } if (t > t0) t0 = t; } else { if (t < t0) { inter = false; break; } if (t < t1) t1 = t; } } }
+  if (inter) return true;
+  if (ptRectDist(ax, ay, R) < r || ptRectDist(bx, by, R) < r) return true;
+  return segPtDist(ax, ay, bx, by, R.x0, R.y0) < r || segPtDist(ax, ay, bx, by, R.x1, R.y0) < r || segPtDist(ax, ay, bx, by, R.x0, R.y1) < r || segPtDist(ax, ay, bx, by, R.x1, R.y1) < r;
+}
+// minimal binary heap keyed by f
+class Heap {
+  constructor() { this.k = []; this.v = []; }
+  get size() { return this.k.length; }
+  push(key, val) { const k = this.k, v = this.v; let i = k.length; k.push(key); v.push(val);
+    while (i > 0) { const p = (i - 1) >> 1; if (k[p] <= k[i]) break; [k[p], k[i]] = [k[i], k[p]]; [v[p], v[i]] = [v[i], v[p]]; i = p; } }
+  pop() { const k = this.k, v = this.v, top = v[0]; const lk = k.pop(), lv = v.pop();
+    if (k.length) { k[0] = lk; v[0] = lv; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i;
+      if (l < k.length && k[l] < k[m]) m = l; if (r < k.length && k[r] < k[m]) m = r; if (m === i) break;
+      [k[m], k[i]] = [k[i], k[m]]; [v[m], v[i]] = [v[i], v[m]]; i = m; } }
+    return top; }
+}
+// world <-> screen fit (uniform scale, centered)
+function fitView(S, x0, y0, x1, y1, pad, yUp) {
+  const s = Math.min((S.w - 2 * pad) / (x1 - x0), (S.h - 2 * pad) / (y1 - y0));
+  const ox = (S.w - s * (x1 - x0)) / 2, oy = (S.h - s * (y1 - y0)) / 2;
+  return { s, X: x => ox + (x - x0) * s, Y: yUp ? (y => oy + (y1 - y) * s) : (y => oy + (y - y0) * s),
+    ix: px => x0 + (px - ox) / s, iy: yUp ? (py => y1 - (py - oy) / s) : (py => y0 + (py - oy) / s) };
+}
+const VIZ = {};
+
+// ===================== 1. grid path planning (A*) =====================
+VIZ.astar = function (S) {
+  const COLS = 30, ROWS = 20, N = COLS * ROWS;
+  const grid = new Uint8Array(N), id = (c, r) => r * COLS + c;
+  const box = (c0, r0, c1, r1) => { for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) grid[id(c, r)] = 1; };
+  box(6, 0, 7, 11); box(14, 8, 15, 19); box(21, 0, 22, 10); box(8, 15, 11, 16); box(16, 4, 19, 5); box(24, 13, 27, 14); box(1, 6, 4, 7); box(25, 5, 26, 9);
+  const R = rng(11); for (let k = 0; k < 50; k++) grid[id(Math.floor(R() * COLS), Math.floor(R() * ROWS))] = 1;
+  const start = { c: 2, r: 17 };
+  for (let r = 15; r <= 19; r++) for (let c = 0; c <= 4; c++) grid[id(c, r)] = 0;
+  const autoGoals = [[27, 2], [19, 17], [10, 3], [28, 18], [3, 2], [24, 11]].map(([c, r]) => { grid[id(c, r)] = 0; return { c, r }; });
+  let ai = 0, goal = autoGoals[0], res = null, t = 0, hold = 0, fast = false;
+  const DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2]];
+  function solve(g) {
+    const G = new Float32Array(N).fill(Infinity), par = new Int32Array(N).fill(-1), closed = new Uint8Array(N), order = [];
+    const h = i => { const dc = Math.abs(i % COLS - g.c), dr = Math.abs(((i / COLS) | 0) - g.r); return Math.max(dc, dr) + (Math.SQRT2 - 1) * Math.min(dc, dr); };
+    const s = id(start.c, start.r), gi = id(g.c, g.r), H = new Heap(); G[s] = 0; H.push(h(s), s);
+    while (H.size) {
+      const i = H.pop(); if (closed[i]) continue; closed[i] = 1; order.push(i); if (i === gi) break;
+      const c = i % COLS, r = (i / COLS) | 0;
+      for (const [dc, dr, w] of DIRS) {
+        const nc = c + dc, nr = r + dr; if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS) continue;
+        const j = id(nc, nr); if (grid[j] || closed[j]) continue;
+        if (dc && dr && (grid[id(c + dc, r)] || grid[id(c, r + dr)])) continue;
+        const ng = G[i] + w; if (ng < G[j]) { G[j] = ng; par[j] = i; H.push(ng + h(j), j); }
+      }
+    }
+    const path = []; if (closed[gi]) for (let i = gi; i !== -1; i = par[i]) path.push(i);
+    path.reverse(); let gmax = 1; for (const i of order) gmax = Math.max(gmax, G[i]);
+    return { order, path, G, gmax };
+  }
+  function setGoal(g, quick) { goal = g; res = solve(g); t = 0; hold = 0; fast = quick; }
+  setGoal(goal, false);
+  let L;
+  return {
+    resize() { const cs = Math.min((S.w - 16) / COLS, (S.h - 16) / ROWS); L = { cs, ox: (S.w - cs * COLS) / 2, oy: (S.h - cs * ROWS) / 2 }; },
+    step(dt) {
+      t += dt;
+      if (S.ptr) {
+        const c = Math.floor((S.ptr.x - L.ox) / L.cs), r = Math.floor((S.ptr.y - L.oy) / L.cs);
+        if (c >= 0 && r >= 0 && c < COLS && r < ROWS && !grid[id(c, r)] && (c !== goal.c || r !== goal.r) && !(c === start.c && r === start.r)) setGoal({ c, r }, true);
+      } else {
+        const rev = fast ? 0.3 : clamp(res.order.length / 260, 0.6, 1.6);
+        if (t > rev + 0.5) hold += dt;
+        if (hold > 2.2) { ai = (ai + 1) % autoGoals.length; setGoal(autoGoals[ai], false); }
+      }
+    },
+    draw(ctx) {
+      const { cs, ox, oy } = L, rev = fast ? 0.3 : clamp(res.order.length / 260, 0.6, 1.6);
+      const nShow = Math.floor(res.order.length * clamp(t / rev, 0, 1));
+      ctx.strokeStyle = S.c('grid'); ctx.lineWidth = 1; ctx.beginPath();
+      for (let c = 0; c <= COLS; c++) { ctx.moveTo(ox + c * cs + .5, oy); ctx.lineTo(ox + c * cs + .5, oy + ROWS * cs); }
+      for (let r = 0; r <= ROWS; r++) { ctx.moveTo(ox, oy + r * cs + .5); ctx.lineTo(ox + COLS * cs, oy + r * cs + .5); }
+      ctx.stroke();
+      for (let k = 0; k < nShow; k++) {
+        const i = res.order[k], c = i % COLS, r = (i / COLS) | 0, fr = nShow - k < 22 && nShow < res.order.length;
+        ctx.fillStyle = fr ? S.c('teal', .55) : S.c('teal', .10 + .22 * (1 - res.G[i] / res.gmax));
+        ctx.fillRect(ox + c * cs + 1, oy + r * cs + 1, cs - 1, cs - 1);
+      }
+      ctx.fillStyle = S.c('obst');
+      for (let i = 0; i < N; i++) if (grid[i]) ctx.fillRect(ox + (i % COLS) * cs, oy + ((i / COLS) | 0) * cs, cs + .5, cs + .5);
+      const cx = i => ox + (i % COLS + .5) * cs, cy = i => oy + (((i / COLS) | 0) + .5) * cs;
+      if (nShow >= res.order.length && res.path.length) {
+        const pt = clamp((t - rev) / 0.45, 0, 1), m = Math.max(1, Math.ceil(res.path.length * pt));
+        ctx.strokeStyle = S.c('teal'); ctx.lineWidth = Math.max(2.5, cs * .28); ctx.lineJoin = ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(cx(res.path[0]), cy(res.path[0]));
+        for (let k = 1; k < m; k++) ctx.lineTo(cx(res.path[k]), cy(res.path[k])); ctx.stroke();
+      }
+      const sx = ox + (start.c + .5) * cs, sy = oy + (start.r + .5) * cs;
+      ctx.fillStyle = S.c('ink'); ctx.beginPath(); ctx.arc(sx, sy, cs * .42, 0, TAU); ctx.fill();
+      const gx = ox + (goal.c + .5) * cs, gy = oy + (goal.r + .5) * cs;
+      ctx.strokeStyle = S.c('magenta'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(gx, gy, cs * .42, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(gx - cs * .75, gy); ctx.lineTo(gx + cs * .75, gy); ctx.moveTo(gx, gy - cs * .75); ctx.lineTo(gx, gy + cs * .75); ctx.stroke();
+      S.label(ctx, `확장한 칸 ${nShow}`, ox + 6, oy + ROWS * cs - 8, 'left');
+    }
+  };
+};
+
+// ===================== 2. RRT =====================
+VIZ.rrt = function (S) {
+  const W = 1.5, H = 1.0, STEP = 0.034, R0 = 0.012;
+  const obs = [{ x0: .27, y0: 0, x1: .34, y1: .6 }, { x0: .58, y0: .4, x1: .65, y1: 1 }, { x0: .9, y0: 0, x1: .97, y1: .52 },
+    { x0: 1.12, y0: .64, x1: 1.5, y1: .71 }, { x0: .4, y0: .18, x1: .52, y1: .26 }, { x0: 1.18, y0: .28, x1: 1.27, y1: .4 }];
+  const free = (x, y) => x > 0 && y > 0 && x < W && y < H && obs.every(o => ptRectDist(x, y, o) > R0);
+  const segFree = (ax, ay, bx, by) => obs.every(o => !segRectHit(ax, ay, bx, by, R0, o));
+  const start = { x: .07, y: .9 };
+  let goal = { x: 1.42, y: .12 }, seed = 1, R, nodes, phase, pt, raw, smo, lastS, pend = null, pendT = 0;
+  function reset() { R = rng(seed++); nodes = [{ x: start.x, y: start.y, p: -1 }]; phase = 'grow'; pt = 0; raw = smo = null; lastS = null; }
+  function resample(P, n) {
+    const d = [0]; for (let i = 1; i < P.length; i++) d.push(d[i - 1] + Math.hypot(P[i].x - P[i - 1].x, P[i].y - P[i - 1].y));
+    const out = []; let j = 0; for (let k = 0; k < n; k++) { const s = d[d.length - 1] * k / (n - 1); while (j < P.length - 2 && d[j + 1] < s) j++;
+      const u = (s - d[j]) / Math.max(1e-9, d[j + 1] - d[j]); out.push({ x: lerp(P[j].x, P[j + 1].x, clamp(u, 0, 1)), y: lerp(P[j].y, P[j + 1].y, clamp(u, 0, 1)) }); }
+    return out;
+  }
+  function grow() {
+    const q = R() < 0.06 ? { x: goal.x, y: goal.y } : { x: R() * W, y: R() * H };
+    let bi = 0, bd = Infinity; for (let i = 0; i < nodes.length; i++) { const d = (nodes[i].x - q.x) ** 2 + (nodes[i].y - q.y) ** 2; if (d < bd) { bd = d; bi = i; } }
+    const nb = nodes[bi], d = Math.sqrt(bd); if (d < 1e-6) return;
+    const s = Math.min(STEP, d), nx = nb.x + (q.x - nb.x) / d * s, ny = nb.y + (q.y - nb.y) / d * s;
+    lastS = { q, nb };
+    if (!free(nx, ny) || !segFree(nb.x, nb.y, nx, ny)) return;
+    nodes.push({ x: nx, y: ny, p: bi });
+    if (Math.hypot(nx - goal.x, ny - goal.y) < 0.045 && segFree(nx, ny, goal.x, goal.y)) {
+      nodes.push({ x: goal.x, y: goal.y, p: nodes.length - 1 });
+      const P = []; for (let i = nodes.length - 1; i !== -1; i = nodes[i].p) P.push(nodes[i]); P.reverse();
+      const sc = P.slice(); for (let k = 0; k < 120; k++) { if (sc.length < 3) break; const i = Math.floor(R() * (sc.length - 2)), j = i + 2 + Math.floor(R() * (sc.length - i - 2));
+        if (j < sc.length && segFree(sc[i].x, sc[i].y, sc[j].x, sc[j].y)) sc.splice(i + 1, j - i - 1); }
+      raw = resample(P, 90); smo = resample(sc, 90); phase = 'found'; pt = 0;
+    }
+  }
+  reset(); let V;
+  return {
+    resize() { V = fitView(S, 0, 0, W, H, 8, false); },
+    step(dt) {
+      pt += dt;
+      if (S.ptr) { const gx = V.ix(S.ptr.x), gy = V.iy(S.ptr.y);
+        if (free(gx, gy) && Math.hypot(gx - goal.x, gy - goal.y) > 0.06) { if (!pend || Math.hypot(pend.x - gx, pend.y - gy) > 0.02) { pend = { x: gx, y: gy }; pendT = 0; } } else pend = null;
+        if (pend) { pendT += dt; if (pendT > 0.22) { goal = pend; pend = null; reset(); } } }
+      if (phase === 'grow') { const n = Math.ceil(dt * 320); for (let k = 0; k < n && phase === 'grow'; k++) grow(); if (nodes.length > 3000) reset(); }
+      else if (phase === 'found' && pt > 0.7) { phase = 'smooth'; pt = 0; }
+      else if (phase === 'smooth' && pt > 3.0 && !S.ptr) reset();
+    },
+    draw(ctx) {
+      ctx.fillStyle = S.c('obst'); for (const o of obs) ctx.fillRect(V.X(o.x0), V.Y(o.y0), (o.x1 - o.x0) * V.s, (o.y1 - o.y0) * V.s);
+      ctx.strokeStyle = S.c('ink', phase === 'grow' ? .42 : .22); ctx.lineWidth = 1; ctx.beginPath();
+      for (let i = 1; i < nodes.length; i++) { const n = nodes[i], p = nodes[n.p]; ctx.moveTo(V.X(p.x), V.Y(p.y)); ctx.lineTo(V.X(n.x), V.Y(n.y)); }
+      ctx.stroke();
+      ctx.fillStyle = S.c('ink', .55); for (let i = Math.max(1, nodes.length - 400); i < nodes.length; i++) ctx.fillRect(V.X(nodes[i].x) - 1, V.Y(nodes[i].y) - 1, 2, 2);
+      if (phase === 'grow' && lastS) {
+        ctx.strokeStyle = S.c('magenta', .55); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(V.X(lastS.nb.x), V.Y(lastS.nb.y)); ctx.lineTo(V.X(lastS.q.x), V.Y(lastS.q.y)); ctx.stroke(); ctx.setLineDash([]);
+        const qx = V.X(lastS.q.x), qy = V.Y(lastS.q.y); ctx.beginPath(); ctx.moveTo(qx - 4, qy - 4); ctx.lineTo(qx + 4, qy + 4); ctx.moveTo(qx + 4, qy - 4); ctx.lineTo(qx - 4, qy + 4); ctx.stroke();
+      }
+      if (raw) {
+        const u = phase === 'smooth' ? smooth(clamp(pt / 0.9, 0, 1)) : 0;
+        if (u > 0) { ctx.strokeStyle = S.c('amber', .7); ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath(); raw.forEach((p, i) => i ? ctx.lineTo(V.X(p.x), V.Y(p.y)) : ctx.moveTo(V.X(p.x), V.Y(p.y))); ctx.stroke(); ctx.setLineDash([]); }
+        ctx.strokeStyle = u > 0 ? S.c('teal') : S.c('amber'); ctx.lineWidth = 3.5; ctx.lineJoin = ctx.lineCap = 'round'; ctx.beginPath();
+        for (let i = 0; i < raw.length; i++) { const x = lerp(raw[i].x, smo[i].x, u), y = lerp(raw[i].y, smo[i].y, u); i ? ctx.lineTo(V.X(x), V.Y(y)) : ctx.moveTo(V.X(x), V.Y(y)); }
+        ctx.stroke();
+      }
+      ctx.fillStyle = S.c('ink'); ctx.beginPath(); ctx.arc(V.X(start.x), V.Y(start.y), 6, 0, TAU); ctx.fill();
+      const gx = V.X(goal.x), gy = V.Y(goal.y); ctx.strokeStyle = S.c('magenta'); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(gx, gy, 0.045 * V.s, 0, TAU); ctx.stroke(); ctx.beginPath(); ctx.arc(gx, gy, 3, 0, TAU); ctx.fillStyle = S.c('magenta'); ctx.fill();
+      if (pend) { ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.arc(V.X(pend.x), V.Y(pend.y), 0.045 * V.s, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+      const txt = phase === 'grow' ? `노드 ${nodes.length}` : phase === 'found' ? `경로 발견, 노드 ${nodes.length}` : '지름길로 다듬은 경로';
+      S.label(ctx, txt, 10, S.h - 10, 'left');
+    }
+  };
+};
+
+// ===================== 3. motion models =====================
+VIZ.motion = function (S) {
+  // each pane: local units, height = 1, width = A (aspect). y down for top views; quad uses y-up internally.
+  let A = 1.5, T = 0;
+  const trailMax = 260;
+  function liss(ax, ay, fx, fy, ph, sp) { return t => ({ x: A / 2 + ax * A / 2 * Math.sin(fx * t * sp + ph), y: .5 + ay / 2 * Math.sin(fy * t * sp) }); }
+  const panes = [
+    { name: '차동 구동', st: { x: .3, y: .5, th: 0 }, tgt: liss(.62, .62, 1, 2, .3, .55), trail: [],
+      sim(dt, g) { const s = this.st, e = wrapAng(Math.atan2(g.y - s.y, g.x - s.x) - s.th), d = Math.hypot(g.x - s.x, g.y - s.y);
+        const v = clamp(d * 2.2, 0, .32) * Math.max(0, Math.cos(e)), w = clamp(4 * e, -3.2, 3.2), Lw = .1;
+        this.vl = v - w * Lw / 2; this.vr = v + w * Lw / 2; s.x += v * Math.cos(s.th) * dt; s.y += v * Math.sin(s.th) * dt; s.th += w * dt; },
+      draw(ctx, P) { const s = this.st, c = Math.cos(s.th), n = Math.sin(s.th), r = .06, Lw = .1;
+        const wheel = (side, v) => { const wx = s.x - n * side * Lw / 2, wy = s.y + c * side * Lw / 2;
+          ctx.save(); ctx.translate(P.X(wx), P.Y(wy)); ctx.rotate(s.th); ctx.fillStyle = S.c('ink'); ctx.fillRect(-.026 * P.s, -.011 * P.s, .052 * P.s, .022 * P.s); ctx.restore();
+          P.arrow(ctx, wx, wy, wx + c * v * .55, wy + n * v * .55, S.c('amber')); };
+        ctx.fillStyle = S.c('plate'); ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(P.X(s.x), P.Y(s.y), r * P.s, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(P.X(s.x), P.Y(s.y)); ctx.lineTo(P.X(s.x + c * r), P.Y(s.y + n * r)); ctx.stroke();
+        wheel(1, this.vl || 0); wheel(-1, this.vr || 0); } },
+    { name: '애커만 조향', st: { x: .4, y: .3, th: 0 }, tgt: liss(.66, .6, 1, 2, 1.6, .5), trail: [], dl: 0,
+      sim(dt, g) { const s = this.st, Lb = .13, v = .34, e = wrapAng(Math.atan2(g.y - s.y, g.x - s.x) - s.th);
+        const dcmd = clamp(1.8 * e, -.55, .55); this.dl += clamp(dcmd - this.dl, -2.5 * dt, 2.5 * dt);
+        s.x += v * Math.cos(s.th) * dt; s.y += v * Math.sin(s.th) * dt; s.th += v / Lb * Math.tan(this.dl) * dt; },
+      pre(ctx, P) { const s = this.st, Lb = .13 * 1.5, c = Math.cos(s.th), n = Math.sin(s.th), d = this.dl;
+        if (Math.abs(d) > .04) { const Rr = Lb / Math.tan(d), ix = s.x - n * Rr, iy = s.y + c * Rr;
+          if (Math.abs(Rr) < .9) { ctx.strokeStyle = S.c('ink', .3); ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath();
+            ctx.moveTo(P.X(s.x), P.Y(s.y)); ctx.lineTo(P.X(ix), P.Y(iy)); ctx.lineTo(P.X(s.x + c * Lb), P.Y(s.y + n * Lb)); ctx.stroke(); ctx.setLineDash([]);
+            ctx.fillStyle = S.c('ink', .45); ctx.beginPath(); ctx.arc(P.X(ix), P.Y(iy), 2.5, 0, TAU); ctx.fill(); } } },
+      draw(ctx, P) { const s = this.st, Lb = .13, d = this.dl;
+        ctx.save(); ctx.translate(P.X(s.x), P.Y(s.y)); ctx.rotate(s.th); const k = P.s;
+        ctx.fillStyle = S.c('plate'); ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 2; ctx.beginPath(); ctx.rect(-.035 * k, -.045 * k, (Lb + .07) * k, .09 * k); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = S.c('ink'); for (const sd of [-1, 1]) { ctx.fillRect(-.022 * k, sd * .052 * k - .009 * k, .044 * k, .018 * k);
+          ctx.save(); ctx.translate(Lb * k, sd * .052 * k); ctx.rotate(d); ctx.fillStyle = S.c('amber'); ctx.fillRect(-.022 * k, -.009 * k, .044 * k, .018 * k); ctx.restore(); }
+        ctx.restore(); } },
+    { name: '쿼드로터', st: { x: .4, z: .5, vx: 0, vz: 0, ph: 0, T: 3 }, tgt: liss(.6, .5, 1, 1.6, 0, .45), trail: [], spin: 0,
+      sim(dt, g) { const s = this.st, G = 3, gz = 1 - g.y;
+        const ax = 5 * (g.x - s.x) - 3.2 * s.vx, az = 5 * (gz - s.z) - 3.2 * s.vz;
+        const pd = clamp(Math.atan2(ax, G + az), -.5, .5); this.pd = pd; s.ph += (pd - s.ph) * Math.min(1, 9 * dt);
+        s.T = clamp((G + az) / Math.cos(s.ph), 0, 2.4 * G); s.vx += s.T * Math.sin(s.ph) * dt; s.vz += (s.T * Math.cos(s.ph) - G) * dt;
+        s.x += s.vx * dt; s.z += s.vz * dt; this.spin += dt * 40; },
+      pos() { return { x: this.st.x, y: 1 - this.st.z }; },
+      draw(ctx, P) { const s = this.st, cx = s.x, cy = 1 - s.z, arm = .085, c = Math.cos(s.ph), n = Math.sin(s.ph), k = P.s;
+        const ux = n, uy = -c; // thrust direction (screen coords)
+        const dT = ((this.pd || 0) - s.ph) * 1.4;
+        for (const sd of [-1, 1]) { const rx = cx + sd * arm * c, ry = cy + sd * arm * n, f = clamp(s.T / 3 * .09 * (1 - sd * dT), .01, .2);
+          P.arrow(ctx, rx, ry, rx + ux * f, ry + uy * f, S.c('amber'));
+          const w = Math.abs(Math.sin(this.spin + sd)) * .045 + .012; ctx.strokeStyle = S.c('ink', .7); ctx.lineWidth = 2; ctx.beginPath();
+          ctx.moveTo(P.X(rx - c * w), P.Y(ry - n * w)); ctx.lineTo(P.X(rx + c * w), P.Y(ry + n * w)); ctx.stroke(); }
+        ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(P.X(cx - arm * c), P.Y(cy - arm * n)); ctx.lineTo(P.X(cx + arm * c), P.Y(cy + arm * n)); ctx.stroke();
+        ctx.fillStyle = S.c('ink'); ctx.fillRect(P.X(cx) - .02 * k, P.Y(cy) - .014 * k, .04 * k, .028 * k); } },
+    { name: '고정익 제트기', st: { x: .5, y: .5, psi: 0, phi: 0 }, tgt: liss(.55, .5, 1, 2, .8, .35), trail: [], trail2: [],
+      sim(dt, g) { const s = this.st, V = .42, Gg = .9, e = wrapAng(Math.atan2(g.y - s.y, g.x - s.x) - s.psi);
+        const pc = clamp(2.2 * e, -1.05, 1.05); s.phi += (pc - s.phi) * Math.min(1, 3 * dt);
+        s.psi += Gg * Math.tan(s.phi) / V * dt; s.x += V * Math.cos(s.psi) * dt; s.y += V * Math.sin(s.psi) * dt; },
+      draw(ctx, P) { const s = this.st, k = P.s, span = .07 * Math.max(.25, Math.cos(s.phi));
+        ctx.save(); ctx.translate(P.X(s.x), P.Y(s.y)); ctx.rotate(s.psi); ctx.fillStyle = S.c('plate'); ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 1.8; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.moveTo(.06 * k, 0); ctx.lineTo(.01 * k, -.008 * k); ctx.lineTo(-.005 * k, -span * k); ctx.lineTo(-.025 * k, -span * k); ctx.lineTo(-.02 * k, -.008 * k);
+        ctx.lineTo(-.045 * k, -.006 * k); ctx.lineTo(-.058 * k, -.028 * k); ctx.lineTo(-.064 * k, -.028 * k); ctx.lineTo(-.06 * k, 0);
+        ctx.lineTo(-.064 * k, .028 * k); ctx.lineTo(-.058 * k, .028 * k); ctx.lineTo(-.045 * k, .006 * k); ctx.lineTo(-.02 * k, .008 * k); ctx.lineTo(-.025 * k, span * k); ctx.lineTo(-.005 * k, span * k); ctx.lineTo(.01 * k, .008 * k); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); } },
+  ];
+  let geo = [];
+  function paneView(i) { const pw = S.w / 2, ph = S.h / 2, x0 = (i % 2) * pw, y0 = (i >> 1) * ph, m = 6, s = (ph - 2 * m);
+    A = (pw - 2 * m) / s; return { x0, y0, pw, ph, s, X: x => x0 + m + x * s, Y: y => y0 + m + y * s, ix: px => (px - x0 - m) / s, iy: py => (py - y0 - m) / s,
+      arrow(ctx, ax, ay, bx, by, col) { const X1 = this.X(ax), Y1 = this.Y(ay), X2 = this.X(bx), Y2 = this.Y(by), L = Math.hypot(X2 - X1, Y2 - Y1); if (L < 2) return;
+        const ux = (X2 - X1) / L, uy = (Y2 - Y1) / L, hd = Math.min(6, L * .45); ctx.strokeStyle = ctx.fillStyle = col; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(X1, Y1); ctx.lineTo(X2 - ux * hd, Y2 - uy * hd); ctx.stroke(); ctx.beginPath(); ctx.moveTo(X2, Y2);
+        ctx.lineTo(X2 - ux * hd - uy * hd * .55, Y2 - uy * hd + ux * hd * .55); ctx.lineTo(X2 - ux * hd + uy * hd * .55, Y2 - uy * hd - ux * hd * .55); ctx.fill(); } }; }
+  return {
+    resize() { geo = [0, 1, 2, 3].map(paneView); },
+    step(dt) { T += dt; const sub = 4;
+      panes.forEach((p, i) => { const P = geo[i]; A = (P.pw - 12) / P.s;
+        let g = p.tgt(T); if (S.ptr && S.ptr.x >= P.x0 && S.ptr.x < P.x0 + P.pw && S.ptr.y >= P.y0 && S.ptr.y < P.y0 + P.ph) g = { x: clamp(P.ix(S.ptr.x), .08, A - .08), y: clamp(P.iy(S.ptr.y), .1, .92) };
+        p.g = g; for (let k = 0; k < sub; k++) p.sim(dt / sub, g);
+        const q = p.pos ? p.pos() : p.st; p.trail.push({ x: q.x, y: q.y }); if (p.trail.length > trailMax) p.trail.shift();
+        if (p.trail2) { const s = p.st, sp = .07 * Math.max(.25, Math.cos(s.phi)); p.trail2.push({ x: s.x - .02 * Math.cos(s.psi) + Math.sin(s.psi) * sp, y: s.y - .02 * Math.sin(s.psi) - Math.cos(s.psi) * sp }); if (p.trail2.length > trailMax) p.trail2.shift(); } });
+    },
+    draw(ctx) {
+      ctx.strokeStyle = S.c('rule'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(S.w / 2 + .5, 0); ctx.lineTo(S.w / 2 + .5, S.h); ctx.moveTo(0, S.h / 2 + .5); ctx.lineTo(S.w, S.h / 2 + .5); ctx.stroke();
+      panes.forEach((p, i) => { const P = geo[i]; ctx.save(); ctx.beginPath(); ctx.rect(P.x0, P.y0, P.pw, P.ph); ctx.clip();
+        if (i === 2) { ctx.strokeStyle = S.c('rule'); ctx.beginPath(); ctx.moveTo(P.x0, P.Y(.97)); ctx.lineTo(P.x0 + P.pw, P.Y(.97)); ctx.stroke(); }
+        const trails = p.trail2 ? [p.trail, p.trail2] : [p.trail];
+        for (const tr of trails) for (let k = 1; k < tr.length; k++) { ctx.strokeStyle = S.c('teal', .9 * k / tr.length); ctx.lineWidth = 2; ctx.beginPath();
+          let a = tr[k - 1], b = tr[k]; if (p.trail2) { /* contrails offset */ }
+          ctx.moveTo(P.X(a.x), P.Y(a.y)); ctx.lineTo(P.X(b.x), P.Y(b.y)); ctx.stroke(); }
+        const g = p.g || { x: 0, y: 0 }; ctx.strokeStyle = S.c('magenta'); ctx.lineWidth = 1.5; const gx = P.X(g.x), gy = P.Y(g.y);
+        ctx.beginPath(); ctx.moveTo(gx - 5, gy); ctx.lineTo(gx + 5, gy); ctx.moveTo(gx, gy - 5); ctx.lineTo(gx, gy + 5); ctx.stroke();
+        if (p.pre) p.pre(ctx, P); const vq = p.pos ? p.pos() : p.st, vx = P.X(vq.x), vy = P.Y(vq.y), K = 1.5;
+        ctx.save(); ctx.translate(vx, vy); ctx.scale(K, K); ctx.translate(-vx, -vy); p.draw(ctx, P); ctx.restore();
+        S.label(ctx, p.name, P.x0 + 9, P.y0 + 18, 'left'); ctx.restore(); });
+    }
+  };
+};
+
+// ===================== 4. planar 2-link arm + C-space =====================
+VIZ.arm2d = function (S) {
+  const L1 = .55, L2 = .45, NG = 120, PAD = .03;
+  const obs = [{ x: .5, y: .45, r: .15 }, { x: -.6, y: -.4, r: .16 }, { x: -.45, y: .62, r: .11 }, { x: .75, y: -.3, r: .1 }];
+  const fk = (a, b) => { const x1 = L1 * Math.cos(a), y1 = L1 * Math.sin(a); return [x1, y1, x1 + L2 * Math.cos(a + b), y1 + L2 * Math.sin(a + b)]; };
+  const hit = (a, b) => { const [x1, y1, x2, y2] = fk(a, b); return obs.some(o => segPtDist(0, 0, x1, y1, o.x, o.y) < o.r + PAD || segPtDist(x1, y1, x2, y2, o.x, o.y) < o.r + PAD); };
+  const ang = i => -Math.PI + (i + .5) * TAU / NG, cell = a => ((Math.floor((wrapAng(a) + Math.PI) / TAU * NG) % NG) + NG) % NG;
+  const cs = new Uint8Array(NG * NG); for (let j = 0; j < NG; j++) for (let i = 0; i < NG; i++) cs[j * NG + i] = hit(ang(i), ang(j)) ? 1 : 0;
+  const qA = [-1.8, .3], qB = [.15, .9];
+  function plan(a, b) { // A* on torus, 8-conn
+    const s = cell(a[1]) * NG + cell(a[0]), g = cell(b[1]) * NG + cell(b[0]); const G = new Float32Array(NG * NG).fill(Infinity), par = new Int32Array(NG * NG).fill(-1), cl = new Uint8Array(NG * NG), H = new Heap();
+    const hd = (i) => { let di = Math.abs(i % NG - g % NG), dj = Math.abs(((i / NG) | 0) - ((g / NG) | 0)); di = Math.min(di, NG - di); dj = Math.min(dj, NG - dj); return Math.hypot(di, dj); };
+    G[s] = 0; H.push(hd(s), s);
+    while (H.size) { const i = H.pop(); if (cl[i]) continue; cl[i] = 1; if (i === g) break; const ci = i % NG, cj = (i / NG) | 0;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { if (!di && !dj) continue; const ni = (ci + di + NG) % NG, nj = (cj + dj + NG) % NG, k = nj * NG + ni;
+        if (cs[k] || cl[k]) continue; const ng = G[i] + Math.hypot(di, dj); if (ng < G[k]) { G[k] = ng; par[k] = i; H.push(ng + hd(k), k); } } }
+    const P = []; for (let i = g; i !== -1; i = par[i]) P.push([ang(i % NG), ang((i / NG) | 0)]); return P.reverse();
+  }
+  // unwrap path so interpolation is continuous
+  const raw = plan(qA, qB); const path = [raw[0].slice()];
+  for (let k = 1; k < raw.length; k++) { const p = path[k - 1]; path.push([p[0] + wrapAng(raw[k][0] - raw[k - 1][0]), p[1] + wrapAng(raw[k][1] - raw[k - 1][1])]); }
+  let q = path[0].slice(), u = 0, dir = 1, hold = 0, img = null, imgKey = '', V, CSv;
+  return {
+    resize() { const half = S.w / 2, side = Math.min(half, S.h) - 16;
+      V = { s: side / 2.2, X: x => half / 2 + x * side / 2.2, Y: y => S.h / 2 - y * side / 2.2 };
+      CSv = { x0: half + (half - side) / 2, y0: (S.h - side) / 2, side }; },
+    step(dt) {
+      if (S.ptr) { const p = S.ptr;
+        if (p.x < S.w / 2) { let tx = (p.x - S.w / 4) / V.s, ty = (S.h / 2 - p.y) / V.s; const d = Math.hypot(tx, ty), dm = L1 + L2 - 1e-3, dn = Math.abs(L1 - L2) + 1e-3;
+          if (d > dm) { tx *= dm / d; ty *= dm / d; } if (d < dn) { tx *= dn / Math.max(d, 1e-6); ty *= dn / Math.max(d, 1e-6); }
+          const c2 = clamp((tx * tx + ty * ty - L1 * L1 - L2 * L2) / (2 * L1 * L2), -1, 1); let best = null, bd = Infinity;
+          for (const sg of [1, -1]) { const b = sg * Math.acos(c2), a = Math.atan2(ty, tx) - Math.atan2(L2 * Math.sin(b), L1 + L2 * Math.cos(b));
+            const dd = Math.abs(wrapAng(a - q[0])) + Math.abs(wrapAng(b - q[1])); if (dd < bd) { bd = dd; best = [a, b]; } }
+          q[0] += wrapAng(best[0] - q[0]) * Math.min(1, 14 * dt); q[1] += wrapAng(best[1] - q[1]) * Math.min(1, 14 * dt);
+        } else { const a = -Math.PI + (p.x - CSv.x0) / CSv.side * TAU, b = Math.PI - (p.y - CSv.y0) / CSv.side * TAU; if (a >= -Math.PI && a <= Math.PI && b >= -Math.PI && b <= Math.PI) q = [a, b]; }
+        return; }
+      if (hold > 0) { hold -= dt; return; }
+      u += dir * dt * 26; if (u >= path.length - 1) { u = path.length - 1; dir = -1; hold = .7; } if (u <= 0) { u = 0; dir = 1; hold = .7; }
+      const i = Math.min(path.length - 2, Math.floor(u)), f = u - i; q = [lerp(path[i][0], path[i + 1][0], f), lerp(path[i][1], path[i + 1][1], f)];
+    },
+    draw(ctx) {
+      const key = S.c('obst') + S.c('plate'); if (key !== imgKey) { imgKey = key; img = document.createElement('canvas'); img.width = img.height = NG; const g = img.getContext('2d'), d = g.createImageData(NG, NG);
+        const o = S.rgb('obst'), b = S.rgb('plate'); for (let j = 0; j < NG; j++) for (let i = 0; i < NG; i++) { const c = cs[j * NG + i] ? o : b, k = ((NG - 1 - j) * NG + i) * 4; d.data[k] = c[0]; d.data[k + 1] = c[1]; d.data[k + 2] = c[2]; d.data[k + 3] = 255; }
+        g.putImageData(d, 0, 0); }
+      // workspace
+      ctx.strokeStyle = S.c('rule'); ctx.setLineDash([4, 4]); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(V.X(0), V.Y(0), (L1 + L2) * V.s, 0, TAU); ctx.stroke(); ctx.beginPath(); ctx.arc(V.X(0), V.Y(0), (L1 - L2) * V.s, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = S.c('obst'); for (const o of obs) { ctx.beginPath(); ctx.arc(V.X(o.x), V.Y(o.y), o.r * V.s, 0, TAU); ctx.fill(); }
+      const drawArm = (a, b, col, w) => { const [x1, y1, x2, y2] = fk(a, b); ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(V.X(0), V.Y(0)); ctx.lineTo(V.X(x1), V.Y(y1)); ctx.lineTo(V.X(x2), V.Y(y2)); ctx.stroke(); return [x1, y1, x2, y2]; };
+      if (!S.ptr) { drawArm(qA[0], qA[1], S.c('ink', .14), 7); drawArm(qB[0], qB[1], S.c('ink', .14), 7); }
+      const bad = hit(q[0], q[1]); const [x1, y1, x2, y2] = drawArm(q[0], q[1], bad ? S.c('magenta') : S.c('ink'), 7);
+      ctx.fillStyle = S.c('plate'); ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 2; for (const [x, y] of [[0, 0], [x1, y1]]) { ctx.beginPath(); ctx.arc(V.X(x), V.Y(y), 5, 0, TAU); ctx.fill(); ctx.stroke(); }
+      ctx.fillStyle = S.c('teal'); ctx.beginPath(); ctx.arc(V.X(x2), V.Y(y2), 5, 0, TAU); ctx.fill();
+      S.label(ctx, '작업 공간', 10, 18, 'left');
+      // C-space
+      const { x0, y0, side } = CSv; ctx.imageSmoothingEnabled = false; ctx.drawImage(img, x0, y0, side, side); ctx.strokeStyle = S.c('rule'); ctx.lineWidth = 1; ctx.strokeRect(x0 + .5, y0 + .5, side, side);
+      const PX = a => x0 + (wrapAng(a) + Math.PI) / TAU * side, PY = b => y0 + (Math.PI - wrapAng(b)) / TAU * side;
+      if (!S.ptr || true) { ctx.strokeStyle = S.c('teal'); ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.beginPath(); let pa = null;
+        for (const p of path) { const X = PX(p[0]), Y = PY(p[1]); if (!pa || Math.abs(X - pa[0]) > side / 2 || Math.abs(Y - pa[1]) > side / 2) ctx.moveTo(X, Y); else ctx.lineTo(X, Y); pa = [X, Y]; } ctx.stroke(); }
+      for (const p of [qA, qB]) { ctx.strokeStyle = S.c('ink', .5); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(PX(p[0]), PY(p[1]), 4, 0, TAU); ctx.stroke(); }
+      ctx.fillStyle = bad ? S.c('magenta') : S.c('ink'); ctx.beginPath(); ctx.arc(PX(q[0]), PY(q[1]), 5.5, 0, TAU); ctx.fill();
+      S.label(ctx, '구성 공간 (θ₁, θ₂)', x0 + 2, y0 - 5 < 14 ? y0 + 16 : y0 - 5, 'left');
+    }
+  };
+};
+
+// ===================== 5. spatial arm =====================
+VIZ.arm3d = function (S) {
+  const H0 = .12, L1 = .42, L2 = .38, L3 = .13; let T = 0, yaw = .7, el = .5, trail = [];
+  function ik(P) { const q0 = Math.atan2(P[1], P[0]), r = Math.hypot(P[0], P[1]), wz = P[2] + L3 - H0;
+    const c2 = clamp((r * r + wz * wz - L1 * L1 - L2 * L2) / (2 * L1 * L2), -1, 1), q2 = -Math.acos(c2);
+    const q1 = Math.atan2(wz, r) - Math.atan2(L2 * Math.sin(q2), L1 + L2 * Math.cos(q2)), q3 = -Math.PI / 2 - q1 - q2; return [q0, q1, q2, q3]; }
+  function fk(q) { const u = [Math.cos(q[0]), Math.sin(q[0])], pts = [[0, 0, 0], [0, 0, H0]]; let a = 0, p = [0, 0, H0], dirs = [];
+    for (const [L, dq] of [[L1, q[1]], [L2, q[2]], [L3, q[3]]]) { a += dq; const d = [u[0] * Math.cos(a), u[1] * Math.cos(a), Math.sin(a)]; dirs.push(d); p = [p[0] + L * d[0], p[1] + L * d[1], p[2] + L * d[2]]; pts.push(p); }
+    return { pts, dirs, side: [-u[1], u[0], 0] }; }
+  // cleaner camera: orbit around target, z up
+  function project(p) { const x = p[0] - .26, y = p[1], z = p[2] - .28; const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const xr = cy * x - sy * y, yr = sy * x + cy * y; // rotate about z
+    const ce = Math.cos(el), se = Math.sin(el); const depth = ce * yr + se * z, up = -se * yr + ce * z; // tilt
+    const D = 2.4, f = Math.min(S.w * 1.25, S.h * 1.9), k = f / (D + depth);
+    return [S.w / 2 + xr * k, S.h * .55 - up * k, k]; }
+  const target = t => [.42 + .1 * Math.sin(2 * t), .3 * Math.sin(t), .2 + .09 * Math.sin(3 * t + .5)];
+  return {
+    resize() {},
+    step(dt) { T += dt * .9; let ty, te; if (S.ptr) { ty = (S.ptr.x / S.w - .5) * 3.2; te = lerp(.85, .12, S.ptr.y / S.h); } else { ty = .55 + .45 * Math.sin(T * .22); te = .42; }
+      yaw += (ty - yaw) * Math.min(1, 5 * dt); el += (te - el) * Math.min(1, 5 * dt);
+      const P = fk(ik(target(T))).pts[4]; trail.push(P); if (trail.length > 240) trail.shift(); },
+    draw(ctx) {
+      const q = ik(target(T)), F = fk(q), pr = project;
+      ctx.strokeStyle = S.c('grid'); ctx.lineWidth = 1; ctx.beginPath();
+      for (let i = -4; i <= 4; i++) { const a = pr([i * .2, -.8, 0]), b = pr([i * .2, .8, 0]), c = pr([-.8, i * .2, 0]), d = pr([.8, i * .2, 0]); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.moveTo(c[0], c[1]); ctx.lineTo(d[0], d[1]); }
+      ctx.stroke();
+      // shadows
+      const sh = F.pts.map(p => pr([p[0], p[1], 0])); ctx.strokeStyle = S.c('ink', .12); ctx.lineCap = ctx.lineJoin = 'round'; ctx.lineWidth = 10; ctx.beginPath(); sh.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
+      ctx.strokeStyle = S.c('teal', .18); ctx.lineWidth = 2; ctx.beginPath(); trail.forEach((p, i) => { const s = pr([p[0], p[1], 0]); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); }); ctx.stroke();
+      for (let i = 1; i < trail.length; i++) { const a = pr(trail[i - 1]), b = pr(trail[i]); ctx.strokeStyle = S.c('teal', i / trail.length); ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+      const axes = (o, dirs, L) => { const cols = ['magenta', 'teal', 'blue']; dirs.forEach((d, i) => { const a = pr(o), b = pr([o[0] + d[0] * L, o[1] + d[1] * L, o[2] + d[2] * L]); ctx.strokeStyle = S.c(cols[i]); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }); };
+      axes([0, 0, 0], [[1, 0, 0], [0, 1, 0], [0, 0, 1]], .14);
+      // base
+      const b0 = pr([0, 0, 0]), b1 = pr([0, 0, H0]); ctx.fillStyle = S.c('obst'); ctx.beginPath(); ctx.ellipse(b0[0], b0[1], .09 * b0[2], .09 * b0[2] * Math.sin(el) + 1, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = S.c('ink'); ctx.lineWidth = .07 * b1[2]; ctx.beginPath(); ctx.moveTo(b0[0], b0[1]); ctx.lineTo(b1[0], b1[1]); ctx.stroke();
+      const P = F.pts.map(pr); const widths = [.05, .042, .034, .022];
+      for (let i = 1; i < 5; i++) { ctx.strokeStyle = S.c('ink'); ctx.lineWidth = widths[i - 1] * P[i][2]; ctx.beginPath(); ctx.moveTo(P[i][0], P[i][1]); ctx.lineTo(P[i + 1 > 4 ? 4 : i + 1][0], P[i + 1 > 4 ? 4 : i + 1][1]); ctx.stroke(); }
+      for (let i = 1; i < 4; i++) { ctx.fillStyle = S.c('plate'); ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(P[i][0], P[i][1], .028 * P[i][2], 0, TAU); ctx.fill(); ctx.stroke(); }
+      const e = F.pts[4], d3 = F.dirs[2], sd = F.side, n = [d3[1] * sd[2] - d3[2] * sd[1], d3[2] * sd[0] - d3[0] * sd[2], d3[0] * sd[1] - d3[1] * sd[0]];
+      axes(e, [d3, sd, n], .11);
+      ctx.fillStyle = S.c('ink'); ctx.font = S.font(); ctx.textAlign = 'left';
+      S.label(ctx, `q = (${q.map(v => (v * 57.3).toFixed(0).padStart(4)).join(', ')})°`, 10, S.h - 10, 'left');
+    }
+  };
+};
+
+// ===================== 6. pick-and-place with RRT-Connect =====================
+VIZ.pick = function (S) {
+  const BX = 0, BY = .3, L1 = .62, L2 = .52, L3 = .16, RL = .035, RB = .065, BOX = .14;
+  const tables = [{ x0: -1.08, x1: -.55, y0: 0, y1: .35 }, { x0: .55, x1: 1.08, y0: 0, y1: .35 }];
+  const ped = { x0: -.09, x1: .09, y0: 0, y1: .3 };
+  let wallH = .62, wallT = .62; const hang = { x0: .26, x1: .44, y0: 1.12, y1: 1.7 };
+  const wall = () => ({ x0: -.47, x1: -.33, y0: 0, y1: wallH });
+  const spots = [-.81, .81];
+  const LIM = [[.02, Math.PI - .02], [-2.7, 2.7], [-2.7, 2.7]];
+  function fk(q) { const a1 = q[0], a2 = a1 + q[1], a3 = a2 + q[2]; const p1 = [BX + L1 * Math.cos(a1), BY + L1 * Math.sin(a1)], p2 = [p1[0] + L2 * Math.cos(a2), p1[1] + L2 * Math.sin(a2)], p3 = [p2[0] + L3 * Math.cos(a3), p2[1] + L3 * Math.sin(a3)]; return [[BX, BY], p1, p2, p3]; }
+  let RECTS = null; const setRects = () => { RECTS = [tables[0], tables[1], wall(), hang]; };
+  function collide(q, carry) { for (let i = 0; i < 3; i++) if (q[i] < LIM[i][0] || q[i] > LIM[i][1]) return true;
+    if (!RECTS) setRects(); const a1 = q[0], a2 = a1 + q[1], a3 = a2 + q[2];
+    const x1 = BX + L1 * Math.cos(a1), y1 = BY + L1 * Math.sin(a1), x2 = x1 + L2 * Math.cos(a2), y2 = y1 + L2 * Math.sin(a2), x3 = x2 + L3 * Math.cos(a3), y3 = y2 + L3 * Math.sin(a3);
+    if (y1 < RL || y2 < RL || y3 < RL) return true;
+    for (let k = 0; k < 4; k++) { const R = RECTS[k]; if (segRectHit(BX, BY, x1, y1, RL, R) || segRectHit(x1, y1, x2, y2, RL, R) || segRectHit(x2, y2, x3, y3, RL, R)) return true; }
+    if (segRectHit(x1, y1, x2, y2, RL, ped) || segRectHit(x2, y2, x3, y3, RL, ped)) return true;
+    if (carry) { if (y3 < RB) return true; for (let k = 0; k < 4; k++) if (ptRectDist(x3, y3, RECTS[k]) < RB) return true; if (ptRectDist(x3, y3, ped) < RB) return true; }
+    return false; }
+  function ikDown(x, y) { const wx = x - BX, wy = y + L3 - BY, c2 = (wx * wx + wy * wy - L1 * L1 - L2 * L2) / (2 * L1 * L2); if (Math.abs(c2) > 1) return null; let best = null;
+    for (const sg of [1, -1]) { const q2 = sg * Math.acos(c2), q1 = Math.atan2(wy, wx) - Math.atan2(L2 * Math.sin(q2), L1 + L2 * Math.cos(q2)), q3 = -Math.PI / 2 - q1 - q2, q = [q1, wrapAng(q2), wrapAng(q3)];
+      const ey = BY + L1 * Math.sin(q1); if (!best || ey > best.ey) best = { q, ey }; } return best.q; }
+  const restY = .35 + BOX / 2, Q = spots.map(x => ikDown(x, restY));
+  const dist = (a, b) => { const d0 = a[0] - b[0], d1 = a[1] - b[1], d2 = a[2] - b[2]; return Math.sqrt(d0 * d0 + d1 * d1 + d2 * d2); };
+  function edgeFree(a, b, carry) { const n = Math.max(1, Math.ceil(dist(a, b) / .045)); for (let i = 1; i <= n; i++) { const t = i / n; if (collide([lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)], carry)) return false; } return true; }
+  function rrtConnect(qs, qg, R) { const STEP = .2, Ta = [{ q: qs, p: -1, t: 0 }], Tb = [{ q: qg, p: -1, t: 1 }], log = [];
+    const near = (T, q) => { let bi = 0, bd = Infinity; for (let i = 0; i < T.length; i++) { const n = T[i].q, d0 = n[0] - q[0], d1 = n[1] - q[1], d2 = n[2] - q[2], d = d0 * d0 + d1 * d1 + d2 * d2; if (d < bd) { bd = d; bi = i; } } return bi; };
+    const steer = (a, b) => { const d = dist(a, b); if (d <= STEP) return b.slice(); return a.map((v, i) => v + (b[i] - v) * STEP / d); };
+    const extend = (T, q) => { const i = near(T, q), qn = steer(T[i].q, q); if (!edgeFree(T[i].q, qn, true)) return -1; T.push({ q: qn, p: i, t: T[0].t }); log.push(T[T.length - 1], T[i]); return T.length - 1; };
+    let A = Ta, B = Tb;
+    for (let it = 0; it < 3000; it++) { const qr = LIM.map(([a, b]) => a + R() * (b - a)); const ia = extend(A, qr); if (ia >= 0) { const qn = A[ia].q;
+        let ib = -1; for (let k = 0; k < 60; k++) { const j = near(B, qn), qs2 = steer(B[j].q, qn); if (!edgeFree(B[j].q, qs2, true)) break; B.push({ q: qs2, p: j, t: B[0].t }); log.push(B[B.length - 1], B[j]); ib = B.length - 1; if (dist(qs2, qn) < 1e-6) break; }
+        if (ib >= 0 && dist(B[ib].q, qn) < 1e-6) { const pa = [], pb = []; for (let i = ia; i !== -1; i = A[i].p) pa.push(A[i].q); for (let i = ib; i !== -1; i = B[i].p) pb.push(B[i].q);
+          pa.reverse(); let path = pa.concat(pb.slice(1)); if (A !== Ta) path.reverse(); return { path, log, iters: it }; } }
+      [A, B] = [B, A]; }
+    return { path: null, log, iters: 3000 }; }
+  function shortcut(P, R) { P = P.slice(); for (let k = 0; k < 80 && P.length > 2; k++) { const i = Math.floor(R() * (P.length - 2)), j = i + 2 + Math.floor(R() * (P.length - i - 2)); if (j < P.length && edgeFree(P[i], P[j], true)) P.splice(i + 1, j - i - 1); } return P; }
+  function densify(P) { const out = [P[0]]; for (let i = 1; i < P.length; i++) { const n = Math.max(1, Math.ceil(dist(P[i - 1], P[i]) / .02)); for (let k = 1; k <= n; k++) out.push(P[i - 1].map((v, d) => lerp(v, P[i][d], k / n))); } return out; }
+  let seed = 3, side = 0, phase = 'grasp', pt = 0, plan = null, q = Q[0].slice(), box = { x: spots[0], y: restY }, grip = 0, V;
+  function makePlan() { wallH = wallT; setRects(); const R = rng(seed++); const r = rrtConnect(Q[side], Q[1 - side], R); if (!r.path) return null;
+    const sp = densify(shortcut(r.path, R)); const L = [0]; for (let i = 1; i < sp.length; i++) L.push(L[i - 1] + dist(sp[i - 1], sp[i]));
+    const tree = r.log.map(n => fk(n.q)[3]); return { sp, L, tree, tcol: r.log.map(n => n.t), ee: sp.map(p => fk(p)[3]), iters: r.iters }; }
+  function at(u) { const P = plan.sp, L = plan.L, s = u * L[L.length - 1]; let i = 0; while (i < L.length - 2 && L[i + 1] < s) i++; const f = clamp((s - L[i]) / Math.max(1e-9, L[i + 1] - L[i]), 0, 1); return P[i].map((v, d) => lerp(v, P[i + 1][d], f)); }
+  return {
+    resize() { V = fitView(S, -1.2, 0, 1.2, 1.6, 6, true); },
+    step(dt) { pt += dt; if (S.ptr) wallT = clamp(lerp(.7, .4, S.ptr.y / S.h), .4, .7);
+      if (phase === 'grasp') { grip = clamp(pt / .35, 0, 1); if (pt > .5) { plan = makePlan(); phase = plan ? 'plan' : 'grasp'; pt = 0; } }
+      else if (phase === 'plan') { if (pt > 1.5) { phase = 'move'; pt = 0; } }
+      else if (phase === 'move') { const dur = plan.L[plan.L.length - 1] / 1.5 + .4, u = smooth(clamp(pt / dur, 0, 1)); q = at(u); const e = fk(q)[3]; box = { x: e[0], y: e[1] }; if (pt > dur) { phase = 'release'; pt = 0; } }
+      else if (phase === 'release') { grip = 1 - clamp(pt / .3, 0, 1); if (pt > .9) { side = 1 - side; phase = 'grasp'; pt = 0; } }
+    },
+    draw(ctx) {
+      const X = V.X, Y = V.Y, s = V.s, rect = (R, col) => { ctx.fillStyle = col; ctx.fillRect(X(R.x0), Y(R.y1), (R.x1 - R.x0) * s, (R.y1 - R.y0) * s); };
+      ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, Y(0)); ctx.lineTo(S.w, Y(0)); ctx.stroke();
+      for (const t of tables) { rect({ x0: t.x0, x1: t.x1, y0: t.y1 - .04, y1: t.y1 }, S.c('obst')); rect({ x0: t.x0 + .03, x1: t.x0 + .07, y0: 0, y1: t.y1 }, S.c('obst')); rect({ x0: t.x1 - .07, x1: t.x1 - .03, y0: 0, y1: t.y1 }, S.c('obst')); }
+      rect(wall(), S.c('obst')); rect(hang, S.c('obst')); rect(ped, S.c('ink', .55));
+      if (Math.abs(wallT - wallH) > .01) { const w = wall(); ctx.strokeStyle = S.c('magenta'); ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5; ctx.strokeRect(X(w.x0), Y(wallT), (w.x1 - w.x0) * s, (wallT) * s); ctx.setLineDash([]); }
+      if (plan && (phase === 'plan' || S.ptr || phase === 'move')) { const n = phase === 'plan' ? Math.floor(plan.tree.length / 2 * clamp(pt / 1.2, 0, 1)) : plan.tree.length / 2, a = phase === 'plan' ? .5 : .16;
+        ctx.lineWidth = 1; for (let k = 0; k < n; k++) { const p = plan.tree[2 * k], c = plan.tree[2 * k + 1]; ctx.strokeStyle = plan.tcol[2 * k] ? S.c('violet', a) : S.c('teal', a); ctx.beginPath(); ctx.moveTo(X(p[0]), Y(p[1])); ctx.lineTo(X(c[0]), Y(c[1])); ctx.stroke(); }
+        if (phase !== 'plan' || pt > 1.2) { ctx.strokeStyle = S.c('amber'); ctx.lineWidth = 2.5; ctx.setLineDash([6, 4]); ctx.beginPath(); plan.ee.forEach((p, i) => i ? ctx.lineTo(X(p[0]), Y(p[1])) : ctx.moveTo(X(p[0]), Y(p[1]))); ctx.stroke(); ctx.setLineDash([]); } }
+      // box
+      { const ga = q[0] + q[1] + q[2] + Math.PI / 2, bh = BOX * s; ctx.save(); ctx.translate(X(box.x), Y(box.y)); if (phase !== 'grasp' || grip > 0) ctx.rotate(-ga);
+        ctx.fillStyle = S.c('amber', .9); ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 1.5; ctx.fillRect(-bh / 2, -bh / 2, bh, bh); ctx.strokeRect(-bh / 2, -bh / 2, bh, bh); ctx.restore(); }
+      // arm
+      const P = fk(q); ctx.lineCap = 'round'; ctx.strokeStyle = S.c('ink'); [12, 9].forEach((w, i) => { ctx.lineWidth = w * s / 260; ctx.beginPath(); ctx.moveTo(X(P[i][0]), Y(P[i][1])); ctx.lineTo(X(P[i + 1][0]), Y(P[i + 1][1])); ctx.stroke(); });
+      const w2 = P[2], a3 = q[0] + q[1] + q[2], ux = Math.cos(a3), uy = Math.sin(a3), nx = -uy, ny = ux, op = lerp(BOX / 2 + .04, BOX / 2 + .004, grip);
+      ctx.lineWidth = 6 * s / 260; ctx.beginPath(); ctx.moveTo(X(w2[0]), Y(w2[1])); ctx.lineTo(X(w2[0] + ux * .06), Y(w2[1] + uy * .06)); ctx.stroke();
+      const hb = [w2[0] + ux * .06, w2[1] + uy * .06]; ctx.lineWidth = 4 * s / 260; ctx.beginPath(); ctx.moveTo(X(hb[0] + nx * op), Y(hb[1] + ny * op)); ctx.lineTo(X(hb[0] - nx * op), Y(hb[1] - ny * op));
+      for (const sg of [1, -1]) { ctx.moveTo(X(hb[0] + sg * nx * op), Y(hb[1] + sg * ny * op)); ctx.lineTo(X(hb[0] + sg * nx * op + ux * .13), Y(hb[1] + sg * ny * op + uy * .13)); } ctx.stroke();
+      ctx.fillStyle = S.c('plate'); ctx.lineWidth = 2; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(X(P[i][0]), Y(P[i][1]), 5, 0, TAU); ctx.fill(); ctx.stroke(); }
+      const lab = { grasp: '집기', plan: 'RRT-Connect로 관절 공간 탐색 중', move: '다듬은 경로로 옮기는 중', release: '내려놓기' }[phase];
+      S.label(ctx, lab, 10, 18, 'left');
+    }
+  };
+};
+
+// ===================== 7. histogram (Bayes) filter in a corridor =====================
+VIZ.bayes = function (S) {
+  const N = 48, doors = new Set([5, 6, 15, 16, 34, 35]), PH = .78, PF = .14, R = rng(5);
+  let bel = new Float64Array(N).fill(1 / N), prev = bel.slice(), x = 2, xs = 2, phase = 'predict', pt = 0, z = null, lik = null, u = 1, loops = 0;
+  function predict(u) { const k = u === 0 ? [.06, .88, .06] : [.1, .8, .1], nb = new Float64Array(N);
+    for (let i = 0; i < N; i++) for (let d = -1; d <= 1; d++) nb[((i + u + d) % N + N) % N] += bel[i] * k[d + 1]; bel = nb; }
+  function sense() { const isDoor = doors.has(x); z = R() < (isDoor ? PH : PF); lik = new Float64Array(N); let s = 0;
+    for (let i = 0; i < N; i++) { lik[i] = doors.has(i) ? (z ? PH : 1 - PH) : (z ? PF : 1 - PF); bel[i] *= lik[i]; s += bel[i]; } for (let i = 0; i < N; i++) bel[i] /= s; }
+  let L;
+  return {
+    resize() { const m = 14, cw = (S.w - 2 * m) / N; L = { m, cw, wallY: S.h * .2, floorY: S.h * .36, base: S.h - 26, top: S.h * .5 }; },
+    step(dt) { pt += dt;
+      if (phase === 'predict' && pt > .28) { phase = 'sense'; pt = 0; prev = bel.slice(); sense(); }
+      else if (phase === 'sense' && pt > .42) { phase = 'predict'; pt = 0; prev = bel.slice();
+        if (S.ptr) { const c = clamp(Math.floor((S.ptr.x - L.m) / L.cw), 0, N - 1); u = Math.sign(c - x); } else u = 1;
+        const nx = ((x + u) % N + N) % N; if (u === 1 && nx < x) { loops++; if (loops % 2 === 0) bel.fill(1 / N); } x = nx; predict(u); z = null; }
+      const tx = x; let d = tx - xs; if (Math.abs(d) > N / 2) xs += Math.sign(d) * N; xs += (tx - xs) * Math.min(1, 10 * dt); },
+    draw(ctx) {
+      const { m, cw, wallY, floorY, base, top } = L;
+      ctx.fillStyle = S.c('obst'); ctx.fillRect(m, wallY - 10, N * cw, 10);
+      for (const d of doors) { ctx.fillStyle = S.c('plate'); ctx.fillRect(m + d * cw + 1, wallY - 10, cw - 1, 10); }
+      for (const d of [5, 15, 34]) { ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 1.5; ctx.strokeRect(m + d * cw + 2, wallY - 34, 2 * cw - 4, 34); ctx.fillStyle = S.c('ink'); ctx.beginPath(); ctx.arc(m + (d + 1.7) * cw, wallY - 16, 1.8, 0, TAU); ctx.fill(); }
+      ctx.strokeStyle = S.c('rule'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(m, floorY + 14); ctx.lineTo(m + N * cw, floorY + 14); ctx.stroke();
+      const rx = m + ((xs % N) + N) % N * cw + cw / 2, ry = floorY;
+      if (z !== null) { ctx.strokeStyle = z ? S.c('magenta') : S.c('ink', .35); ctx.setLineDash([3, 3]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(rx, ry - 8); ctx.lineTo(rx, wallY + 2); ctx.stroke(); ctx.setLineDash([]);
+        S.label(ctx, z ? '문이다' : '벽이다', rx + 6, (ry + wallY) / 2 + 4, 'left', z ? S.c('magenta') : null); }
+      ctx.fillStyle = S.c('plate'); ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(rx - 13, ry - 9, 26, 18, 5); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = S.c('ink'); ctx.beginPath(); ctx.arc(rx - 7, ry + 11, 3.5, 0, TAU); ctx.arc(rx + 7, ry + 11, 3.5, 0, TAU); ctx.fill();
+      // belief bars
+      const f = phase === 'sense' ? smooth(clamp(pt / .22, 0, 1)) : smooth(clamp(pt / .2, 0, 1));
+      let mx = 0; for (let i = 0; i < N; i++) mx = Math.max(mx, bel[i], prev[i]); mx = Math.max(mx, 3 / N);
+      const hh = base - top;
+      if (lik && phase === 'sense') for (let i = 0; i < N; i++) { ctx.fillStyle = S.c('amber', .2); const h = lik[i] * hh * .16; ctx.fillRect(m + i * cw + 1, base - h, cw - 2, h); }
+      for (let i = 0; i < N; i++) { const v = lerp(prev[i], bel[i], f), h = v / mx * hh; ctx.fillStyle = S.c('violet', .85); ctx.fillRect(m + i * cw + 1.5, base - h, cw - 3, h); }
+      ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(m, base + .5); ctx.lineTo(m + N * cw, base + .5); ctx.stroke();
+      ctx.fillStyle = S.c('ink'); ctx.beginPath(); ctx.moveTo(m + x * cw + cw / 2, base + 3); ctx.lineTo(m + x * cw + cw / 2 - 5, base + 11); ctx.lineTo(m + x * cw + cw / 2 + 5, base + 11); ctx.fill();
+      S.label(ctx, phase === 'sense' ? '측정 갱신: 관측과 맞는 곳이 커진다' : '예측: 움직이면 믿음이 퍼진다', m, top - 8, 'left');
+    }
+  };
+};
+
+// ===================== 8. robot vacuum MCL =====================
+VIZ.vacuum = function (S) {
+  const W = 3, H = 2, room = { x0: .08, y0: .08, x1: 2.92, y1: 1.92 }, RR = .075, NP = 520, NR = 16, MAXR = 3.6, R = rng(21);
+  const furn = [{ x0: 2.2, y0: .08, x1: 2.92, y1: .72 }, { x0: .35, y0: 1.58, x1: 1.25, y1: 1.92 }, { x0: 1.35, y0: .7, x1: 1.8, y1: 1.05 }, { x0: .08, y0: .3, x1: .32, y1: .78 }, { x0: 2.45, y0: 1.35, x1: 2.92, y1: 1.92 }];
+  function ray(x, y, a) { const dx = Math.cos(a), dy = Math.sin(a); let t = MAXR;
+    // exit from room
+    if (dx > 1e-9) t = Math.min(t, (room.x1 - x) / dx); else if (dx < -1e-9) t = Math.min(t, (room.x0 - x) / dx);
+    if (dy > 1e-9) t = Math.min(t, (room.y1 - y) / dy); else if (dy < -1e-9) t = Math.min(t, (room.y0 - y) / dy);
+    for (const b of furn) { let t0 = -Infinity, t1 = Infinity;
+      if (Math.abs(dx) < 1e-9) { if (x < b.x0 || x > b.x1) continue; } else { let a1 = (b.x0 - x) / dx, a2 = (b.x1 - x) / dx; if (a1 > a2) [a1, a2] = [a2, a1]; t0 = Math.max(t0, a1); t1 = Math.min(t1, a2); }
+      if (Math.abs(dy) < 1e-9) { if (y < b.y0 || y > b.y1) continue; } else { let a1 = (b.y0 - y) / dy, a2 = (b.y1 - y) / dy; if (a1 > a2) [a1, a2] = [a2, a1]; t0 = Math.max(t0, a1); t1 = Math.min(t1, a2); }
+      if (t0 <= t1 && t1 > 0 && t0 < t) t = Math.max(0, t0); }
+    return t; }
+  const freeAt = (x, y, r) => x > room.x0 + r && x < room.x1 - r && y > room.y0 + r && y < room.y1 - r && furn.every(b => ptRectDist(x, y, b) > r);
+  function randPose() { for (;;) { const x = R() * W, y = R() * H; if (freeAt(x, y, .02)) return { x, y, a: R() * TAU }; } }
+  let rob = { x: 1.0, y: 1.3, a: -.4 }, turn = 0, P = [], T = 0, upd = 0, last = { ...rob }, scan = [], clean = null, cleanKey = '', V, est = null, kidT = 0;
+  const reinit = () => { P = Array.from({ length: NP }, randPose); est = null; age = 0; }; let age = 0;
+  reinit();
+  function measure() { scan = []; for (let i = 0; i < NR; i++) { const a = rob.a + i * TAU / NR; scan.push(ray(rob.x, rob.y, a) + gauss(R) * .02); } }
+  function mclUpdate() { const d = Math.hypot(rob.x - last.x, rob.y - last.y), da = wrapAng(rob.a - last.a); last = { ...rob };
+    const lw = new Float64Array(NP); let mxw = -Infinity; age += .12; const sg = Math.max(.13, .45 * Math.exp(-age / 2.5));
+    for (let k = 0; k < NP; k++) { const p = P[k], dd = d * (1 + .1 * gauss(R)); p.a += da + .04 * gauss(R) + .2 * d * gauss(R); p.x += dd * Math.cos(p.a); p.y += dd * Math.sin(p.a);
+      if (!freeAt(p.x, p.y, .01)) { lw[k] = -Infinity; continue; } let s = 0;
+      for (let i = 0; i < NR; i++) { const e = Math.min(scan[i], MAXR) - ray(p.x, p.y, p.a + i * TAU / NR); s += Math.min(e * e, 9 * sg * sg); } lw[k] = -s / (2 * sg * sg); if (lw[k] > mxw) mxw = lw[k]; }
+    if (!isFinite(mxw)) { reinit(); return; }
+    const w = Array.from(lw, v => Math.exp(v - mxw)), sum = w.reduce((a, b) => a + b, 0), np = [], step = sum / NP; let c = w[0], i = 0, r0 = R() * step;
+    for (let m = 0; m < NP; m++) { const U = r0 + m * step; while (U > c && i < NP - 1) { i++; c += w[i]; } np.push(R() < .015 ? randPose() : { ...P[i] }); }
+    P = np; let mx = 0, my = 0; for (const p of P) { mx += p.x; my += p.y; } mx /= NP; my /= NP; let cnt = 0, sv = 0;
+    for (let it = 0; it < 4; it++) { let ax = 0, ay = 0; cnt = 0; for (const p of P) if (Math.hypot(p.x - mx, p.y - my) < .4) { ax += p.x; ay += p.y; cnt++; } if (!cnt) break; mx = ax / cnt; my = ay / cnt; }
+    for (const p of P) { const d = Math.hypot(p.x - mx, p.y - my); if (d < .4) sv += d * d; }
+    const sd = Math.sqrt(sv / Math.max(cnt, 1)); est = cnt > NP * .7 && sd < .15 ? { x: mx, y: my, sd } : null; }
+  return {
+    resize() { V = fitView(S, 0, 0, W, H, 6, false); clean = document.createElement('canvas'); clean.width = Math.round(S.w * S.dpr); clean.height = Math.round(S.h * S.dpr); cleanKey = ''; },
+    step(dt) { T += dt; kidT += dt;
+      const front = ray(rob.x, rob.y, rob.a) ;
+      if (turn !== 0) { const s = Math.sign(turn) * Math.min(Math.abs(turn), 3.2 * dt); rob.a += s; turn -= s; if (Math.abs(turn) < 1e-3) turn = 0; }
+      else if (front < RR + .07) turn = (R() < .5 ? -1 : 1) * (.9 + R() * 1.8);
+      else { if (S.ptr) { const tx = V.ix(S.ptr.x), ty = V.iy(S.ptr.y), e = wrapAng(Math.atan2(ty - rob.y, tx - rob.x) - rob.a); if (Math.hypot(tx - rob.x, ty - rob.y) > .1) rob.a += clamp(e, -2.5 * dt, 2.5 * dt); }
+        const nx = rob.x + .33 * dt * Math.cos(rob.a), ny = rob.y + .33 * dt * Math.sin(rob.a); if (freeAt(nx, ny, RR)) { rob.x = nx; rob.y = ny; } else turn = (R() < .5 ? -1 : 1) * (.9 + R() * 1.8); }
+      if (clean) { const g = clean.getContext('2d'); g.setTransform(S.dpr, 0, 0, S.dpr, 0, 0); const pl = S.rgb('plate'), tl = S.rgb('teal'); g.fillStyle = `rgb(${pl.map((v, i) => Math.round(v + (tl[i] - v) * .14)).join(',')})`; g.beginPath(); g.arc(V.X(rob.x), V.Y(rob.y), RR * V.s * 1.05, 0, TAU); g.fill(); }
+      upd += dt; if (upd > .12) { upd = 0; measure(); mclUpdate(); }
+      if (kidT > 18) { kidT = 0; reinit(); if (clean) clean.getContext('2d').clearRect(0, 0, clean.width, clean.height); } },
+    draw(ctx) {
+      ctx.drawImage(clean, 0, 0, S.w, S.h);
+      ctx.fillStyle = S.c('obst'); for (const b of furn) ctx.fillRect(V.X(b.x0), V.Y(b.y0), (b.x1 - b.x0) * V.s, (b.y1 - b.y0) * V.s);
+      ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 3; ctx.strokeRect(V.X(room.x0), V.Y(room.y0), (room.x1 - room.x0) * V.s, (room.y1 - room.y0) * V.s);
+      ctx.lineWidth = 1; scan.forEach((d, i) => { const a = rob.a + i * TAU / NR, ex = rob.x + Math.cos(a) * d, ey = rob.y + Math.sin(a) * d; ctx.strokeStyle = S.c('teal', .35); ctx.beginPath(); ctx.moveTo(V.X(rob.x), V.Y(rob.y)); ctx.lineTo(V.X(ex), V.Y(ey)); ctx.stroke();
+        if (d < MAXR - .01) { ctx.fillStyle = S.c('teal'); ctx.fillRect(V.X(ex) - 2, V.Y(ey) - 2, 4, 4); } });
+      ctx.fillStyle = S.c('violet', .75); for (const p of P) { ctx.beginPath(); ctx.arc(V.X(p.x), V.Y(p.y), 1.8, 0, TAU); ctx.fill(); }
+      ctx.strokeStyle = S.c('violet', .5); ctx.lineWidth = 1; ctx.beginPath(); for (let k = 0; k < NP; k += 3) { const p = P[k]; ctx.moveTo(V.X(p.x), V.Y(p.y)); ctx.lineTo(V.X(p.x + .05 * Math.cos(p.a)), V.Y(p.y + .05 * Math.sin(p.a))); } ctx.stroke();
+      const rx = V.X(rob.x), ry = V.Y(rob.y), rr = RR * V.s; ctx.fillStyle = S.c('plate'); ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(rx, ry, rr, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(rx, ry, rr, rob.a - 1, rob.a + 1); ctx.stroke(); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(rx, ry, rr * .35, 0, TAU); ctx.stroke();
+      if (est) { ctx.strokeStyle = S.c('magenta'); ctx.lineWidth = 2; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.arc(V.X(est.x), V.Y(est.y), Math.max(rr * 1.6, est.sd * 2 * V.s), 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+      S.label(ctx, est ? '위치 추정 완료' : '입자가 아직 여러 곳에 흩어져 있음', V.X(room.x0) + 8, V.Y(room.y1) - 8, 'left');
+    }
+  };
+};
+
+// ===================== 9. Kalman filter car through a tunnel =====================
+VIZ.kalman = function (S) {
+  const W = 3, H = 2, NS = 900, R = rng(9), SIG = .04, Q = .12;
+  const RAD = .62, SX0 = .78, SX1 = 2.22, CY = 1.0, SL = SX1 - SX0, LOOP = 2 * SL + TAU * RAD;
+  const road = u => { let d = u * LOOP; if (d < SL) return [SX1 - d, CY + RAD]; d -= SL; if (d < Math.PI * RAD) { const a = Math.PI / 2 + d / RAD; return [SX0 + RAD * Math.cos(a), CY + RAD * Math.sin(a)]; }
+    d -= Math.PI * RAD; if (d < SL) return [SX0 + d, CY - RAD]; d -= SL; const a = -Math.PI / 2 + d / RAD; return [SX1 + RAD * Math.cos(a), CY + RAD * Math.sin(a)]; };
+  const pts = [], arc = [0]; for (let i = 0; i <= NS; i++) { pts.push(road(i / NS % 1 + (i === NS ? 0 : 0))); if (i) arc.push(arc[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); }
+  const LEN = arc[NS];
+  function at(s) { s = ((s % LEN) + LEN) % LEN; let lo = 0, hi = NS; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (arc[m] <= s) lo = m; else hi = m; } const f = (s - arc[lo]) / (arc[hi] - arc[lo]);
+    const p = [lerp(pts[lo][0], pts[hi][0], f), lerp(pts[lo][1], pts[hi][1], f)]; return { p, a: Math.atan2(pts[hi][1] - pts[lo][1], pts[hi][0] - pts[lo][0]) }; }
+  let s = 0, v = .6, tc = SL * .62, tLen = 1.0, x = [0, 0, 0, 0], P, gpsT = 0, gps = [], trail = [], T = 0, V;
+  { const a = at(0); x = [a.p[0], a.p[1], v * Math.cos(a.a), v * Math.sin(a.a)]; P = [[.01, 0, 0, 0], [0, .01, 0, 0], [0, 0, .05, 0], [0, 0, 0, .05]]; }
+  const inTunnel = ss => { let d = (((ss - tc) % LEN) + LEN) % LEN; if (d > LEN / 2) d -= LEN; return Math.abs(d) < tLen / 2; };
+  function predict(dt) { x = [x[0] + x[2] * dt, x[1] + x[3] * dt, x[2], x[3]];
+    const F = [[1, 0, dt, 0], [0, 1, 0, dt], [0, 0, 1, 0], [0, 0, 0, 1]], FP = F.map(r => [0, 1, 2, 3].map(j => r.reduce((a, v, k) => a + v * P[k][j], 0))), Pn = FP.map(r => [0, 1, 2, 3].map(j => r.reduce((a, v, k) => a + v * F[j][k], 0)));
+    const q3 = Q * dt ** 3 / 3, q2 = Q * dt * dt / 2, q1 = Q * dt; Pn[0][0] += q3; Pn[1][1] += q3; Pn[0][2] += q2; Pn[2][0] += q2; Pn[1][3] += q2; Pn[3][1] += q2; Pn[2][2] += q1; Pn[3][3] += q1; P = Pn; }
+  function update(z) { const r2 = SIG * SIG, Sm = [[P[0][0] + r2, P[0][1]], [P[1][0], P[1][1] + r2]], det = Sm[0][0] * Sm[1][1] - Sm[0][1] * Sm[1][0], Si = [[Sm[1][1] / det, -Sm[0][1] / det], [-Sm[1][0] / det, Sm[0][0] / det]];
+    const K = P.map(r => [r[0] * Si[0][0] + r[1] * Si[1][0], r[0] * Si[0][1] + r[1] * Si[1][1]]), y = [z[0] - x[0], z[1] - x[1]];
+    x = x.map((v, i) => v + K[i][0] * y[0] + K[i][1] * y[1]); P = P.map((r, i) => r.map((v, j) => v - K[i][0] * P[0][j] - K[i][1] * P[1][j])); }
+  return {
+    resize() { V = fitView(S, 0, 0, W, H, 4, false); },
+    step(dt) { T += dt;
+      if (S.ptr) { const px = V.ix(S.ptr.x), py = V.iy(S.ptr.y); let bi = 0, bd = Infinity; for (let i = 0; i < NS; i += 2) { const d = (pts[i][0] - px) ** 2 + (pts[i][1] - py) ** 2; if (d < bd) { bd = d; bi = i; } } if (bd < .09) tc = arc[bi]; }
+      const sub = 3; for (let k = 0; k < sub; k++) { s += v * dt / sub; predict(dt / sub); }
+      gpsT += dt; const tr = at(s); if (gpsT > .1) { gpsT = 0; if (!inTunnel(s)) { const z = [tr.p[0] + gauss(R) * SIG, tr.p[1] + gauss(R) * SIG]; gps.push({ z, t: T }); update(z); } }
+      gps = gps.filter(g => T - g.t < 1.6); trail.push([x[0], x[1]]); if (trail.length > 200) trail.shift(); },
+    draw(ctx) {
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = S.c('obst', .55); ctx.lineWidth = .2 * V.s; ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(V.X(p[0]), V.Y(p[1])) : ctx.moveTo(V.X(p[0]), V.Y(p[1]))); ctx.stroke();
+      ctx.strokeStyle = S.c('plate'); ctx.lineWidth = 1.5; ctx.setLineDash([8, 8]); ctx.stroke(); ctx.setLineDash([]);
+      // tunnel
+      const dark = S.rgb('plate').reduce((a, b) => a + b, 0) < 384; ctx.strokeStyle = dark ? 'rgba(0,0,0,.55)' : S.c('ink', .78); ctx.lineWidth = .27 * V.s; ctx.lineCap = 'butt'; ctx.beginPath(); const n0 = 60;
+      for (let k = 0; k <= n0; k++) { const q = at(tc - tLen / 2 + tLen * k / n0).p; k ? ctx.lineTo(V.X(q[0]), V.Y(q[1])) : ctx.moveTo(V.X(q[0]), V.Y(q[1])); } ctx.stroke();
+      const mid = at(tc), lx0 = mid.p[0] + (1.5 - mid.p[0]) * .42, ly0 = mid.p[1] + (1 - mid.p[1]) * .42; S.label(ctx, '터널: GPS 없음', V.X(lx0), V.Y(ly0) + 4, 'center');
+      // gps
+      for (const g of gps) { const a = 1 - (T - g.t) / 1.6; ctx.fillStyle = S.c('amber', a); ctx.beginPath(); ctx.arc(V.X(g.z[0]), V.Y(g.z[1]), 3.2, 0, TAU); ctx.fill(); }
+      // truth car
+      const tr = at(s), cx = V.X(tr.p[0]), cy = V.Y(tr.p[1]); ctx.save(); ctx.translate(cx, cy); ctx.rotate(tr.a); const k = V.s; ctx.globalAlpha = inTunnel(s) ? .45 : 1;
+      ctx.fillStyle = S.c('plate'); ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(-.07 * k, -.035 * k, .14 * k, .07 * k, 3); ctx.fill(); ctx.stroke(); ctx.fillStyle = S.c('ink'); ctx.fillRect(.015 * k, -.026 * k, .028 * k, .052 * k); ctx.restore();
+      // estimate
+      ctx.strokeStyle = S.c('violet', .75); ctx.lineWidth = 1.8; ctx.beginPath(); trail.forEach((p, i) => i ? ctx.lineTo(V.X(p[0]), V.Y(p[1])) : ctx.moveTo(V.X(p[0]), V.Y(p[1]))); ctx.stroke();
+      const a = P[0][0], b = P[0][1], d = P[1][1], tr2 = (a + d) / 2, df = Math.sqrt(((a - d) / 2) ** 2 + b * b), l1 = tr2 + df, l2 = Math.max(1e-9, tr2 - df), ang = Math.atan2(l1 - a, b || 1e-12);
+      ctx.save(); ctx.translate(V.X(x[0]), V.Y(x[1])); ctx.rotate(Math.abs(b) < 1e-12 ? (a >= d ? 0 : Math.PI / 2) : ang); ctx.fillStyle = S.c('violet', .14); ctx.strokeStyle = S.c('violet'); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(0, 0, Math.max(2, 2 * Math.sqrt(l1) * V.s), Math.max(2, 2 * Math.sqrt(l2) * V.s), 0, 0, TAU); ctx.fill(); ctx.stroke(); ctx.restore();
+      ctx.fillStyle = S.c('violet'); ctx.beginPath(); ctx.arc(V.X(x[0]), V.Y(x[1]), 3.5, 0, TAU); ctx.fill();
+      const lx = 10, ly = 18; S.label(ctx, `위치 불확실성 2σ ≈ ${(2 * Math.sqrt(l1) * 100).toFixed(0)} m`, lx, ly, 'left');
+    }
+  };
+};
+
+// ===================== 10. PID feedback =====================
+VIZ.pid = function (S) {
+  const KP = 7, KI = 3.2, KD = 3.4, M = 1, B = .5, DIST = -2.2, UMAX = 18, HIST = 6, SR = .02;
+  const sps = [2.5, 7.5, 4, 8.5, 3, 6.5]; let si = 0, sp = sps[0], x = 1, vx = 0, I = 0, ePrev = 0, T = 0, swT = 0, terms = [0, 0, 0], u = 0, hist = [], hT = 0, L;
+  return {
+    resize() { L = { m: 14, railY: S.h * .25, x0: 22, x1: S.w - 22, py0: S.h * .42, py1: S.h - 14, px1: S.w * .76 }; },
+    step(dt) { T += dt; swT += dt;
+      if (S.ptr) sp = clamp((S.ptr.x - L.x0) / (L.x1 - L.x0) * 10, .5, 9.5); else if (swT > 3) { swT = 0; si = (si + 1) % sps.length; sp = sps[si]; }
+      const n = Math.ceil(dt / .004), h = dt / n;
+      for (let k = 0; k < n; k++) { const e = sp - x, de = -vx; const P = KP * e, D = KD * de; let Ic = I + e * h; let uu = P + KI * Ic + D;
+        if (Math.abs(uu) > UMAX) { uu = clamp(uu, -UMAX, UMAX); } else I = Ic; terms = [P, KI * I, D]; u = uu;
+        const a = (u + DIST - B * vx) / M; vx += a * h; x += vx * h; if (x < 0) { x = 0; vx = 0; } if (x > 10) { x = 10; vx = 0; } }
+      hT += dt; while (hT > SR) { hT -= SR; hist.push([sp, x]); if (hist.length > HIST / SR) hist.shift(); } },
+    draw(ctx) {
+      const { railY, x0, x1, py0, py1, px1 } = L, X = v => x0 + v / 10 * (x1 - x0);
+      ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, railY + 18); ctx.lineTo(x1, railY + 18); ctx.stroke();
+      ctx.strokeStyle = S.c('rule'); ctx.lineWidth = 1; for (let i = 0; i <= 10; i++) { ctx.beginPath(); ctx.moveTo(X(i), railY + 18); ctx.lineTo(X(i), railY + 24); ctx.stroke(); }
+      const gx = X(sp); ctx.strokeStyle = S.c('magenta'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(gx, railY - 28); ctx.lineTo(gx, railY + 24); ctx.stroke(); ctx.fillStyle = S.c('magenta'); ctx.beginPath(); ctx.moveTo(gx, railY - 28); ctx.lineTo(gx + 12, railY - 23); ctx.lineTo(gx, railY - 18); ctx.fill();
+      const cx = X(x); ctx.fillStyle = S.c('plate'); ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(cx - 22, railY - 10, 44, 22, 4); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = S.c('ink'); ctx.beginPath(); ctx.arc(cx - 12, railY + 14, 4, 0, TAU); ctx.arc(cx + 12, railY + 14, 4, 0, TAU); ctx.fill();
+      const arrow = (xa, xb, y, col, w) => { if (Math.abs(xb - xa) < 3) return; const sg = Math.sign(xb - xa); ctx.strokeStyle = ctx.fillStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(xa, y); ctx.lineTo(xb - sg * 7, y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(xb, y); ctx.lineTo(xb - sg * 8, y - 5); ctx.lineTo(xb - sg * 8, y + 5); ctx.fill(); };
+      arrow(cx + Math.sign(u) * 22, cx + Math.sign(u) * 22 + u * 3.2, railY + 1, S.c('amber'), 3);
+      arrow(cx + 8, cx + 8 + DIST * 9, railY - 20, S.c('ink', .4), 1.5); S.label(ctx, '외란', cx + 12, railY - 16, 'left');
+      // plot
+      ctx.strokeStyle = S.c('rule'); ctx.lineWidth = 1; ctx.strokeRect(x0 + .5, py0 + .5, px1 - x0, py1 - py0);
+      const n = HIST / SR, PX = i => x0 + (px1 - x0) * i / (n - 1), PY = v => py1 - 6 - (v / 10) * (py1 - py0 - 12);
+      ctx.strokeStyle = S.c('magenta'); ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); hist.forEach((h, i) => { const X0 = PX(i + n - hist.length); i ? ctx.lineTo(X0, PY(h[0])) : ctx.moveTo(X0, PY(h[0])); }); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 2.2; ctx.beginPath(); hist.forEach((h, i) => { const X0 = PX(i + n - hist.length); i ? ctx.lineTo(X0, PY(h[1])) : ctx.moveTo(X0, PY(h[1])); }); ctx.stroke();
+      S.label(ctx, '목표', x0 + 8, py0 + 18, 'left', S.c('magenta')); S.label(ctx, '위치', x0 + 46, py0 + 18, 'left');
+      // P I D bars
+      const bx0 = px1 + 18, bw = (S.w - 14 - bx0) / 3, mid = (py0 + py1) / 2 - 8, sc = (py1 - py0 - 40) / 2 / UMAX, cols = ['blue', 'violet', 'teal'], nm = ['P', 'I', 'D'];
+      ctx.strokeStyle = S.c('rule'); ctx.beginPath(); ctx.moveTo(bx0, mid + .5); ctx.lineTo(S.w - 14, mid + .5); ctx.stroke();
+      terms.forEach((v, i) => { const h = clamp(v, -UMAX, UMAX) * sc; ctx.fillStyle = S.c(cols[i]); ctx.fillRect(bx0 + i * bw + bw * .2, Math.min(mid, mid - h), bw * .6, Math.abs(h)); S.label(ctx, nm[i], bx0 + i * bw + bw / 2, py1 - 4, 'center', S.c(cols[i])); });
+    }
+  };
+};
+
+// ===================== 11. MKV hover with on/off thrusters =====================
+VIZ.mkv = function (S) {
+  const G = 1.0, TUP = 1.85, TSIDE = .9, DB = .025, MIN_ON = .05, R = rng(17);
+  const targets = [[0, 1.05], [.6, 1.35], [-.55, .85], [.15, 1.55], [-.3, 1.2]];
+  let st = { x: 0, y: 1, vx: 0, vy: 0 }, tg = targets[0], ti = 0, tT = 0, up = 0, side = 0, upT = 0, sideT = 0, puffs = [], acs = 0, phase = [], T = 0, V;
+  function ctrl(dt) { const ny = st.y + gauss(R) * .004, nvy = st.vy + gauss(R) * .015, nx = st.x + gauss(R) * .004, nvx = st.vx + gauss(R) * .015;
+    const sy = (tg[1] - ny) - .6 * nvy, sx = (tg[0] - nx) - .75 * nvx; upT += dt; sideT += dt;
+    if (upT > MIN_ON) { const want = sy > DB ? 1 : sy < -DB ? 0 : up; if (want !== up) { up = want; upT = 0; } }
+    if (sideT > MIN_ON) { const want = sx > DB ? 1 : sx < -DB ? -1 : 0; if (want !== side) { side = want; sideT = 0; } }
+    return { ex: tg[0] - st.x, evx: -st.vx }; }
+  return {
+    resize() { V = fitView({ w: S.w * .68, h: S.h }, -1.05, 0, 1.05, 2, 4, true); },
+    step(dt) { T += dt; tT += dt;
+      if (S.ptr) tg = [clamp(V.ix(S.ptr.x), -.85, .85), clamp(V.iy(S.ptr.y), .55, 1.7)]; else if (tT > 3.4) { tT = 0; ti = (ti + 1) % targets.length; tg = targets[ti]; }
+      const n = Math.ceil(dt / .005), h = dt / n; let ph;
+      for (let k = 0; k < n; k++) { ph = ctrl(h); const ay = up * TUP - G - .15 * st.vy, ax = side * TSIDE - .15 * st.vx; st.vy += ay * h; st.vx += ax * h; st.y += st.vy * h; st.x += st.vx * h; if (st.y < .3) { st.y = .3; st.vy = Math.max(0, st.vy); } }
+      phase.push(ph); if (phase.length > 220) phase.shift();
+      acs = R() < .06 ? (R() < .5 ? -1 : 1) : (R() < .7 ? 0 : acs);
+      const emit = (x, y, dx, dy, n) => { for (let i = 0; i < n; i++) puffs.push({ x, y, vx: dx * (.5 + R() * .6) + gauss(R) * .05, vy: dy * (.5 + R() * .6) + gauss(R) * .05, t: 0, life: .4 + R() * .5 }); };
+      if (up) { emit(st.x - .09, st.y - .2, 0, -1.4, 2); emit(st.x + .09, st.y - .2, 0, -1.4, 2); }
+      if (side) emit(st.x - side * .17, st.y - .02, -side * 1.3, 0, 2);
+      for (const p of puffs) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .97; p.vy *= .97; p.vy += .1 * dt; } puffs = puffs.filter(p => p.t < p.life); },
+    draw(ctx) {
+      const X = V.X, Y = V.Y, s = V.s;
+      const gx1 = S.w * .68; ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, Y(.1)); ctx.lineTo(gx1, Y(.1)); ctx.stroke();
+      ctx.strokeStyle = S.c('rule'); ctx.lineWidth = 1; for (let x = -1.5; X(x) < gx1; x += .08) { ctx.beginPath(); ctx.moveTo(X(x), Y(.1)); ctx.lineTo(X(x - .05), Y(.03)); ctx.stroke(); }
+      // target + deadband
+      const gx = X(tg[0]), gy = Y(tg[1]); ctx.strokeStyle = S.c('magenta'); ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.strokeRect(gx - .09 * s, gy - .09 * s, .18 * s, .18 * s); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(gx - 9, gy); ctx.lineTo(gx + 9, gy); ctx.moveTo(gx, gy - 9); ctx.lineTo(gx, gy + 9); ctx.stroke();
+      for (const p of puffs) { const a = 1 - p.t / p.life; ctx.fillStyle = S.c('ink', .1 * a); ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), (.015 + .06 * p.t / p.life) * s, 0, TAU); ctx.fill(); }
+      const cx = X(st.x), cy = Y(st.y), k = s;
+      const flame = (x, y, dx, dy, len) => { const fl = len * (.8 + .4 * R()); const g = ctx.createLinearGradient(x, y, x + dx * fl * k, y + dy * fl * k); g.addColorStop(0, S.c('amber', .95)); g.addColorStop(1, S.c('amber', 0)); ctx.fillStyle = g;
+        const nx = -dy, ny = dx, w = .028 * k; ctx.beginPath(); ctx.moveTo(x + nx * w, y + ny * w); ctx.lineTo(x + dx * fl * k, y + dy * fl * k); ctx.lineTo(x - nx * w, y - ny * w); ctx.fill(); };
+      if (up) { flame(cx - .09 * k, cy + .2 * k, 0, 1, .32); flame(cx + .09 * k, cy + .2 * k, 0, 1, .32); }
+      if (side) flame(cx - side * .17 * k, cy + .02 * k, -side, 0, .26);
+      if (acs) flame(cx + acs * .06 * k, cy - .2 * k, acs, 0, .1);
+      // body
+      ctx.fillStyle = S.c('plate'); ctx.strokeStyle = S.c('ink'); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(cx, cy - .27 * k); ctx.lineTo(cx + .05 * k, cy - .2 * k); ctx.lineTo(cx + .05 * k, cy + .14 * k); ctx.lineTo(cx - .05 * k, cy + .14 * k); ctx.lineTo(cx - .05 * k, cy - .2 * k); ctx.closePath(); ctx.fill(); ctx.stroke();
+      for (const sg of [-1, 1]) { ctx.beginPath(); ctx.arc(cx + sg * .1 * k, cy - .02 * k, .045 * k, 0, TAU); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx + sg * .05 * k, cy + .1 * k); ctx.lineTo(cx + sg * .09 * k, cy + .2 * k); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx + sg * .05 * k, cy + .02 * k); ctx.lineTo(cx + sg * .17 * k, cy + .02 * k); ctx.stroke(); ctx.fillStyle = S.c('ink'); ctx.fillRect(cx + sg * .17 * k - (sg > 0 ? 0 : .025 * k), cy - .002 * k, .025 * k, .044 * k); ctx.fillStyle = S.c('plate');
+        ctx.beginPath(); ctx.moveTo(cx + sg * .05 * k, cy + .12 * k); ctx.lineTo(cx + sg * .16 * k, cy + .3 * k); ctx.stroke(); }
+      ctx.fillStyle = S.c('ink'); ctx.fillRect(cx - .11 * k, cy + .19 * k, .04 * k, .025 * k); ctx.fillRect(cx + .07 * k, cy + .19 * k, .04 * k, .025 * k);
+      // phase-plane inset (horizontal channel)
+      const iw = S.w * .28, ih = iw, ix = S.w - iw - 12, iy = (S.h - ih) / 2 + 8, sc = iw / 1.4;
+      ctx.fillStyle = S.c('plate', .92); ctx.fillRect(ix, iy, iw, ih); ctx.strokeStyle = S.c('rule'); ctx.lineWidth = 1; ctx.strokeRect(ix + .5, iy + .5, iw, ih);
+      const ox = ix + iw / 2, oy = iy + ih / 2; ctx.beginPath(); ctx.moveTo(ix, oy); ctx.lineTo(ix + iw, oy); ctx.moveTo(ox, iy); ctx.lineTo(ox, iy + ih); ctx.stroke();
+      ctx.save(); ctx.beginPath(); ctx.rect(ix, iy, iw, ih); ctx.clip();
+      ctx.strokeStyle = S.c('magenta', .7); ctx.setLineDash([3, 3]); for (const sg of [-1, 1]) { ctx.beginPath(); for (const ev of [-1, 1]) { const e = sg * DB - .75 * ev; const px = ox + e * sc, py = oy - ev * sc; ev < 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); } ctx.stroke(); } ctx.setLineDash([]);
+      ctx.strokeStyle = S.c('teal'); ctx.lineWidth = 1.6; ctx.beginPath(); phase.forEach((p, i) => { const px = ox + p.ex * sc, py = oy - p.evx * sc; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }); ctx.stroke();
+      const lp = phase[phase.length - 1]; if (lp) { ctx.fillStyle = S.c('ink'); ctx.beginPath(); ctx.arc(ox + lp.ex * sc, oy - lp.evx * sc, 3, 0, TAU); ctx.fill(); }
+      ctx.restore(); S.label(ctx, '위상 평면: 좌우 오차와 속도', ix, iy - 8, 'left');
+      S.label(ctx, `추력기: 아래 ${up ? '켜짐' : '꺼짐'}, 옆 ${side ? (side > 0 ? '오른쪽으로' : '왼쪽으로') : '꺼짐'}`, 10, 18, 'left');
+    }
+  };
+};
+
+// ===================== page runtime =====================
+(function () {
+  const root = document.documentElement, NAMES = ['paper', 'plate', 'ink', 'ink2', 'rule', 'grid', 'teal', 'magenta', 'violet', 'amber', 'blue', 'obst'], CV = {};
+  const hex = h => { h = h.trim(); if (h.length === 4) h = '#' + [...h.slice(1)].map(c => c + c).join(''); return [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); };
+  const readColors = () => { const cs = getComputedStyle(root); NAMES.forEach(n => CV[n] = hex(cs.getPropertyValue('--' + n))); };
+  readColors();
+  const col = (n, a = 1) => { const c = CV[n]; return `rgba(${c[0]},${c[1]},${c[2]},${a})`; };
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const FONT = '"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Noto Sans CJK KR",sans-serif';
+  const items = [];
+
+  document.querySelectorAll('canvas[data-viz]').forEach(cv => {
+    const S = { w: 300, h: 200, dpr: 1, ptr: null, c: col, rgb: n => CV[n] };
+    S.font = () => `500 ${Math.round(clamp(S.w / 46, 11, 13.5))}px ${FONT}`;
+    S.label = (ctx, t, x, y, align, color) => { ctx.font = S.font(); ctx.textAlign = align || 'left'; ctx.textBaseline = 'alphabetic'; ctx.lineJoin = 'round';
+      ctx.strokeStyle = col('plate', .9); ctx.lineWidth = 4; ctx.strokeText(t, x, y); ctx.fillStyle = color || col('ink2'); ctx.fillText(t, x, y); };
+    const it = { cv, S, ctx: cv.getContext('2d'), viz: VIZ[cv.dataset.viz](S), visible: false, ready: false };
+    it.draw = () => { const { ctx } = it; ctx.setTransform(S.dpr, 0, 0, S.dpr, 0, 0); ctx.clearRect(0, 0, S.w, S.h); ctx.save(); it.viz.draw(ctx); ctx.restore(); };
+    new ResizeObserver(() => { const w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return; S.w = w; S.h = h; S.dpr = Math.min(window.devicePixelRatio || 1, 2);
+      cv.width = Math.round(w * S.dpr); cv.height = Math.round(h * S.dpr); it.viz.resize();
+      if (!it.ready) { it.ready = true; const warm = reduce ? 5 : .8; for (let t = 0; t < warm; t += 1 / 60) it.viz.step(1 / 60); }
+      it.draw(); }).observe(cv);
+    cv.addEventListener('pointermove', e => { if (e.pointerType === 'touch') return; const r = cv.getBoundingClientRect(); S.ptr = { x: e.clientX - r.left, y: e.clientY - r.top }; });
+    cv.addEventListener('pointerleave', () => { S.ptr = null; });
+    items.push(it);
+  });
+  const io = new IntersectionObserver(es => es.forEach(e => { const it = items.find(i => i.cv === e.target); if (it) it.visible = e.isIntersecting; }), { rootMargin: '80px' });
+  items.forEach(it => io.observe(it.cv));
+  const refresh = () => { readColors(); items.forEach(it => it.ready && it.draw()); drawRoute(); };
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', refresh);
+  new MutationObserver(refresh).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  let last = performance.now();
+  function frame(now) { const dt = Math.min(.05, (now - last) / 1000); last = now;
+    for (const it of items) { if (!it.visible || !it.ready) continue; if (reduce && !it.S.ptr) continue; it.viz.step(dt); it.draw(); }
+    requestAnimationFrame(frame); }
+  requestAnimationFrame(frame);
+
+  // ---------- hero route: the chapter sequence drawn as a grid path ----------
+  const route = document.getElementById('route'), svg = route.querySelector('svg'), trace = svg.querySelector('.trace'), gridG = svg.querySelector('.grid');
+  const stops = [...document.querySelectorAll('article.ch')].map((a, i) => { const s = document.createElement('a'); s.className = 'stop' + (i === 0 ? ' first' : ''); s.href = '#' + a.id;
+    s.innerHTML = `${i + 1}<span>${a.dataset.short}</span>`; s.setAttribute('aria-label', `${i + 1}장 ${a.querySelector('h3').textContent.trim()}`); route.appendChild(s); return s; });
+  stops[stops.length - 1].classList.add('last');
+  const LV = [0, 0, 1, 2, 2, 2, 1, 1, 1, 0, 0];
+  let drawn = false;
+  function drawRoute() {
+    const W = route.clientWidth, H = route.clientHeight, n = stops.length, pad = 24, cell = (W - 2 * pad) / (n - 1);
+    const rowY = [30, 30 + Math.min(52, cell * .78), 30 + 2 * Math.min(52, cell * .78)];
+    const P = stops.map((s, i) => [pad + i * cell, rowY[LV[i]]]);
+    stops.forEach((s, i) => { s.style.left = P[i][0] + 'px'; s.style.top = P[i][1] + 'px'; });
+    let d = `M${P[0][0]},${P[0][1]}`;
+    for (let i = 1; i < n; i++) { const [x0, y0] = P[i - 1], [x1, y1] = P[i], dy = y1 - y0, dx = x1 - x0, diag = Math.min(Math.abs(dy), dx);
+      if (dy === 0) d += ` L${x1},${y1}`; else { const xm = x1 - diag; d += ` L${xm},${y0} L${x1},${y1}`; } }
+    trace.setAttribute('d', d);
+    let g = ''; const step = cell / 2; for (let x = pad - step; x <= W; x += step) g += `<line x1="${x}" y1="0" x2="${x}" y2="${rowY[2] + 30}"/>`;
+    for (let y = rowY[0]; y <= rowY[2] + 30; y += (rowY[1] - rowY[0]) / 2) g += `<line x1="0" y1="${y}" x2="${W}" y2="${y}"/>`;
+    gridG.innerHTML = g;
+    if (!drawn) { drawn = true; if (!reduce) { const L = trace.getTotalLength(); trace.style.strokeDasharray = L; trace.style.strokeDashoffset = L;
+      trace.getBoundingClientRect(); trace.style.transition = 'stroke-dashoffset 1.8s cubic-bezier(.45,.05,.25,1) .2s'; trace.style.strokeDashoffset = 0;
+      trace.addEventListener('transitionend', () => { trace.style.strokeDasharray = 'none'; trace.style.transition = 'none'; }, { once: true }); } }
+  }
+  new ResizeObserver(drawRoute).observe(route);
+})();
+
+</script>
+</body>
+</html>

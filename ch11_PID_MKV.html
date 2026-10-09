@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>호버 시험기: 추력기만으로 공중에 멈추기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+window.MathJax = {
+  loader: { load: ['[tex]/html'] },
+  tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']], packages: { '[+]': ['html'] } },
+  svg: { fontCache: 'global', scale: 1.08 }
+};
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<style>
+:root{
+  --paper:#ECF0F3; --paper-2:#F7F9FA; --ink:#15233A; --ink-2:#4A5A72; --rule:rgba(21,35,58,.16);
+  --grid:rgba(21,35,58,.07); --flame:#E8590C; --flame-2:#FFB347; --est:#0E8A7E; --meas:#C2187A;
+  --target:#E8590C; --ok:#2B8A3E; --warn:#C92A2A; --chip:#DDE4EA;
+  --code-bg:#15233A; --code-ink:#E6EDF5;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0E1726; --paper-2:#142036; --ink:#DCE4EE; --ink-2:#97A6BA; --rule:rgba(220,228,238,.16);
+    --grid:rgba(220,228,238,.06); --flame:#FF7A33; --flame-2:#FFC46B; --est:#3CC9B8; --meas:#FF5FAE;
+    --target:#FF7A33; --ok:#51CF66; --warn:#FF6B6B; --chip:#1D2B44; --code-bg:#08101D; --code-ink:#E6EDF5;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0E1726; --paper-2:#142036; --ink:#DCE4EE; --ink-2:#97A6BA; --rule:rgba(220,228,238,.16);
+  --grid:rgba(220,228,238,.06); --flame:#FF7A33; --flame-2:#FFC46B; --est:#3CC9B8; --meas:#FF5FAE;
+  --target:#FF7A33; --ok:#51CF66; --warn:#FF6B6B; --chip:#1D2B44; --code-bg:#08101D; --code-ink:#E6EDF5;
+  color-scheme: dark;
+}
+:root{ box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+html{ scroll-padding-top:env(safe-area-inset-top,0px); }
+*,*::before,*::after{ box-sizing:inherit; }
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  font-size:16px; line-height:1.7; -webkit-text-size-adjust:100%; word-break:keep-all; overflow-wrap:break-word;
+  background-image:linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:24px 24px;
+}
+.wrap{ max-width:1180px; margin:0 auto; padding:0 18px; }
+header.hero{ padding:40px 0 18px; }
+header.hero h1{
+  font-size:clamp(30px, 6.4vw, 58px); line-height:1.08; letter-spacing:-0.035em; margin:0 0 14px; font-weight:700;
+  max-width:20ch;
+}
+header.hero p{ margin:0; max-width:62ch; color:var(--ink-2); font-size:17px; }
+
+/* ---------- 실험실 ---------- */
+.lab{ display:grid; grid-template-columns: minmax(0,1.25fr) minmax(0,1fr); gap:22px; margin:22px 0 10px; align-items:start; }
+@media (max-width: 880px){ .lab{ grid-template-columns: minmax(0,1fr); } }
+.stage{ position:relative; border:1.5px solid var(--ink); border-radius:4px; background:var(--paper-2); overflow:hidden; touch-action:manipulation; }
+#sim{ display:block; width:100%; height:auto; aspect-ratio: 4 / 3.3; cursor:crosshair; }
+@media (max-width:560px){ #sim{ aspect-ratio: 1 / 1.08; } }
+.stage .status{ position:absolute; top:34px; right:10px; font-weight:600; font-size:13px; padding:3px 9px; border-radius:3px; display:none; }
+.stage .status.show{ display:block; background:var(--warn); color:#fff; }
+.stage .hint{ position:absolute; right:10px; top:8px; font-size:12px; color:var(--ink-2); pointer-events:none; }
+.readouts{ display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); border:1.5px solid var(--ink); border-top:none; border-radius:0 0 4px 4px; background:var(--paper-2); }
+.readouts div{ padding:8px 10px; border-left:1px solid var(--rule); }
+.readouts div:first-child{ border-left:none; }
+.readouts b{ display:block; font-size:20px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-0.01em; line-height:1.25; }
+.readouts span{ font-size:12px; color:var(--ink-2); line-height:1.3; display:block; }
+@media (max-width:480px){ .readouts{ grid-template-columns:repeat(2,minmax(0,1fr)); } .readouts div:nth-child(3){ border-left:none; } .readouts div:nth-child(n+3){ border-top:1px solid var(--rule); } }
+.stage-wrap .stage{ border-radius:4px 4px 0 0; }
+
+.row{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+button{ font:inherit; font-size:14px; font-weight:500; color:var(--ink); background:var(--chip); border:1px solid var(--rule); border-radius:3px; padding:8px 13px; cursor:pointer; line-height:1.2; }
+button:hover{ border-color:var(--ink-2); }
+button:focus-visible, input:focus-visible, summary:focus-visible{ outline:2.5px solid var(--flame); outline-offset:2px; }
+button.primary{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+button.on{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+
+.panel{ border-top:1.5px solid var(--ink); padding-top:10px; margin-bottom:18px; }
+.panel h3{ margin:0 0 8px; font-size:15px; font-weight:600; letter-spacing:-0.01em; }
+.presets{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+.presets button{ text-align:left; padding:8px 9px; font-size:13px; }
+.presets button .n{ font-weight:700; margin-right:4px; }
+.caption{ font-size:14px; color:var(--ink-2); margin:10px 0 0; min-height:3em; }
+.seg{ display:flex; border:1px solid var(--ink); border-radius:3px; overflow:hidden; margin-bottom:10px; }
+.seg button{ flex:1; border:none; border-left:1px solid var(--ink); border-radius:0; background:transparent; padding:8px 4px; font-size:13.5px; }
+.seg button:first-child{ border-left:none; }
+.seg button.on{ background:var(--ink); color:var(--paper); }
+.seg-label{ font-size:13px; color:var(--ink-2); margin:0 0 4px; }
+
+.chart-box{ border:1.5px solid var(--ink); border-radius:4px; background:var(--paper-2); }
+#chart{ display:block; width:100%; height:330px; }
+.legend{ display:flex; flex-wrap:wrap; gap:4px 14px; font-size:12.5px; color:var(--ink-2); padding:6px 10px 8px; border-top:1px solid var(--rule); }
+.legend i{ display:inline-block; width:18px; height:0; vertical-align:middle; margin-right:5px; border-top:2px solid; }
+.legend i.dot{ width:7px; height:7px; border:none; border-radius:50%; }
+
+details{ border-top:1px solid var(--rule); padding:8px 0; }
+details:last-of-type{ border-bottom:1px solid var(--rule); }
+summary{ cursor:pointer; font-weight:600; font-size:15px; }
+.sl{ display:grid; grid-template-columns: 9.5em minmax(0,1fr) 4.6em; gap:8px; align-items:center; margin:8px 0; font-size:14px; }
+.sl label{ line-height:1.25; }
+.sl output{ text-align:right; font-variant-numeric:tabular-nums; font-weight:500; }
+input[type=range]{ width:100%; accent-color:var(--flame); }
+.check{ display:flex; gap:8px; align-items:center; font-size:14px; margin:8px 0; }
+.check input{ width:18px; height:18px; accent-color:var(--flame); }
+
+/* ---------- 칼만 필터 들여다보기 ---------- */
+.kf{ border:1.5px solid var(--ink); border-radius:4px; background:var(--paper-2); padding:16px 18px; margin:8px 0 34px; }
+.kf h2{ font-size:20px; margin:0 0 4px; letter-spacing:-0.02em; }
+.kf > p{ margin:0 0 14px; color:var(--ink-2); font-size:14.5px; max-width:70ch; }
+.kf-grid{ display:grid; grid-template-columns:auto auto auto minmax(0,1fr); gap:22px; align-items:start; }
+@media (max-width:880px){ .kf-grid{ grid-template-columns:auto auto auto; } .kf-gauge{ grid-column:1 / -1; } }
+@media (max-width:480px){ .kf-grid{ grid-template-columns:auto auto; gap:16px; } }
+.mat-title{ font-size:13px; color:var(--ink-2); margin-bottom:4px; }
+.mat{ display:inline-grid; gap:3px; padding:4px 8px; position:relative; font-variant-numeric:tabular-nums; }
+.mat::before,.mat::after{ content:""; position:absolute; top:0; bottom:0; width:6px; border:1.5px solid var(--ink); }
+.mat::before{ left:0; border-right:none; } .mat::after{ right:0; border-left:none; }
+.mat.c1{ grid-template-columns:auto; } .mat.c2{ grid-template-columns:auto auto; }
+.cell{ min-width:5.2em; text-align:right; padding:5px 7px; border-radius:2px; font-size:14px; transition:background-color .15s; }
+.cell small{ display:block; font-size:10.5px; color:var(--ink-2); text-align:left; line-height:1; margin-bottom:2px; }
+.kf-gauge svg{ width:100%; max-width:440px; height:auto; display:block; }
+.gauge-legend{ font-size:12.5px; color:var(--ink-2); margin-top:4px; }
+
+/* ---------- 본문 ---------- */
+.lesson{ max-width:760px; margin:0 auto 60px; }
+.lesson section{ padding:26px 0 8px; border-top:1.5px solid var(--ink); }
+.lesson h2{ font-size:clamp(22px,3.6vw,30px); letter-spacing:-0.025em; line-height:1.25; margin:0 0 14px; display:flex; gap:12px; align-items:baseline; }
+.lesson h2 .num{ font-size:.75em; color:var(--flame); font-weight:700; font-variant-numeric:tabular-nums; }
+.lesson p, .lesson li{ font-size:16.5px; }
+.lesson .math{ overflow-x:auto; overflow-y:hidden; padding:6px 0; font-size:19px; }
+@media (max-width:560px){ .lesson .math{ font-size:14.5px; } }
+.lesson mjx-container[display="true"]{ margin:10px 0 !important; }
+.lesson table{ border-collapse:collapse; width:100%; font-size:15px; margin:10px 0 16px; font-variant-numeric:tabular-nums; }
+.lesson th, .lesson td{ border-bottom:1px solid var(--rule); padding:7px 8px; text-align:left; }
+.lesson th{ font-weight:600; border-bottom:1.5px solid var(--ink); }
+.tablewrap{ overflow-x:auto; }
+.note{ border-left:3px solid var(--flame); padding:4px 0 4px 14px; margin:14px 0; color:var(--ink); }
+.fig{ margin:16px 0; overflow-x:auto; }
+.fig svg{ display:block; max-width:100%; height:auto; margin:0 auto; }
+.fig figcaption{ font-size:13.5px; color:var(--ink-2); text-align:center; margin-top:6px; }
+.hl-a{ fill:var(--flame); color:var(--flame); } .hl-b{ fill:var(--est); color:var(--est); } .hl-c{ fill:var(--meas); color:var(--meas); }
+.lesson ol.tasks{ padding-left:1.3em; } .lesson ol.tasks li{ margin-bottom:12px; }
+.lesson ol.tasks li b{ font-weight:600; }
+pre{ background:var(--code-bg); color:var(--code-ink); border-radius:4px; padding:14px 16px; overflow-x:auto; font-size:13.5px; line-height:1.55; margin:12px 0 18px; }
+code{ font-family:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; }
+:not(pre) > code{ background:var(--chip); padding:1px 5px; border-radius:3px; font-size:.9em; }
+.hljs-keyword,.hljs-built_in{ color:#FF9E64; } .hljs-string{ color:#9ECE6A; } .hljs-number,.hljs-literal{ color:#F7C873; }
+.hljs-comment{ color:#7F8FA6; font-style:italic; } .hljs-title,.hljs-title.function_{ color:#7DCFFF; } .hljs-params{ color:#E6EDF5; }
+.hljs-meta{ color:#BB9AF7; } .hljs-class .hljs-title,.hljs-title.class_{ color:#7DCFFF; }
+footer{ font-size:13px; color:var(--ink-2); padding:20px 0 40px; border-top:1px solid var(--rule); }
+@media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <h1>추력기만으로 공중에 멈추기</h1>
+  <p>켜고 끄는 것밖에 못 하는 작은 로켓 추력기로 중력을 이기고, 한 점에 가만히 떠 있게 만들어 봅니다. PD 제어로 힘을 계산하고, 펄스로 쪼개서 쏘고, 잡음 섞인 센서는 칼만 필터로 걸러 냅니다.</p>
+</header>
+
+<section class="lab" aria-label="호버링 시뮬레이터">
+  <div class="stage-wrap">
+    <div class="stage">
+      <canvas id="sim" aria-label="호버 시험기 시뮬레이션 화면"></canvas>
+      <div class="status" id="status"></div>
+      <div class="hint">화면을 탭하면 목표 위치가 옮겨집니다</div>
+    </div>
+    <div class="readouts">
+      <div><b id="ro-err">0.00 m</b><span>목표까지 거리</span></div>
+      <div><b id="ro-th">0.0°</b><span>기울기 θ</span></div>
+      <div><b id="ro-fuel">0 N</b><span>평균 사용 추력 (최소 98 N)</span></div>
+      <div><b id="ro-pulse">0</b><span>밸브 열림 / 초</span></div>
+    </div>
+    <div class="row">
+      <button id="btn-pause" class="primary">일시정지</button>
+      <button id="btn-reset">처음부터</button>
+      <button id="btn-push">툭 밀기</button>
+      <button id="btn-slow">느리게 ¼배</button>
+    </div>
+  </div>
+
+  <div class="lab-side">
+    <div class="panel">
+      <h3>실험 순서</h3>
+      <div class="presets" id="presets"></div>
+      <p class="caption" id="caption"></p>
+    </div>
+    <div class="panel">
+      <p class="seg-label">추력기</p>
+      <div class="seg" id="seg-act">
+        <button data-v="ideal">이상적 (연속)</button><button data-v="bang">On-Off</button><button data-v="pwm">PWM</button>
+      </div>
+      <p class="seg-label">제어기가 쓰는 상태</p>
+      <div class="seg" id="seg-est">
+        <button data-v="truth">참값</button><button data-v="raw">센서 그대로</button><button data-v="kf">칼만 필터</button>
+      </div>
+    </div>
+    <div class="chart-box">
+      <canvas id="chart" aria-label="최근 8초 고도, 수평 위치, 기울기와 추력기 점화 기록"></canvas>
+      <div class="legend">
+        <span><i style="border-color:var(--ink)"></i>실제</span>
+        <span><i style="border-color:var(--est);border-top-style:dashed"></i>칼만 추정</span>
+        <span><i class="dot" style="background:var(--meas)"></i>위치·자세 센서</span>
+        <span><i style="border-color:var(--target);border-top-style:dotted"></i>목표</span>
+        <span><i style="border-color:var(--flame);border-top-width:6px"></i>점화</span>
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      <details open id="d-gain"><summary>제어기 게인</summary><div id="g-gain"></div></details>
+      <details id="d-thr"><summary>추력기</summary><div id="g-thr"></div></details>
+      <details id="d-sens"><summary>센서와 칼만 필터</summary><div id="g-sens"></div></details>
+      <details id="d-dist"><summary>바람과 무게</summary>
+        <label class="check"><input type="checkbox" id="chk-wind"> 바람 켜기 (돌풍이 무작위로 붑니다)</label>
+        <div id="g-dist"></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="kf" aria-label="칼만 필터 실시간 값">
+  <h2>칼만 필터 들여다보기: 고도 축</h2>
+  <p>위치 센서 값이 들어올 때마다(초당 10번) 갱신됩니다. 칸 색이 진할수록 값이 큽니다. 아래 5장에서 각 칸의 뜻을 설명합니다.</p>
+  <div class="kf-grid">
+    <div><div class="mat-title">추정 상태 x̂</div><div class="mat c1" id="m-x"></div></div>
+    <div><div class="mat-title">불확실성 P</div><div class="mat c2" id="m-p"></div></div>
+    <div><div class="mat-title">칼만 이득 K</div><div class="mat c1" id="m-k"></div></div>
+    <div class="kf-gauge">
+      <div class="mat-title">마지막 보정: 예측과 측정 사이 어디에 놓였나</div>
+      <svg id="gauge" viewBox="0 0 360 96" role="img" aria-label="예측값, 측정값, 보정값 위치"></svg>
+      <div class="gauge-legend" id="gauge-text"></div>
+    </div>
+  </div>
+</section>
+
+<article class="lesson">
+  <section>
+    <h2><span class="num">1</span>추력기는 작은 로켓 엔진이다</h2>
+    <p>네, 로켓처럼 가스를 내뿜습니다. 연료를 태워 생긴 뜨거운 가스(또는 탱크에 눌러 담은 질소 같은 압축 가스)를 좁은 노즐로 빠르게 뿜으면, 가스를 뒤로 밀어낸 만큼 비행체는 반대쪽으로 밀립니다. 뉴턴의 제3법칙, 작용과 반작용입니다.</p>
+    <div class="math">\[ F = \dot m \, v_e \]</div>
+    <p>\(\dot m\)은 1초에 내뿜는 가스의 질량, \(v_e\)는 가스가 노즐을 떠나는 속도입니다. 가스를 많이, 빠르게 뿜을수록 힘이 큽니다.</p>
+    <p>재사용 로켓의 수직 이착륙 시험기, 달 착륙선, 요격체 호버링 시험 영상에서 보던 장면이 모두 이 원리입니다. 그런데 이런 추력기는 대부분 밸브를 <b>열거나 닫는 것</b>밖에 못 합니다. 드론 모터처럼 "힘을 37%만" 내는 게 안 됩니다. 이 제약을 어떻게 다루는지가 이번 실습의 핵심입니다.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">2</span>비행체를 숫자 세 개로 나타내기</h2>
+    <p>화면 속 비행체는 평면(2D) 위에서 움직입니다. 위치를 알려면 숫자 세 개면 충분합니다. 수평 위치 \(x\), 높이 \(y\), 기울기 \(\theta\)입니다.</p>
+    <figure class="fig">
+      <svg viewBox="0 0 420 250" width="420" role="img" aria-label="비행체에 작용하는 힘">
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker></defs>
+        <g style="stroke:var(--ink);fill:none;stroke-width:1.6">
+          <rect x="180" y="80" width="60" height="80" rx="6" style="fill:var(--paper-2)"/>
+          <path d="M184 160 L166 196 M236 160 L254 196"/>
+          <path d="M150 92 L270 92"/>
+        </g>
+        <g style="stroke:var(--flame);stroke-width:2.6" fill="none">
+          <path d="M210 230 L210 170" marker-end="url(#ah)"/>
+          <path d="M120 125 L172 125" marker-end="url(#ah)"/>
+        </g>
+        <g style="stroke:var(--ink);stroke-width:2.2" fill="none"><path d="M210 135 L210 215" marker-end="url(#ah)" stroke-dasharray="5 4"/></g>
+        <g style="stroke:var(--est);stroke-width:2.4" fill="none"><path d="M268 70 A 46 46 0 0 0 152 70" marker-end="url(#ah)"/></g>
+        <g style="font:600 15px 'IBM Plex Sans KR',sans-serif">
+          <text x="218" y="242" style="fill:var(--flame)">T 주 추력기 (0~150 N)</text>
+          <text x="20" y="118" style="fill:var(--flame)">Fₛ 측면 추력기</text>
+          <text x="20" y="136" style="fill:var(--flame);font-weight:400;font-size:13px">(왼쪽·오른쪽, ±25 N)</text>
+          <text x="248" y="210" style="fill:var(--ink)">mg 중력</text>
+          <text x="282" y="58" style="fill:var(--est)">τ 자세 추력기 쌍</text>
+          <text x="282" y="76" style="fill:var(--est);font-weight:400;font-size:13px">(±4 N·m, 회전만)</text>
+        </g>
+      </svg>
+      <figcaption>세 종류의 추력기와 중력. 무게 중심은 몸통 가운데에 있습니다.</figcaption>
+    </figure>
+    <p>각 숫자가 어떻게 변하는지는 "힘 = 질량 × 가속도" 하나로 씁니다. 회전도 똑같이 "토크 = 관성 모멘트 × 각가속도"입니다. 점 두 개(\(\ddot x\))는 가속도를 뜻합니다.</p>
+    <div class="math">\[
+      \begin{aligned}
+        m\,\ddot x &= \class{hl-a}{F_s}\cos\theta - \class{hl-a}{T}\sin\theta + F_{\text{wind}} \\
+        m\,\ddot y &= \class{hl-a}{T}\cos\theta + \class{hl-a}{F_s}\sin\theta - m g \\
+        I\,\ddot\theta &= \class{hl-b}{\tau}
+      \end{aligned}
+    \]</div>
+    <p>복잡해 보이지만, 비행체가 거의 똑바로 서 있으면(\(\theta \approx 0\)) \(\cos\theta \approx 1\), \(\sin\theta \approx 0\)이 되어 식이 이렇게 단순해집니다.</p>
+    <div class="math">\[ m\,\ddot x = F_s, \qquad m\,\ddot y = T - mg, \qquad I\,\ddot\theta = \tau \]</div>
+    <div class="note">세 식이 서로 얽혀 있지 않습니다. 그래서 고도, 수평, 자세에 제어기를 <b>하나씩 따로</b> 붙일 수 있습니다. 자세 제어기가 \(\theta\)를 0 근처로 잡아 주는 동안에만 성립하는 약속이라, 자세 제어가 가장 빨라야 합니다.</div>
+    <div class="tablewrap"><table>
+      <tr><th>항목</th><th>값</th><th>뜻</th></tr>
+      <tr><td>질량 \(m\)</td><td>10 kg</td><td>무게 \(mg\) = 98.1 N</td></tr>
+      <tr><td>주 추력기 \(T_{\max}\)</td><td>150 N</td><td>무게의 1.5배. 켜면 올라가고 끄면 떨어짐</td></tr>
+      <tr><td>측면 추력기 \(F_{s,\max}\)</td><td>±25 N</td><td>좌우 이동용</td></tr>
+      <tr><td>자세 추력기 \(\tau_{\max}\)</td><td>±4 N·m</td><td>회전용 (한 쌍이 반대로 밀어서 회전만 만듦)</td></tr>
+      <tr><td>제어 주기 \(\Delta t\)</td><td>0.02 s</td><td>1초에 50번 계산</td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <h2><span class="num">3</span>PD 제어와 중력 보상</h2>
+    <p>목표 높이 \(r\)과 지금 높이 \(y\)의 차이를 오차 \(e = r - y\)라고 합시다. 원하는 가속도를 이렇게 정합니다.</p>
+    <div class="math">\[ a_{\text{des}} = \class{hl-a}{K_p}\,(r - y) \;-\; \class{hl-b}{K_d}\,\dot y \]</div>
+    <p>\(K_p\) 항은 <b>용수철</b>입니다. 목표에서 멀수록 세게 당깁니다. \(K_d\) 항은 <b>댐퍼(쇼크업소버)</b>입니다. 빨리 움직일수록 반대로 브레이크를 겁니다. 용수철만 있으면 목표 주변을 계속 출렁이고, 댐퍼를 더하면 부드럽게 멈춥니다.</p>
+    <p>이제 이 가속도를 내려면 추력이 얼마나 필요한지 계산합니다. 여기서 중요한 한 줄이 있습니다.</p>
+    <div class="math">\[ T_{\text{cmd}} = \frac{m\,(\class{hl-c}{g} + a_{\text{des}})}{\cos\theta} \]</div>
+    <p>\(\class{hl-c}{g}\)를 더하는 것이 <b>중력 보상</b>(피드포워드)입니다. 중력은 항상 아래로 당기니, 오차가 0일 때도 무게만큼(98.1 N)은 미리 밀어 줍니다. 이걸 빼면 비행체는 목표보다 조금 아래에서 "버티는" 자리를 찾아 멈춥니다. \(\cos\theta\)로 나누는 건 기울어지면 위로 가는 성분이 줄어드는 걸 채워 주기 위해서입니다.</p>
+    <p>게인을 고르는 요령도 있습니다. 이 식은 용수철-댐퍼 진동계와 같은 꼴이라서</p>
+    <div class="math">\[ K_p = \omega_n^2, \qquad K_d = 2\,\zeta\,\omega_n \]</div>
+    <p>로 바꿔 생각할 수 있습니다. \(\omega_n\)은 반응 속도, \(\zeta\)는 출렁임 정도입니다. \(\zeta = 1\)이면 넘치지 않고 가장 빨리 멈춥니다. 기본값 \(K_p = 4,\ K_d = 4\)는 \(\omega_n = 2\), \(\zeta = 1\)입니다. 자세 축은 \(K_p = 25,\ K_d = 10\)으로 \(\omega_n = 5\), 고도 축보다 2.5배 빠릅니다.</p>
+    <div class="note"><b>그럼 PID의 I는?</b> 적분항은 "정체를 모르는 일정한 힘"을 지워 줍니다. 중력은 크기를 알기 때문에 미리 더했지만, 화물을 실어 실제 질량이 달라지면 계산한 중력 보상이 틀립니다. 실험 ⑥에서 오차가 남는 걸 확인하고 \(K_i\)를 올려 보세요.
+    \[ a_{\text{des}} = K_p\,e - K_d\,\dot y + \class{hl-a}{K_i \textstyle\int e\,dt} \]</div>
+  </section>
+
+  <section>
+    <h2><span class="num">4</span>켜고 끄기만 되는 추력기 다루기</h2>
+    <p>PD 제어기는 "113 N 주세요"처럼 연속적인 값을 내놓는데, 추력기는 0 N 아니면 150 N입니다. 두 가지 방법을 비교해 봅니다.</p>
+    <p><b>On-Off (뱅뱅 제어).</b> 필요한 힘이 있으면 한 주기(20 ms) 동안 꽉 켜고, 아니면 끕니다. 가장 단순하지만 목표 근처에서 켜짐과 꺼짐을 끝없이 반복합니다(채터링). 작은 오차에는 반응하지 않도록 <b>데드밴드</b>를 두면 덜 깜빡이지만 그만큼 정밀도가 떨어집니다.</p>
+    <p><b>PWM (펄스 폭 변조).</b> 한 주기 안에서 켜 두는 시간의 비율로 평균 힘을 맞춥니다.</p>
+    <div class="math">\[ t_{\text{on}} = \frac{|F_{\text{cmd}}|}{F_{\max}}\,\Delta t \]</div>
+    <div class="math">\[ \bar F = \frac{t_{\text{on}}}{\Delta t}\,F_{\max} = |F_{\text{cmd}}| \]</div>
+    <p>떠 있으려면 98.1 N이 필요하니 \(98.1 / 150 \approx 65\%\), 즉 20 ms마다 13 ms씩 켜면 됩니다.</p>
+    <figure class="fig">
+      <svg viewBox="0 0 400 170" width="400" role="img" aria-label="PWM 펄스와 평균 추력">
+        <g style="font:500 13px 'IBM Plex Sans KR',sans-serif;fill:var(--ink-2)">
+          <text x="4" y="40">30%</text><text x="4" y="120">65%</text>
+          <g text-anchor="middle"><text x="50" y="164">0</text><text x="130" y="164">20</text><text x="210" y="164">40</text><text x="290" y="164">60</text><text x="370" y="164">80 ms</text></g>
+        </g>
+        <g id="pwm-rows"></g>
+      </svg>
+      <figcaption>주황 막대가 점화, 점선이 평균 추력. 켜 둔 시간이 길수록 평균이 올라갑니다.</figcaption>
+    </figure>
+    <p>현실의 밸브는 너무 짧게는 못 엽니다. 이 한계를 <b>최소 점화 시간</b>이라 하고, 그보다 짧은 펄스는 아예 쏘지 않습니다. 결국 세 가지가 서로 당깁니다. 정밀도를 올리면 밸브가 더 자주 열리고(수명), 데드밴드를 넓히면 연료와 밸브는 아끼지만 오차가 커집니다. 화면 아래 숫자 "밸브 열림 / 초"와 "평균 사용 추력"으로 이 저울질을 직접 재 볼 수 있습니다.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">5</span>센서와 칼만 필터</h2>
+    <p>지금까지는 제어기가 위치와 속도를 정확히 안다고 가정했습니다(실험 ①~③의 "참값"). 실제로는 센서로 재야 하고, 센서는 늘 조금씩 틀립니다.</p>
+    <div class="tablewrap"><table>
+      <tr><th>센서</th><th>속도</th><th>재는 것</th><th>성질</th></tr>
+      <tr><td>IMU 가속도계</td><td>50 Hz</td><td>가속도 (20 ms 평균)</td><td>빠르지만 잡음. 적분하면 오차가 쌓임</td></tr>
+      <tr><td>IMU 자이로</td><td>50 Hz</td><td>회전 속도 \(\dot\theta\)</td><td>빠르지만 잡음</td></tr>
+      <tr><td>위치·자세 센서</td><td>10 Hz</td><td>\(x, y, \theta\)</td><td>느리고 잡음 있지만 오차가 쌓이지 않음</td></tr>
+    </table></div>
+    <p><b>위치를 그냥 미분해서 속도를 구하면?</b> 위치 잡음 \(\sigma_p = 5\) cm, 측정 간격 0.1 s일 때 속도 잡음은</p>
+    <div class="math">\[ \sigma_v \approx \frac{\sqrt 2\,\sigma_p}{\Delta t} = \frac{\sqrt2 \times 0.05}{0.1} \approx 0.7\ \text{m/s} \]</div>
+    <p>로 커집니다. \(K_d\)가 이 잡음을 그대로 증폭해서 추력기가 쓸데없이 깜빡입니다. 실험 ④에서 확인하세요.</p>
+    <p>칼만 필터는 두 센서의 장점을 섞습니다. 상태를 \(\hat{\mathbf x} = [\,\hat p,\ \hat v\,]^\top\)(추정 위치, 추정 속도)로 두고 두 단계를 반복합니다.</p>
+    <p><b>예측 (50 Hz).</b> IMU 가속도로 위치와 속도를 한 걸음 굴립니다. 동시에 불확실성 \(P\)는 조금씩 커집니다.</p>
+    <div class="math">\[
+      \hat{\mathbf x}^- = \underbrace{\begin{bmatrix}1 & \Delta t\\ 0 & 1\end{bmatrix}}_{F}\hat{\mathbf x}
+      + \underbrace{\begin{bmatrix}\Delta t^2/2\\ \Delta t\end{bmatrix}}_{B} a_{\text{IMU}}
+    \]</div>
+    <div class="math">\[ P^- = F P F^\top + \class{hl-b}{Q} \]</div>
+    <p><b>보정 (10 Hz).</b> 위치 센서 값 \(z\)가 오면 예측과 비교해서 고칩니다. 위치만 재므로 \(H = [\,1\ \ 0\,]\)이고, 이때 칼만 이득은 이렇게 단순해집니다.</p>
+    <div class="math">\[
+      K = \frac{1}{\class{hl-a}{P^-_{11}} + \class{hl-c}{R}}
+      \begin{bmatrix} \class{hl-a}{P^-_{11}} \\ P^-_{21} \end{bmatrix}
+    \]</div>
+    <div class="math">\[ \hat{\mathbf x} = \hat{\mathbf x}^- + K\,(\class{hl-c}{z} - \hat p^-), \qquad P = (I - K H)\,P^- \]</div>
+    <p>\(K\)의 첫 칸은 0과 1 사이 숫자입니다. 예측이 불확실하면(\(\class{hl-a}{P^-_{11}}\)이 크면) 1에 가까워져 측정을 믿고, 센서 잡음 \(\class{hl-c}{R}\)이 크면 0에 가까워져 예측을 믿습니다. 둘째 칸은 "위치가 틀렸다면 속도도 이만큼 틀렸겠지" 하고 속도까지 고쳐 줍니다. 미분 없이 속도를 얻는 비결이 여기 있습니다.</p>
+    <div class="note">\(\class{hl-b}{Q}\)는 "내 예측 모델을 얼마나 못 믿는가"입니다. 실험실의 Q 배율을 0.01로 내리면 필터가 센서를 무시하다 늦게 따라가고, 100으로 올리면 센서 잡음을 그대로 따라갑니다. 위쪽 "칼만 필터 들여다보기"에서 \(P\)와 \(K\) 칸이 어떻게 바뀌는지 보세요.</div>
+    <p>자세 축도 같은 구조입니다. 상태는 \([\,\theta,\ \dot\theta\,]\), 예측에는 내가 쏜 자세 추력기 토크를 쓰고, 보정은 자이로(\(\dot\theta\), 50 Hz)와 자세 센서(\(\theta\), 10 Hz) 두 가지로 합니다.</p>
+  </section>
+
+  <section>
+    <h2><span class="num">6</span>코드로 옮기면</h2>
+    <p>시뮬레이터 안의 핵심 로직을 Python으로 옮긴 것입니다. 고도 축 하나만 보입니다. 수평 축은 중력 보상만 빼면 같고, 자세 축은 상태만 \([\theta, \dot\theta]\)로 바뀝니다.</p>
+<pre><code class="language-python">import numpy as np
+
+G, M = 9.81, 10.0          # 중력, 제어기가 알고 있는 질량
+DT = 0.02                  # 제어 주기 (50 Hz)
+T_MAX = 150.0              # 주 추력기 최대 추력
+
+def altitude_pd(r, y, vy, theta=0.0, kp=4.0, kd=4.0):
+    a_des = kp * (r - y) - kd * vy                          # 용수철 + 댐퍼
+    return M * (G + a_des) / max(np.cos(theta), 0.5)      # 중력 보상
+
+def pwm(cmd, f_max, deadband=0.0, t_min=0.004):
+    duty = min(abs(cmd) / f_max, 1.0)
+    if duty &lt; deadband:
+        return 0.0
+    t_on = duty * DT
+    return np.sign(cmd) * (t_on if t_on &gt;= t_min else 0.0)   # 켜 둘 시간 [s]
+
+class KalmanAxis:
+    """상태 x = [위치, 속도]"""
+    def __init__(self, p0, sigma_a, sigma_z):
+        self.x = np.array([p0, 0.0])
+        self.P = np.eye(2) * 0.01
+        self.F = np.array([[1.0, DT], [0.0, 1.0]])
+        self.B = np.array([DT**2 / 2, DT])
+        self.H = np.array([[1.0, 0.0]])
+        self.Q = sigma_a**2 * np.outer(self.B, self.B)
+        self.R = np.array([[sigma_z**2]])
+
+    def predict(self, a_imu):
+        self.x = self.F @ self.x + self.B * a_imu
+        self.P = self.F @ self.P @ self.F.T + self.Q
+
+    def update(self, z):
+        S = self.H @ self.P @ self.H.T + self.R
+        K = self.P @ self.H.T @ np.linalg.inv(S)
+        self.x = self.x + (K @ (np.atleast_1d(z) - self.H @ self.x)).ravel()
+        self.P = (np.eye(2) - K @ self.H) @ self.P
+
+# 제어 루프
+kf = KalmanAxis(p0=0.5, sigma_a=0.35, sigma_z=0.05)
+for k in range(steps):
+    kf.predict(imu.vertical_accel())        # 50 Hz
+    if k % 5 == 0:
+        kf.update(pos_sensor.read_y())      # 10 Hz
+    y, vy = kf.x
+    t_on = pwm(altitude_pd(3.0, y, vy), T_MAX)
+    vehicle.fire_main(t_on)</code></pre>
+  </section>
+
+  <section>
+    <h2><span class="num">7</span>실습 과제</h2>
+    <ol class="tasks">
+      <li><b>추력기 비교.</b> 실험 ①, ②, ③을 차례로 눌러 각각 20초씩 띄워 두고, 목표까지 거리, 평균 사용 추력, 밸브 열림 횟수를 표로 정리하세요. On-Off일 때 비행체가 목표보다 낮게 떠 있는 이유를 설명해 보세요. (힌트: 켰을 때 위로 +5.2 m/s², 껐을 때 아래로 −9.8 m/s²입니다. 비대칭입니다.)</li>
+      <li><b>데드밴드 저울질.</b> PWM 모드에서 바람을 켜고, 데드밴드를 0%, 5%, 10%, 20%로 바꾸며 수평 오차와 밸브 열림 횟수를 기록해 그래프로 그리세요. 여러분이라면 몇 %를 고르겠습니까?</li>
+      <li><b>미분의 함정.</b> 실험 ④에서 \(K_d\)를 절반으로 줄이면 어떻게 되나요? 깜빡임은 줄지만 다른 문제가 생깁니다. 무엇인지 차트로 확인하세요. 그다음 ⑤로 바꿔 차이를 보세요.</li>
+      <li><b>Q와 R.</b> 실험 ⑤에서 Q 배율을 0.01, 1, 100으로 바꾸며 칼만 추정(점선)과 실제(실선)를 비교하세요. "칼만 필터 들여다보기"에서 \(K\)의 첫 칸이 어떻게 변하는지 함께 적으세요.</li>
+      <li><b>무거운 화물.</b> 실험 ⑥에서 고도가 목표보다 얼마나 처지는지 재고, \(K_p\)만 올려서 해결되는지 확인하세요. 그다음 \(K_i\)를 올려 보세요. 처짐 크기를 손으로 계산해 시뮬레이션과 비교하세요. (힌트: 정지 상태에서 \(K_p e = g\,(m_{\text{실제}}/m - 1)\))</li>
+      <li><b>도전: 착륙.</b> 목표 고도를 한 번에 0.5 m로 내리면 착지 충격이 큽니다. 목표를 시간에 따라 천천히 내리는 궤적을 Python으로 설계하고, 착지 속도가 0.5 m/s 이하가 되게 해 보세요.</li>
+    </ol>
+  </section>
+</article>
+<footer>모든 수치는 수업용으로 단순화한 값입니다. 실제 비행체의 무게, 추력, 센서 성능과는 다릅니다.</footer>
+</div>
+<script>
+// ===== SIM CORE (DOM 없음) =====
+const SimCore = (() => {
+  const G = 9.81;
+  const PHYS = { m: 10, I: 0.8, Tmax: 150, Fs: 25, Tau: 4, legH: 0.5, attArm: 0.4 };
+  const DT = 0.001, DTC = 0.02, SUB = 20, SENS_DIV = 5;
+  const BASE = { acc: 0.3, gyro: 0.02, pos: 0.05, att: 0.02 };
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  function randn() {
+    let u = 0, v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+  function defaultParams() {
+    return {
+      actuator: 'pwm', estimator: 'kf',
+      kpY: 4, kdY: 4, kpX: 2, kdX: 3, kpT: 25, kdT: 10,
+      deadband: 0.05, mib: 0.004,
+      noise: 1, qMult: 1,
+      wind: false, windStd: 6, kiY: 0, massReal: 10, qLog: 0,
+      target: { x: 0, y: 3 },
+    };
+  }
+  class KF2 {
+    constructor(p, v, p0) { this.x = [p, v]; this.P = [[p0, 0], [0, p0]]; this.K = [0, 0]; }
+    predict(a, dt, q) {
+      const [p, v] = this.x, P = this.P;
+      this.x = [p + v * dt + 0.5 * a * dt * dt, v + a * dt];
+      const p00 = P[0][0] + dt * (P[1][0] + P[0][1]) + dt * dt * P[1][1];
+      const p01 = P[0][1] + dt * P[1][1], p10 = P[1][0] + dt * P[1][1], p11 = P[1][1];
+      const q2 = q * q;
+      this.P = [[p00 + q2 * dt ** 4 / 4, p01 + q2 * dt ** 3 / 2],
+                [p10 + q2 * dt ** 3 / 2, p11 + q2 * dt * dt]];
+    }
+    update(z, idx, r) {
+      const P = this.P, S = P[idx][idx] + r;
+      const K = [P[0][idx] / S, P[1][idx] / S];
+      const y = z - this.x[idx];
+      this.x = [this.x[0] + K[0] * y, this.x[1] + K[1] * y];
+      const r0 = P[idx][0], r1 = P[idx][1];
+      this.P = [[P[0][0] - K[0] * r0, P[0][1] - K[0] * r1],
+                [P[1][0] - K[1] * r0, P[1][1] - K[1] * r1]];
+      if (idx === 0) this.K = K;
+      return { K, innov: y };
+    }
+  }
+  class Sim {
+    constructor(params) { this.p = params || defaultParams(); this.reset(); }
+    reset() {
+      this.t = 0; this.acc = 0;
+      this.s = { x: 0, y: PHYS.legH, vx: 0, vy: 0, th: 0, w: 0 };
+      this.windF = 0;
+      this.kfX = new KF2(0, 0, 0.01); this.kfY = new KF2(PHYS.legH, 0, 0.01); this.kfT = new KF2(0, 0, 0.001);
+      this.raw = { x: 0, y: PHYS.legH, vx: 0, vy: 0, th: 0, w: 0 };
+      this.lastMz = { x: 0, y: PHYS.legH, th: 0 };
+      this.out = { cont: false, main: 0, side: 0, att: 0 };
+      this.tauAvg = 0; this.n = 0;
+      this.vStart = { vx: 0, vy: 0 };
+      this.on = { main: false, side: false, att: false };
+      this.stats = { impulse: 0, pulses: 0, crash: false, lost: false };
+      this.hist = [];
+      this.lastY = null; // 칼만 갱신 기록 (y축)
+      this.iY = 0;
+    }
+    get est() {
+      return { x: this.kfX.x[0], vx: this.kfX.x[1], y: this.kfY.x[0], vy: this.kfY.x[1], th: this.kfT.x[0], w: this.kfT.x[1] };
+    }
+    control() {
+      const p = this.p, s = this.s, n = p.noise;
+      // 1) 센서: IMU(구간 평균 비력, 자이로) 50Hz, 위치/자세 센서 10Hz
+      const fwx = (s.vx - this.vStart.vx) / DTC, fwy = (s.vy - this.vStart.vy) / DTC + G;
+      const c = Math.cos(s.th), sn = Math.sin(s.th);
+      const fbx = fwx * c + fwy * sn + randn() * BASE.acc * n;
+      const fby = -fwx * sn + fwy * c + randn() * BASE.acc * n;
+      const gyro = s.w + randn() * BASE.gyro * n;
+      this.n++;
+      let mz = null;
+      if (this.n % SENS_DIV === 0)
+        mz = { x: s.x + randn() * BASE.pos * n, y: s.y + randn() * BASE.pos * n, th: s.th + randn() * BASE.att * n };
+      // 2) 칼만 필터 (항상 실행)
+      const te = this.kfT.x[0], ce = Math.cos(te), se = Math.sin(te);
+      const awx = fbx * ce - fby * se, awy = fbx * se + fby * ce - G;
+      const qa = (BASE.acc * n + 0.05) * p.qMult;
+      this.kfX.predict(awx, DTC, qa); this.kfY.predict(awy, DTC, qa);
+      this.kfT.predict(this.tauAvg / PHYS.I, DTC, 0.5 * p.qMult);
+      this.kfT.update(gyro, 1, Math.max((BASE.gyro * n) ** 2, 1e-8));
+      if (mz) {
+        const rp = Math.max((BASE.pos * n) ** 2, 1e-8);
+        const pPrior = this.kfY.x[0];
+        this.kfX.update(mz.x, 0, rp);
+        const u = this.kfY.update(mz.y, 0, rp);
+        this.lastY = { z: mz.y, prior: pPrior, post: this.kfY.x[0], K: u.K };
+        this.kfT.update(mz.th, 0, Math.max((BASE.att * n) ** 2, 1e-8));
+        const dtp = DTC * SENS_DIV;
+        this.raw.vx = (mz.x - this.lastMz.x) / dtp; this.raw.vy = (mz.y - this.lastMz.y) / dtp;
+        this.raw.x = mz.x; this.raw.y = mz.y; this.raw.th = mz.th;
+        this.lastMz = mz;
+      }
+      this.raw.w = gyro;
+      // 3) 제어기가 쓸 상태 선택
+      const e = p.estimator === 'truth' ? s : p.estimator === 'raw' ? this.raw : this.est;
+      // 4) PD 제어 + 중력 보상
+      const eY = p.target.y - e.y;
+      if (p.kiY > 0) { this.iY += eY * DTC; this.iY = clamp(this.iY, -3 / p.kiY, 3 / p.kiY); } else this.iY = 0;
+      const ay = p.kpY * eY - p.kdY * e.vy + p.kiY * this.iY;
+      const ax = p.kpX * (p.target.x - e.x) - p.kdX * e.vx;
+      const al = p.kpT * (0 - e.th) - p.kdT * e.w;
+      const cth = Math.max(Math.cos(e.th), 0.5);
+      const Tcmd = PHYS.m * (G + ay) / cth, Scmd = PHYS.m * ax, Acmd = PHYS.I * al;
+      // 5) 추력기 변조
+      let o;
+      if (p.actuator === 'ideal') {
+        o = { cont: true, main: clamp(Tcmd, 0, PHYS.Tmax), side: clamp(Scmd, -PHYS.Fs, PHYS.Fs), att: clamp(Acmd, -PHYS.Tau, PHYS.Tau) };
+        this.tauAvg = o.att;
+      } else if (p.actuator === 'bang') {
+        const bb = (cmd, max) => Math.abs(cmd) > p.deadband * max ? Math.sign(cmd) * DTC : 0;
+        o = { cont: false, main: ay > 0 ? DTC : 0, side: bb(Scmd, PHYS.Fs), att: bb(Acmd, PHYS.Tau) };
+        this.tauAvg = PHYS.Tau * o.att / DTC;
+      } else {
+        const pw = (cmd, max, db) => {
+          let d = Math.min(Math.abs(cmd) / max, 1);
+          if (d < db) d = 0;
+          let tOn = d * DTC;
+          if (tOn < p.mib) tOn = 0;
+          return Math.sign(cmd) * tOn;
+        };
+        o = { cont: false, main: pw(Math.max(Tcmd, 0), PHYS.Tmax, 0), side: pw(Scmd, PHYS.Fs, p.deadband), att: pw(Acmd, PHYS.Tau, p.deadband) };
+        this.tauAvg = PHYS.Tau * o.att / DTC;
+      }
+      this.out = o;
+      this.cmd = { Tcmd, Scmd, Acmd, ay, ax, al };
+      const fr = o.cont
+        ? { main: o.main / PHYS.Tmax, side: o.side / PHYS.Fs, att: o.att / PHYS.Tau }
+        : { main: o.main / DTC, side: o.side / DTC, att: o.att / DTC };
+      const est = this.est;
+      this.hist.push({ imp: this.stats.impulse, pul: this.stats.pulses, t: this.t, x: s.x, y: s.y, th: s.th, ex: est.x, ey: est.y, eth: est.th, mz, fr });
+      if (this.hist.length > 600) this.hist.shift();
+      this.vStart = { vx: s.vx, vy: s.vy };
+    }
+    physics() {
+      const p = this.p, s = this.s, o = this.out, P = PHYS;
+      const mR = p.massReal, IR = P.I * mR / P.m;
+      for (let k = 0; k < SUB; k++) {
+        const tin = k * DT;
+        let T, F, Q;
+        if (o.cont) { T = o.main; F = o.side; Q = o.att; }
+        else {
+          T = tin < o.main ? P.Tmax : 0;
+          F = tin < Math.abs(o.side) ? Math.sign(o.side) * P.Fs : 0;
+          Q = tin < Math.abs(o.att) ? Math.sign(o.att) * P.Tau : 0;
+          const on = { main: T > 0, side: F !== 0, att: Q !== 0 };
+          for (const ch in on) { if (on[ch] && !this.on[ch]) this.stats.pulses++; }
+          this.on = on;
+        }
+        this.stats.impulse += (T + Math.abs(F) + Math.abs(Q) / P.attArm) * DT;
+        if (p.wind) this.windF += (-this.windF / 1.5) * DT + p.windStd * Math.sqrt(2 * DT / 1.5) * randn();
+        else this.windF *= (1 - DT / 0.5);
+        const c = Math.cos(s.th), sn = Math.sin(s.th);
+        const fx = F * c - T * sn + this.windF;
+        const fy = F * sn + T * c - mR * G;
+        const tq = Q + 0.08 * this.windF;
+        s.vx += fx / mR * DT; s.vy += fy / mR * DT; s.w += tq / IR * DT;
+        s.x += s.vx * DT; s.y += s.vy * DT; s.th += s.w * DT;
+        if (s.y <= P.legH) {
+          if (s.vy < -2.5) this.stats.crash = true;
+          s.y = P.legH; if (s.vy < 0) s.vy = 0;
+          s.vx *= (1 - 6 * DT); s.w *= (1 - 15 * DT); s.th *= (1 - 8 * DT);
+        }
+        if (Math.abs(s.th) > 1.3) this.stats.lost = true;
+      }
+      this.t += DTC;
+    }
+    step(dtReal) {
+      this.acc += Math.min(dtReal, 0.1);
+      while (this.acc >= DTC) { this.control(); this.physics(); this.acc -= DTC; }
+    }
+    push() { this.s.vx += 1.5; this.s.w += 1.5; }
+  }
+  return { Sim, defaultParams, PHYS, DTC, G, BASE };
+})();
+
+// ===== UI =====
+(() => {
+  const { Sim, PHYS, DTC } = SimCore;
+  const sim = new Sim();
+  const P = sim.p;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  let paused = false, slow = false;
+
+  let C = {};
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  function readColors() {
+    C = { ink: css('--ink'), ink2: css('--ink-2'), paper2: css('--paper-2'), grid: css('--grid'), rule: css('--rule'),
+          flame: css('--flame'), flame2: css('--flame-2'), est: css('--est'), meas: css('--meas'), target: css('--target') };
+  }
+  readColors();
+  try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors); } catch (e) {}
+  const reduceMotion = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
+
+  // ---------- 프리셋 ----------
+  const BASE_SET = { kpY: 4, kdY: 4, kiY: 0, kpX: 2, kdX: 3, kpT: 25, kdT: 10, deadband: 0.05, mib: 0.004,
+                     noise: 1, qLog: 0, qMult: 1, wind: false, windStd: 6, massReal: 10 };
+  const PRESETS = [
+    { n: '①', name: '이상적 추력기', set: { actuator: 'ideal', estimator: 'truth' },
+      cap: '① 기준선입니다. 추력을 연속으로 조절할 수 있고 위치와 속도도 정확히 안다고 가정합니다. 불꽃 길이가 매끄럽게 변합니다.' },
+    { n: '②', name: 'On-Off', set: { actuator: 'bang', estimator: 'truth' },
+      cap: '② 추력기를 20 ms 단위로 꽉 켜거나 끄기만 합니다. 점화 기록이 빽빽하게 깜빡이고, 고도가 목표보다 살짝 낮게 머뭅니다.' },
+    { n: '③', name: 'PWM', set: { actuator: 'pwm', estimator: 'truth' },
+      cap: '③ 켜 두는 시간의 비율로 평균 추력을 맞춥니다. 펄스만으로 ①과 거의 같은 비행을 해냅니다.' },
+    { n: '④', name: '센서 그대로', set: { actuator: 'pwm', estimator: 'raw', noise: 2 },
+      cap: '④ 센서 잡음을 2배로 키우고, 위치 센서 값과 그걸 미분한 속도를 그대로 씁니다. 추력기가 쓸데없이 바빠지고 연료를 더 씁니다.' },
+    { n: '⑤', name: '칼만 필터', set: { actuator: 'pwm', estimator: 'kf', noise: 2 },
+      cap: '⑤ 같은 잡음에서 칼만 필터 추정값(청록 점선)을 씁니다. ④와 평균 사용 추력, 밸브 열림 횟수를 비교해 보세요.' },
+    { n: '⑥', name: '무거운 화물', set: { actuator: 'ideal', estimator: 'kf', massReal: 12 },
+      cap: '⑥ 실제 질량은 12 kg인데 제어기는 10 kg로 알고 있어 고도가 처집니다. 계산이 깔끔하도록 이상적 추력기로 돌립니다. 제어기 게인에서 Ki를 올려 보세요.' },
+  ];
+  const presetBox = document.getElementById('presets');
+  const caption = document.getElementById('caption');
+  const presetBtns = PRESETS.map((pr, i) => {
+    const b = document.createElement('button');
+    b.innerHTML = `<span class="n">${pr.n}</span>${pr.name}`;
+    b.addEventListener('click', () => applyPreset(i));
+    presetBox.appendChild(b);
+    return b;
+  });
+  function applyPreset(i) {
+    Object.assign(P, BASE_SET, PRESETS[i].set);
+    P.qMult = 10 ** P.qLog;
+    presetBtns.forEach((b, j) => b.classList.toggle('on', j === i));
+    caption.textContent = PRESETS[i].cap;
+    syncUI();
+  }
+  function clearPreset() { presetBtns.forEach(b => b.classList.remove('on')); }
+
+  // ---------- 모드 버튼 ----------
+  function bindSeg(id, key) {
+    const box = document.getElementById(id);
+    box.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      P[key] = b.dataset.v; clearPreset(); syncUI();
+    }));
+    return box;
+  }
+  const segAct = bindSeg('seg-act', 'actuator'), segEst = bindSeg('seg-est', 'estimator');
+
+  // ---------- 슬라이더 ----------
+  const fmtQ = q => (q >= 10 ? q.toFixed(0) : q >= 1 ? q.toFixed(1) : q.toFixed(2)) + '×';
+  const SL = {
+    'g-gain': [['kpY', 'K<sub>p</sub> 고도', 0, 20, 0.5], ['kdY', 'K<sub>d</sub> 고도', 0, 12, 0.25], ['kiY', 'K<sub>i</sub> 고도', 0, 4, 0.1],
+               ['kpX', 'K<sub>p</sub> 수평', 0, 10, 0.25], ['kdX', 'K<sub>d</sub> 수평', 0, 10, 0.25],
+               ['kpT', 'K<sub>p</sub> 자세', 0, 80, 1], ['kdT', 'K<sub>d</sub> 자세', 0, 30, 0.5]],
+    'g-thr': [['deadband', '데드밴드', 0, 0.3, 0.01, v => Math.round(v * 100) + '%'],
+              ['mib', '최소 점화 시간', 0, 0.012, 0.001, v => (v * 1000).toFixed(0) + ' ms']],
+    'g-sens': [['noise', '센서 잡음 배율', 0, 4, 0.1, v => v.toFixed(1) + '×'],
+               ['qLog', 'Q 배율 (예측 모델을 덜 믿기)', -2, 2, 0.1, v => fmtQ(10 ** v)]],
+    'g-dist': [['windStd', '바람 세기', 0, 20, 1, v => v + ' N'], ['massReal', '실제 질량', 7, 14, 0.1, v => v.toFixed(1) + ' kg']],
+  };
+  const sliders = [];
+  for (const gid in SL) {
+    const g = document.getElementById(gid);
+    for (const [k, label, min, max, step, fmt] of SL[gid]) {
+      const row = document.createElement('div'); row.className = 'sl';
+      const id = 'sl-' + k;
+      row.innerHTML = `<label for="${id}">${label}</label><input type="range" id="${id}" min="${min}" max="${max}" step="${step}"><output></output>`;
+      const inp = row.querySelector('input'), out = row.querySelector('output');
+      const f = fmt || (v => (+v).toFixed(step < 1 ? (step < 0.1 ? 2 : 1) : 0));
+      inp.addEventListener('input', () => {
+        P[k] = +inp.value; if (k === 'qLog') P.qMult = 10 ** P.qLog;
+        out.textContent = f(+inp.value); clearPreset();
+      });
+      g.appendChild(row);
+      sliders.push({ k, inp, out, f });
+    }
+  }
+  const chkWind = document.getElementById('chk-wind');
+  chkWind.addEventListener('change', () => { P.wind = chkWind.checked; clearPreset(); });
+  function syncUI() {
+    for (const s of sliders) { s.inp.value = P[s.k]; s.out.textContent = s.f(P[s.k]); }
+    chkWind.checked = P.wind;
+    segAct.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === P.actuator));
+    segEst.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === P.estimator));
+  }
+
+  // ---------- 버튼 ----------
+  const bPause = document.getElementById('btn-pause'), bSlow = document.getElementById('btn-slow');
+  bPause.addEventListener('click', () => { paused = !paused; bPause.textContent = paused ? '계속' : '일시정지'; });
+  document.getElementById('btn-reset').addEventListener('click', () => { sim.reset(); camX = P.target.x; });
+  document.getElementById('btn-push').addEventListener('click', () => sim.push());
+  bSlow.addEventListener('click', () => { slow = !slow; bSlow.classList.toggle('on', slow); });
+
+  // ---------- 캔버스 공통 ----------
+  function fit(c) {
+    const r = c.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.round(r.width * d), h = Math.round(r.height * d);
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    const ctx = c.getContext('2d'); ctx.setTransform(d, 0, 0, d, 0, 0);
+    return { ctx, w: r.width, h: r.height };
+  }
+
+  // ---------- 시뮬레이션 화면 ----------
+  const cv = document.getElementById('sim');
+  let camX = 0, view = { w: 1, h: 1, s: 1 };
+  const toPx = (x, y) => [view.w / 2 + (x - camX) * view.s, view.h - (y + 0.45) * view.s];
+  const toWorld = (px, py) => [(px - view.w / 2) / view.s + camX, (view.h - py) / view.s - 0.45];
+
+  cv.addEventListener('pointerdown', e => {
+    const r = cv.getBoundingClientRect();
+    const [wx, wy] = toWorld(e.clientX - r.left, e.clientY - r.top);
+    const half = view.w / view.s / 2 - 0.4;
+    P.target = { x: clamp(wx, camX - half, camX + half), y: clamp(wy, 1, 4.6) };
+  });
+
+  function flame(ctx, x, y, dx, dy, len, width, alpha) {
+    // (x,y)에서 (dx,dy) 방향으로 뻗는 불꽃 (몸체 좌표, m 단위)
+    if (len <= 0 || alpha <= 0) return;
+    const jitter = reduceMotion ? 1 : 0.85 + Math.random() * 0.3;
+    const L = len * jitter, nx = -dy, ny = dx;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = C.flame;
+    ctx.beginPath();
+    ctx.moveTo(x + nx * width, y + ny * width);
+    ctx.quadraticCurveTo(x + dx * L * 0.55 + nx * width * 1.3, y + dy * L * 0.55 + ny * width * 1.3, x + dx * L, y + dy * L);
+    ctx.quadraticCurveTo(x + dx * L * 0.55 - nx * width * 1.3, y + dy * L * 0.55 - ny * width * 1.3, x - nx * width, y - ny * width);
+    ctx.fill();
+    ctx.fillStyle = C.flame2;
+    ctx.beginPath();
+    ctx.moveTo(x + nx * width * 0.5, y + ny * width * 0.5);
+    ctx.lineTo(x + dx * L * 0.5, y + dy * L * 0.5);
+    ctx.lineTo(x - nx * width * 0.5, y - ny * width * 0.5);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function vehiclePath(ctx, lw) {
+    ctx.lineWidth = lw;
+    // 몸통
+    ctx.beginPath();
+    ctx.moveTo(-0.17, -0.25); ctx.lineTo(-0.17, 0.22);
+    ctx.quadraticCurveTo(-0.17, 0.42, 0, 0.42); ctx.quadraticCurveTo(0.17, 0.42, 0.17, 0.22);
+    ctx.lineTo(0.17, -0.25); ctx.closePath();
+  }
+
+  function drawVehicle(ctx, st, fr, opts) {
+    const [px, py] = toPx(st.x, st.y);
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(-st.th);
+    ctx.scale(view.s, -view.s); // 이제 m 단위, y 위쪽
+    const lw = 1.6 / view.s;
+    if (opts.ghost) {
+      ctx.setLineDash([0.05, 0.04]); ctx.strokeStyle = C.est; ctx.globalAlpha = 0.9;
+      vehiclePath(ctx, lw); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-0.15, -0.2); ctx.lineTo(-0.32, -0.5); ctx.moveTo(0.15, -0.2); ctx.lineTo(0.32, -0.5); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1; ctx.restore(); return;
+    }
+    // 불꽃
+    if (fr) {
+      const phase = sim.acc / DTC; // 현재 주기 안에서의 위치
+      const vis = f => P.actuator === 'ideal' ? Math.abs(f) : (phase < Math.abs(f) ? 1 : 0);
+      const lenMain = P.actuator === 'ideal' ? 0.25 + 0.55 * fr.main : 0.75;
+      if (fr.main > 0) flame(ctx, 0, -0.33, 0, -1, lenMain, 0.07, vis(fr.main) > 0 ? (P.actuator === 'ideal' ? 0.5 + 0.5 * fr.main : 1) : 0);
+      if (fr.side) {
+        const sgn = Math.sign(fr.side), a = vis(fr.side);
+        const len = P.actuator === 'ideal' ? 0.1 + 0.3 * Math.abs(fr.side) : 0.38;
+        if (a > 0) flame(ctx, -sgn * 0.22, 0.02, -sgn, 0, len, 0.035, P.actuator === 'ideal' ? 0.5 + 0.5 * a : 1);
+      }
+      if (fr.att) {
+        const sgn = Math.sign(fr.att), a = vis(fr.att);
+        const len = P.actuator === 'ideal' ? 0.08 + 0.22 * Math.abs(fr.att) : 0.28;
+        const al = P.actuator === 'ideal' ? 0.5 + 0.5 * a : 1;
+        if (a > 0) { flame(ctx, 0.36, 0.28 - 0.03 * sgn, 0, -sgn, len, 0.025, al); flame(ctx, -0.36, 0.28 + 0.03 * sgn, 0, sgn, len, 0.025, al); }
+      }
+    }
+    // 다리
+    ctx.strokeStyle = C.ink; ctx.lineWidth = lw * 1.2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-0.15, -0.2); ctx.lineTo(-0.32, -0.5); ctx.moveTo(0.15, -0.2); ctx.lineTo(0.32, -0.5);
+    ctx.moveTo(-0.38, -0.5); ctx.lineTo(-0.26, -0.5); ctx.moveTo(0.26, -0.5); ctx.lineTo(0.38, -0.5); ctx.stroke();
+    // 자세 추력기 가로대
+    ctx.beginPath(); ctx.moveTo(-0.36, 0.28); ctx.lineTo(0.36, 0.28); ctx.stroke();
+    ctx.fillStyle = C.ink;
+    ctx.fillRect(-0.39, 0.24, 0.06, 0.08); ctx.fillRect(0.33, 0.24, 0.06, 0.08);
+    // 몸통
+    ctx.fillStyle = C.paper2; vehiclePath(ctx, lw); ctx.fill(); ctx.strokeStyle = C.ink; ctx.stroke();
+    // 띠와 측면 노즐
+    ctx.fillStyle = C.flame; ctx.fillRect(-0.17, 0.08, 0.34, 0.05);
+    ctx.fillStyle = C.ink; ctx.fillRect(-0.22, -0.015, 0.05, 0.07); ctx.fillRect(0.17, -0.015, 0.05, 0.07);
+    // 주 노즐 (종 모양)
+    ctx.beginPath(); ctx.moveTo(-0.05, -0.25); ctx.lineTo(-0.08, -0.33); ctx.lineTo(0.08, -0.33); ctx.lineTo(0.05, -0.25); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSim() {
+    const { ctx, w, h } = fit(cv);
+    const s = Math.min(w / (w < 520 ? 5.4 : 6.6), h / 5.7);
+    view = { w, h, s };
+    const st = sim.s, half = w / s / 2;
+    let desired = P.target.x;
+    if (Math.abs(st.x - camX) > half * 0.7) desired = st.x;
+    camX += (desired - camX) * 0.04;
+
+    ctx.clearRect(0, 0, w, h);
+    // 1 m 격자
+    ctx.strokeStyle = C.rule; ctx.lineWidth = 1; ctx.globalAlpha = 0.45;
+    ctx.beginPath();
+    for (let gx = Math.floor(camX - half) - 1; gx <= camX + half + 1; gx++) { const [x] = toPx(gx, 0); ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+    for (let gy = 1; gy < 8; gy++) { const [, y] = toPx(0, gy); ctx.moveTo(0, y); ctx.lineTo(w, y); }
+    ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillStyle = C.ink2; ctx.font = '500 11px "IBM Plex Sans KR", sans-serif';
+    for (let gy = 1; gy < 7; gy++) { const [, y] = toPx(0, gy); if (y > 12) ctx.fillText(gy + ' m', 6, y - 4); }
+    // 지면
+    const [, gyPx] = toPx(0, 0);
+    ctx.fillStyle = C.grid; ctx.fillRect(0, gyPx, w, h - gyPx);
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, gyPx); ctx.lineTo(w, gyPx); ctx.stroke();
+    ctx.lineWidth = 1; ctx.globalAlpha = 0.35; ctx.beginPath();
+    for (let x = -((camX * s) % 12) - 12; x < w; x += 12) { ctx.moveTo(x, gyPx + 1); ctx.lineTo(x - 8, gyPx + 9); }
+    ctx.stroke(); ctx.globalAlpha = 1;
+    // 이륙대
+    { const [ax] = toPx(-0.55, 0), [bx] = toPx(0.55, 0); ctx.fillStyle = C.ink; ctx.globalAlpha = 0.25; ctx.fillRect(ax, gyPx - 4, bx - ax, 4); ctx.globalAlpha = 1; }
+
+    // 위치 센서 점
+    const H = sim.hist;
+    let cnt = 0;
+    for (let i = H.length - 1; i >= 0 && cnt < 14; i--) {
+      const m = H[i].mz; if (!m) continue;
+      const [mx, my] = toPx(m.x, m.y);
+      ctx.globalAlpha = 1 - cnt / 14; ctx.fillStyle = C.meas;
+      ctx.beginPath(); ctx.arc(mx, my, 3.2, 0, Math.PI * 2); ctx.fill(); cnt++;
+    }
+    ctx.globalAlpha = 1;
+    // 목표
+    { const [tx, ty] = toPx(P.target.x, P.target.y), r = 0.2 * s;
+      ctx.strokeStyle = C.target; ctx.lineWidth = 1.6; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(tx - r * 2.2, ty); ctx.lineTo(tx + r * 2.2, ty); ctx.moveTo(tx, ty - r * 2.2); ctx.lineTo(tx, ty + r * 2.2); ctx.stroke();
+      ctx.setLineDash([]); ctx.beginPath(); ctx.arc(tx, ty, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = C.target; ctx.font = '600 12px "IBM Plex Sans KR", sans-serif'; ctx.fillText('목표', tx + r + 5, ty - r - 3); }
+
+    const fr = H.length ? H[H.length - 1].fr : null;
+    drawVehicle(ctx, st, fr, {});
+    const e = sim.est;
+    drawVehicle(ctx, { x: e.x, y: e.y, th: e.th }, null, { ghost: true });
+  }
+
+  // ---------- 차트 ----------
+  const chv = document.getElementById('chart');
+  const DEG = 180 / Math.PI;
+  function drawChart() {
+    const { ctx, w, h } = fit(chv);
+    ctx.clearRect(0, 0, w, h);
+    const H = sim.hist; if (H.length < 2) return;
+    const tEnd = H[H.length - 1].t, WIN = 8, t0 = tEnd - WIN;
+    const L = 46, R = 8, top = 8, rasterRows = 5, rowH = 12, rasterH = rasterRows * rowH;
+    const stripGap = 8, stripH = (h - top - rasterH - 26 - stripGap * 3) / 3;
+    const pw = w - L - R, X = t => L + (t - t0) / WIN * pw;
+    const strips = [
+      { k: 'y', ek: 'ey', tg: P.target.y, sc: 1, min: 0.3, label: '고도 y', unit: 'm' },
+      { k: 'x', ek: 'ex', tg: P.target.x, sc: 1, min: 0.3, label: '수평 x', unit: 'm' },
+      { k: 'th', ek: 'eth', tg: 0, sc: DEG, min: 3, label: '기울기 θ', unit: '°' },
+    ];
+    const start = H.findIndex(r => r.t >= t0);
+    ctx.font = '500 11px "IBM Plex Sans KR", sans-serif';
+    strips.forEach((S, si) => {
+      const y0 = top + si * (stripH + stripGap);
+      let lo = S.tg * S.sc, hi = lo;
+      for (let i = start; i < H.length; i++) { const a = H[i][S.k] * S.sc, b = H[i][S.ek] * S.sc; lo = Math.min(lo, a, b); hi = Math.max(hi, a, b); }
+      const c = (lo + hi) / 2, span = Math.max(S.min, (hi - lo) * 1.15);
+      const vlo = c - span / 2, vhi = c + span / 2;
+      const Y = v => y0 + stripH - (v - vlo) / (vhi - vlo) * stripH;
+      ctx.strokeStyle = C.rule; ctx.lineWidth = 1; ctx.strokeRect(L, y0, pw, stripH);
+      ctx.fillStyle = C.ink2; ctx.textAlign = 'right';
+      ctx.fillText(vhi.toFixed(S.sc === 1 ? 2 : 1), L - 4, y0 + 10);
+      ctx.fillText(vlo.toFixed(S.sc === 1 ? 2 : 1), L - 4, y0 + stripH - 2);
+      ctx.textAlign = 'left'; ctx.fillStyle = C.ink; ctx.font = '600 11.5px "IBM Plex Sans KR", sans-serif';
+      ctx.fillText(`${S.label} (${S.unit})`, L + 6, y0 + 14); ctx.font = '500 11px "IBM Plex Sans KR", sans-serif';
+      ctx.save(); ctx.beginPath(); ctx.rect(L, y0, pw, stripH); ctx.clip();
+      // 목표
+      ctx.strokeStyle = C.target; ctx.setLineDash([2, 3]); ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(L, Y(S.tg * S.sc)); ctx.lineTo(L + pw, Y(S.tg * S.sc)); ctx.stroke(); ctx.setLineDash([]);
+      // 측정 점
+      ctx.fillStyle = C.meas;
+      for (let i = start; i < H.length; i++) { const m = H[i].mz; if (m) { ctx.beginPath(); ctx.arc(X(H[i].t), Y(m[S.k] * S.sc), 2, 0, 6.3); ctx.fill(); } }
+      // 실제
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 1.6; ctx.beginPath();
+      for (let i = start; i < H.length; i++) { const x = X(H[i].t), y = Y(H[i][S.k] * S.sc); i === start ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.stroke();
+      // 추정
+      ctx.strokeStyle = C.est; ctx.lineWidth = 1.6; ctx.setLineDash([5, 3]); ctx.beginPath();
+      for (let i = start; i < H.length; i++) { const x = X(H[i].t), y = Y(H[i][S.ek] * S.sc); i === start ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.stroke(); ctx.setLineDash([]);
+      ctx.restore();
+    });
+    // 점화 기록
+    const ry = top + 3 * (stripH + stripGap) + 2;
+    const rows = [['주', r => r.main], ['측+', r => Math.max(r.side, 0)], ['측−', r => Math.max(-r.side, 0)], ['자+', r => Math.max(r.att, 0)], ['자−', r => Math.max(-r.att, 0)]];
+    const bw = Math.max(1, DTC / WIN * pw);
+    ctx.textAlign = 'right'; ctx.fillStyle = C.ink2;
+    rows.forEach(([lab, f], ri) => {
+      const yy = ry + ri * rowH;
+      ctx.fillStyle = C.ink2; ctx.font = '500 10px "IBM Plex Sans KR", sans-serif'; ctx.fillText(lab, L - 4, yy + 9.5);
+      ctx.fillStyle = C.flame;
+      for (let i = start; i < H.length; i++) {
+        const v = f(H[i].fr); if (v <= 0.001) continue;
+        ctx.globalAlpha = Math.min(1, 0.25 + v); ctx.fillRect(X(H[i].t), yy + 1, bw + 0.3, rowH - 2);
+      }
+      ctx.globalAlpha = 1;
+    });
+    ctx.strokeStyle = C.rule; ctx.strokeRect(L, ry, pw, rasterH);
+    ctx.textAlign = 'left'; ctx.fillStyle = C.ink2; ctx.font = '500 11px "IBM Plex Sans KR", sans-serif';
+    ctx.fillText('점화 기록', L, ry + rasterH + 15);
+    ctx.textAlign = 'right'; ctx.fillText('최근 8초 →', L + pw, ry + rasterH + 15); ctx.textAlign = 'left';
+  }
+
+  // ---------- 숫자 표시 ----------
+  const ro = { err: document.getElementById('ro-err'), th: document.getElementById('ro-th'), fuel: document.getElementById('ro-fuel'), pulse: document.getElementById('ro-pulse') };
+  const status = document.getElementById('status');
+  function updateReadouts() {
+    const s = sim.s, H = sim.hist;
+    ro.err.textContent = Math.hypot(s.x - P.target.x, s.y - P.target.y).toFixed(2) + ' m';
+    ro.th.textContent = (s.th * DEG).toFixed(1) + '°';
+    if (H.length > 10) {
+      const a = H[Math.max(0, H.length - 250)], b = H[H.length - 1], dt = b.t - a.t;
+      ro.fuel.textContent = ((b.imp - a.imp) / dt).toFixed(0) + ' N';
+      ro.pulse.textContent = P.actuator === 'ideal' ? '—' : ((b.pul - a.pul) / dt).toFixed(0);
+    }
+    let msg = '';
+    if (sim.stats.lost) msg = '자세를 잃었습니다. 처음부터를 누르세요';
+    else if (sim.stats.crash) msg = '착지 충격이 너무 큽니다';
+    status.textContent = msg; status.classList.toggle('show', !!msg);
+  }
+
+  // ---------- 칼만 필터 패널 ----------
+  const mX = document.getElementById('m-x'), mP = document.getElementById('m-p'), mK = document.getElementById('m-k');
+  const gauge = document.getElementById('gauge'), gaugeText = document.getElementById('gauge-text');
+  function cells(el, labels) {
+    el.innerHTML = labels.map(l => `<div class="cell"><small>${l}</small><span>0</span></div>`).join('');
+    return [...el.querySelectorAll('.cell')];
+  }
+  const cX = cells(mX, ['위치 p̂ [m]', '속도 v̂ [m/s]']);
+  const cP = cells(mP, ['P₁₁', 'P₁₂', 'P₂₁', 'P₂₂']);
+  const cK = cells(mK, ['K₁', 'K₂']);
+  const fmtE = v => { const a = Math.abs(v); return a === 0 ? '0' : a >= 0.01 ? v.toFixed(4) : v.toExponential(1); };
+  const tint = (el, color, a) => { el.style.backgroundColor = `color-mix(in srgb, ${color} ${Math.round(a * 60)}%, transparent)`; };
+  let lastY = null;
+  function updateKF() {
+    const kf = sim.kfY, u = sim.lastY;
+    cX[0].lastChild.textContent = kf.x[0].toFixed(3); cX[1].lastChild.textContent = kf.x[1].toFixed(3);
+    const Pm = kf.P;
+    [Pm[0][0], Pm[0][1], Pm[1][0], Pm[1][1]].forEach((v, i) => {
+      cP[i].lastChild.textContent = fmtE(v);
+      tint(cP[i], 'var(--flame)', clamp((Math.log10(Math.abs(v) + 1e-12) + 7) / 6, 0, 1));
+    });
+    if (!u || u === lastY) return;
+    lastY = u;
+    cK[0].lastChild.textContent = u.K[0].toFixed(3); cK[1].lastChild.textContent = u.K[1].toFixed(3);
+    tint(cK[0], 'var(--est)', clamp(u.K[0], 0, 1)); tint(cK[1], 'var(--est)', clamp(Math.abs(u.K[1]) / 4, 0, 1));
+    // 수직선 게이지
+    const span = Math.max(Math.abs(u.z - u.prior) * 1.4, 0.02);
+    const c = u.prior, X = v => 180 + (v - c) / span * 150;
+    const fmt = v => v.toFixed(3);
+    const xp = X(u.prior), xz = X(u.z), xq = X(u.post);
+    gauge.innerHTML = `
+      <line x1="20" y1="48" x2="340" y2="48" style="stroke:var(--ink-2);stroke-width:1.2"/>
+      <line x1="${xp}" y1="40" x2="${xq}" y2="40" style="stroke:var(--est);stroke-width:2.4"/>
+      <circle cx="${xp}" cy="48" r="7" style="fill:var(--paper-2);stroke:var(--ink);stroke-width:2"/>
+      <circle cx="${xz}" cy="48" r="6" style="fill:var(--meas)"/>
+      <rect x="${xq - 6}" y="42" width="12" height="12" style="fill:var(--est)"/>
+      <text x="${xp}" y="78" text-anchor="middle" style="font:600 12px 'IBM Plex Sans KR',sans-serif;fill:var(--ink)">예측</text>
+      <text x="${xz}" y="24" text-anchor="middle" style="font:600 12px 'IBM Plex Sans KR',sans-serif;fill:var(--meas)">측정</text>
+      <text x="${xq}" y="94" text-anchor="middle" style="font:600 12px 'IBM Plex Sans KR',sans-serif;fill:var(--est)">보정</text>`;
+    const pct = Math.round(u.K[0] * 100);
+    gaugeText.textContent = `예측 ${fmt(u.prior)} m, 측정 ${fmt(u.z)} m, 보정 ${fmt(u.post)} m. K₁ = ${u.K[0].toFixed(2)}이라 예측에서 측정 쪽으로 ${pct}%만큼 옮겼습니다.`;
+  }
+
+  // ---------- PWM 그림 ----------
+  (function pwmFig() {
+    const g = document.getElementById('pwm-rows'); if (!g) return;
+    let s = '';
+    [[0.3, 60], [0.65, 140]].forEach(([d, base]) => {
+      s += `<line x1="50" y1="${base}" x2="370" y2="${base}" style="stroke:var(--ink-2);stroke-width:1"/>`;
+      for (let k = 0; k < 4; k++) s += `<rect x="${50 + k * 80}" y="${base - 40}" width="${80 * d}" height="40" style="fill:var(--flame)"/>`;
+      s += `<line x1="50" y1="${base - 40 * d}" x2="370" y2="${base - 40 * d}" style="stroke:var(--ink);stroke-width:1.8;stroke-dasharray:6 4"/>`;
+    });
+    g.innerHTML = s;
+  })();
+
+  // ---------- 루프 ----------
+  applyPreset(4);
+  camX = P.target.x;
+  let last = performance.now(), frame = 0;
+  function loop(now) {
+    const dt = (now - last) / 1000; last = now;
+    if (!paused) sim.step(dt * (slow ? 0.25 : 1));
+    drawSim();
+    if (frame % 2 === 0) drawChart();
+    if (frame % 6 === 0) { updateReadouts(); updateKF(); }
+    frame++;
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  try { if (window.hljs) hljs.highlightAll(); } catch (e) {}
+})();
+
+</script>
+</body>
+</html>
