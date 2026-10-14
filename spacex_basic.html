@@ -1,0 +1,2803 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>착륙하는 로켓 만들기 — 그래스호퍼에서 팰컨 9까지</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;600&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['$', '$']], displayMath: [['\\[', '\\]']] },
+  svg: { fontCache: 'global' },
+  options: { skipHtmlTags: ['script','noscript','style','textarea','pre','code'] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-clike.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-javascript.min.js"></script>
+<style>
+:root {
+  --paper:#EDF0F2; --panel:#F8F9FA; --ink:#17212B; --muted:#56636E; --rule:#C6CED5; --rule-soft:#DCE2E7;
+  --lox:#2C6B9E; --lox-soft:#D7E5F1; --kero:#C27A12; --kero-soft:#F5E3C4; --fault:#B3372F; --fault-soft:#F4DAD7;
+  --ok:#2D7A4C; --ok-soft:#D6EBDD; --sky:#8FAABF; --space:#0E1620; --ground:#9AA3A9; --sea:#5D7E96;
+  --code-bg:#F2F4F6; --tok-k:#8B3A9C; --tok-s:#2D7A4C; --tok-c:#7A8792; --tok-n:#B35A12; --tok-f:#2C6B9E;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:#10161C; --panel:#18212A; --ink:#E3E8EC; --muted:#93A1AC; --rule:#33404B; --rule-soft:#25303A;
+    --lox:#74ABD8; --lox-soft:#1E3346; --kero:#E6A445; --kero-soft:#3A2C16; --fault:#E2766D; --fault-soft:#3D1F1C;
+    --ok:#6CC08F; --ok-soft:#1B3325; --sky:#22384A; --space:#05080C; --ground:#4A535A; --sea:#25425A;
+    --code-bg:#141C24; --tok-k:#D29BDF; --tok-s:#8FD3A6; --tok-c:#76838E; --tok-n:#F0B070; --tok-f:#8EC0E8;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper:#10161C; --panel:#18212A; --ink:#E3E8EC; --muted:#93A1AC; --rule:#33404B; --rule-soft:#25303A;
+  --lox:#74ABD8; --lox-soft:#1E3346; --kero:#E6A445; --kero-soft:#3A2C16; --fault:#E2766D; --fault-soft:#3D1F1C;
+  --ok:#6CC08F; --ok-soft:#1B3325; --sky:#22384A; --space:#05080C; --ground:#4A535A; --sea:#25425A;
+  --code-bg:#141C24; --tok-k:#D29BDF; --tok-s:#8FD3A6; --tok-c:#76838E; --tok-n:#F0B070; --tok-f:#8EC0E8;
+  color-scheme: dark;
+}
+:root { box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
+html { scroll-padding-top: calc(env(safe-area-inset-top,0px) + 64px); }
+*, *::before, *::after { box-sizing: inherit; }
+body {
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui, sans-serif;
+  font-size:17px; line-height:1.7; -webkit-font-smoothing:antialiased; font-variant-numeric: tabular-nums;
+  word-break: keep-all; overflow-wrap: break-word;
+}
+a { color: var(--lox); }
+code, pre, textarea.code { font-family:'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; }
+p code, li code, td code { font-size:.88em; background:var(--code-bg); padding:.1em .35em; border-radius:4px; }
+.wrap { max-width:1240px; margin:0 auto; padding:0 24px; }
+.prose { max-width:760px; }
+.prose p, .prose li { margin:.6em 0; }
+
+/* ---------- 머리 ---------- */
+header.top { padding:56px 0 28px; }
+header.top .kicker { color:var(--muted); font-size:15px; margin:0 0 10px; }
+header.top h1 { font-size:clamp(34px, 5.4vw, 60px); line-height:1.08; margin:0 0 18px; font-weight:700; letter-spacing:-.02em; }
+header.top .lede { font-size:19px; max-width:720px; color:var(--ink); margin:0; }
+.theme-btn { position:absolute; right:24px; top:calc(env(safe-area-inset-top,0px) + 20px); background:none; border:1px solid var(--rule); color:var(--muted); border-radius:20px; padding:4px 12px; font:inherit; font-size:13px; cursor:pointer; }
+
+/* 비행 단계별 액추에이터 표 */
+.act-table { width:100%; border-collapse:collapse; font-size:15px; margin:18px 0 6px; }
+.act-table th, .act-table td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--rule-soft); vertical-align:top; }
+.act-table th { font-weight:500; color:var(--muted); }
+.act-table td:first-child { font-weight:500; white-space:nowrap; }
+.pill { display:inline-block; padding:1px 9px; border-radius:11px; font-size:13px; margin:1px 2px 1px 0; }
+.pill.tvc { background:var(--kero-soft); color:var(--kero); }
+.pill.rcs { background:var(--lox-soft); color:var(--lox); }
+.pill.fin { background:var(--ok-soft); color:var(--ok); }
+.scroll-x { overflow-x:auto; }
+
+/* ---------- 단계 내비게이션 ---------- */
+nav.stages { position:sticky; top:0; z-index:20; background:var(--paper); border-bottom:1px solid var(--rule); padding-top:env(safe-area-inset-top,0px); }
+nav.stages ol { list-style:none; margin:0 auto; padding:0 24px; display:flex; gap:4px; max-width:1240px; overflow-x:auto; }
+nav.stages button { background:none; border:0; border-bottom:3px solid transparent; color:var(--muted); font:inherit; font-size:15px; padding:14px 14px 11px; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:8px; }
+nav.stages button .n { display:inline-grid; place-items:center; width:24px; height:24px; border-radius:50%; border:1.5px solid currentColor; font-size:13px; font-weight:700; }
+nav.stages button[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--kero); font-weight:500; }
+nav.stages button:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible { outline:2px solid var(--lox); outline-offset:2px; }
+
+section.stage { display:none; padding:36px 0 72px; }
+section.stage.active { display:block; }
+section.stage > .wrap > h2 { font-size:clamp(26px, 3.4vw, 38px); line-height:1.2; margin:0 0 6px; letter-spacing:-.01em; }
+.stage-sub { color:var(--muted); margin:0 0 24px; font-size:16px; }
+h3 { font-size:21px; margin:34px 0 8px; }
+h4 { font-size:17px; margin:22px 0 4px; }
+
+/* 수식 */
+mjx-container[display="true"] { font-size:122% !important; margin:16px 0 !important; overflow-x:auto; overflow-y:hidden; padding:4px 0; }
+mjx-container:not([display="true"]) { font-size:108% !important; }
+.eqbox { background:var(--panel); border-left:3px solid var(--lox); padding:6px 18px; margin:14px 0; border-radius:0 6px 6px 0; }
+.note { background:var(--kero-soft); padding:12px 16px; border-radius:6px; font-size:15.5px; margin:16px 0; }
+.note b { color:var(--kero); }
+
+/* ---------- 실험대: 화면 가로 전체 ---------- */
+html, body { overflow-x: clip; }
+.bench { width: calc(100vw - 32px); max-width: 2000px; position: relative; left: 50%; transform: translateX(-50%); margin-top: 28px; }
+.viewport { position:relative; background:var(--space); border-radius:10px; overflow:hidden; width:100%; aspect-ratio: 21 / 9; min-height:440px; max-height:80vh; }
+.viewport > canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.hud { position:absolute; left:10px; top:10px; font-size:13px; line-height:1.45; color:#E8EEF2; background:rgba(9,15,21,.62); padding:6px 10px 7px; border-radius:6px; pointer-events:none; max-width:calc(100% - 20px); }
+.hud .phase { font-size:16px; font-weight:700; }
+.cams { position:absolute; top:10px; left:50%; transform:translateX(-50%); display:flex; background:rgba(9,15,21,.62); border-radius:7px; overflow:hidden; }
+.cams button { font:inherit; font-size:13px; color:#cfd8df; background:none; border:0; padding:6px 12px; cursor:pointer; }
+.cams button[aria-pressed="true"] { background:#fff; color:#111; }
+.result { margin-top:12px; padding:12px 16px; border-radius:8px; font-weight:500; display:none; }
+.result.ok { display:block; background:var(--ok-soft); color:var(--ok); }
+.result.bad { display:block; background:var(--fault-soft); color:var(--fault); }
+
+.result.warn { display:block; background:var(--kero-soft); color:var(--kero); }
+.seg { grid-column:1 / -1; display:flex; border:1px solid var(--rule); border-radius:7px; overflow:hidden; margin-top:4px; }
+.seg button { flex:1; font:inherit; font-size:13.5px; border:0; background:none; color:var(--muted); padding:5px 0; cursor:pointer; }
+.seg button[aria-checked="true"] { background:var(--lox); color:#fff; }
+
+/* 스페이스X 중계 화면 같은 텔레메트리 띠 */
+.tlm { position:absolute; left:0; right:0; bottom:0; height:118px; display:grid; grid-template-columns: 1fr auto 1fr; align-items:center; gap:12px; padding:0 18px;
+  background:linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,.45) 70%, rgba(0,0,0,0)); color:#fff; font-family:'Barlow Semi Condensed', 'IBM Plex Sans KR', sans-serif; pointer-events:none; }
+.tlm-side { display:flex; align-items:center; gap:12px; min-width:0; overflow:hidden; }
+.tlm-side.right { justify-content:flex-end; }
+.tlm-eng { width:84px; height:84px; pointer-events:auto; cursor:pointer; flex:none; }
+.tlm-icon { width:70px; height:84px; flex:none; }
+.tlm-nums { font-size:21px; font-weight:600; letter-spacing:.04em; min-width:236px; white-space:nowrap; }
+.tlm-nums div { display:grid; grid-template-columns: 96px 1fr 58px; align-items:baseline; line-height:1.25; }
+.tlm-nums span { font-size:18px; }
+.tlm-nums b { text-align:right; font-size:24px; font-variant-numeric:tabular-nums; }
+.tlm-nums i { font-style:normal; font-size:14px; padding-left:6px; opacity:.85; }
+.tlm-nums .x b { font-size:20px; } .tlm-nums .x span { font-size:15px; opacity:.85; }
+.tlm-bars { font-size:16px; font-weight:600; width:150px; flex:none; }
+.tlm-bars div { display:grid; grid-template-columns: 52px 1fr; align-items:center; gap:6px; line-height:1.6; }
+.tlm-bars em { display:block; height:9px; border-radius:5px; background:rgba(255,255,255,.18); overflow:hidden; }
+.tlm-bars u { display:block; height:100%; background:#fff; border-radius:5px; }
+.tlm-mid { text-align:center; }
+.tlm-clock { font-size:34px; font-weight:600; letter-spacing:.04em; font-variant-numeric:tabular-nums; }
+.tlm-title { font-size:15px; font-weight:600; letter-spacing:.08em; opacity:.9; white-space:nowrap; }
+@media (max-width: 1350px) { .tlm-icon { display:none; } .tlm-bars { width:110px; } .tlm-nums { min-width:200px; } .tlm-nums div { grid-template-columns: 84px 1fr 54px; } }
+
+/* 조작 패널: 아래쪽 가로 배치 */
+.controls { background:var(--panel); border:1px solid var(--rule-soft); border-radius:10px; padding:14px 16px 10px; margin-top:12px; }
+.runbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:10px; }
+.btn { font:inherit; font-size:15px; border-radius:7px; padding:8px 16px; cursor:pointer; border:1px solid var(--rule); background:var(--paper); color:var(--ink); }
+.btn.primary { background:var(--kero); border-color:var(--kero); color:#fff; font-weight:500; }
+.btn.small { font-size:13px; padding:4px 10px; }
+.speed { display:inline-flex; border:1px solid var(--rule); border-radius:7px; overflow:hidden; }
+.speed button { font:inherit; font-size:13px; border:0; background:none; color:var(--muted); padding:6px 9px; cursor:pointer; }
+.speed button[aria-pressed="true"] { background:var(--ink); color:var(--paper); }
+.intro-line { font-size:13.5px; color:var(--muted); margin:-2px 0 8px; }
+.groups { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:10px 18px; }
+.group { border-top:1px solid var(--rule-soft); padding-top:4px; }
+.group-title { font-size:13px; color:var(--muted); margin:6px 0 2px; font-weight:500; }
+.slider { display:grid; grid-template-columns: 1fr auto; gap:0 10px; align-items:baseline; padding:4px 0; }
+.slider label { font-size:14px; }
+.slider label .sym { font-family:'Times New Roman', serif; font-style:italic; font-size:16px; }
+.slider output { font-size:14px; color:var(--lox); font-weight:500; min-width:62px; text-align:right; }
+.slider input[type=range] { grid-column:1 / -1; width:100%; accent-color:var(--lox); margin:2px 0 0; }
+.toggle { display:flex; align-items:center; gap:10px; padding:6px 0; font-size:14px; cursor:pointer; }
+.toggle input { width:18px; height:18px; accent-color:var(--lox); }
+.readout { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:2px 18px; margin-top:10px; padding:10px 14px; font-size:14px; background:var(--panel); border:1px solid var(--rule-soft); border-radius:10px; }
+.readout div { display:flex; justify-content:space-between; gap:8px; }
+.readout span:first-child { color:var(--muted); }
+.seedrow { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin-left:auto; }
+.fsm-label { writing-mode:horizontal-tb; font-weight:700; font-size:14px; padding:0 10px 0 0; display:flex; align-items:center; }
+
+/* 텔레메트리 */
+.telemetry { display:grid; grid-template-columns:repeat(auto-fit, minmax(330px, 1fr)); gap:14px; margin-top:20px; }
+.plot { background:var(--panel); border:1px solid var(--rule-soft); border-radius:10px; padding:10px 12px 6px; }
+.plot h5 { margin:0 0 4px; font-size:14px; font-weight:500; }
+.plot canvas { width:100%; height:170px; display:block; }
+.legend { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:12.5px; color:var(--muted); margin-top:2px; }
+.legend i { display:inline-block; width:14px; height:3px; border-radius:2px; vertical-align:middle; margin-right:5px; }
+
+/* 행렬 표시 */
+.mats { display:flex; flex-wrap:wrap; gap:22px; align-items:center; margin:14px 0; font-size:14px; }
+.mat { display:inline-flex; align-items:center; gap:8px; }
+.mat .name { font-family:'Times New Roman', serif; font-style:italic; font-size:22px; }
+.mat .grid { display:grid; gap:3px; padding:4px 8px; border-left:2px solid var(--ink); border-right:2px solid var(--ink); border-radius:4px; }
+.mat .cell { min-width:78px; text-align:right; padding:4px 7px; border-radius:4px; font-size:13.5px; transition: background-color .15s; }
+.mat .cap { font-size:12.5px; color:var(--muted); max-width:160px; line-height:1.4; }
+
+/* 상태 기계 */
+.fsm { display:flex; align-items:stretch; gap:0; overflow-x:auto; padding:8px 0; margin:14px 0; }
+.fsm .st { min-width:120px; border:1.5px solid var(--rule); border-radius:8px; padding:8px 10px; background:var(--panel); font-size:13px; text-align:center; }
+.fsm .st b { display:block; font-size:14px; }
+.fsm .st.on { border-color:var(--kero); background:var(--kero-soft); }
+.fsm .st.done { border-color:var(--ok); }
+.fsm .arr { display:flex; flex-direction:column; justify-content:center; align-items:center; min-width:96px; font-size:11.5px; color:var(--muted); text-align:center; padding:0 4px; line-height:1.3; }
+.fsm .arr::after { content:''; display:block; width:100%; height:0; border-top:1.5px solid var(--rule); margin-top:4px; }
+.events { font-size:13.5px; color:var(--muted); margin:0; padding-left:18px; }
+
+/* 코드 편집기 */
+.editor-shell { margin-top:14px; border:1px solid var(--rule); border-radius:10px; overflow:hidden; background:var(--code-bg); }
+.editor-tabs { display:flex; gap:2px; border-bottom:1px solid var(--rule); background:var(--panel); padding:0 6px; align-items:center; flex-wrap:wrap; }
+.editor-tabs button.tab { font:inherit; font-size:13.5px; background:none; border:0; border-bottom:2px solid transparent; padding:9px 12px; color:var(--muted); cursor:pointer; }
+.editor-tabs button.tab[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--lox); }
+.editor-tabs .spacer { flex:1; }
+.editor { position:relative; height:440px; }
+.editor pre, .editor textarea { position:absolute; inset:0; margin:0; padding:14px 16px; font-size:13.5px; line-height:1.6; white-space:pre; overflow:auto; tab-size:2; border:0; letter-spacing:0; font-variant-ligatures:none; }
+.editor pre { pointer-events:none; color:var(--ink); background:transparent; }
+.editor textarea { background:transparent; color:transparent; caret-color:var(--ink); resize:none; outline:none; }
+.editor textarea::selection { background:rgba(120,160,200,.35); color:transparent; }
+.editor textarea[readonly] { cursor:default; }
+.token.keyword { color:var(--tok-k); }
+.token.string, .token.template-string { color:var(--tok-s); }
+.token.comment { color:var(--tok-c); font-style:italic; }
+.token.number, .token.boolean { color:var(--tok-n); }
+.token.function { color:var(--tok-f); }
+.token.operator, .token.punctuation { color:var(--muted); }
+.code-msg { font-size:13.5px; padding:8px 14px; border-top:1px solid var(--rule); background:var(--panel); color:var(--muted); }
+.code-msg.err { color:var(--fault); }
+.code-msg.ok { color:var(--ok); }
+
+/* 과제 */
+.tasks { counter-reset:t; list-style:none; padding:0; margin:12px 0; max-width:820px; }
+.tasks li { counter-increment:t; position:relative; padding:10px 0 10px 44px; border-bottom:1px solid var(--rule-soft); }
+.tasks li::before { content:counter(t); position:absolute; left:4px; top:10px; width:26px; height:26px; border-radius:50%; background:var(--ink); color:var(--paper); font-size:13px; font-weight:700; display:grid; place-items:center; }
+.tasks li .tag { font-size:12.5px; color:var(--kero); font-weight:500; margin-left:6px; }
+
+table.cmp { border-collapse:collapse; font-size:14.5px; margin:12px 0; min-width:620px; }
+table.cmp th, table.cmp td { text-align:left; padding:8px 12px; border-bottom:1px solid var(--rule-soft); vertical-align:top; }
+table.cmp th { color:var(--muted); font-weight:500; }
+
+footer { border-top:1px solid var(--rule); padding:26px 0 48px; color:var(--muted); font-size:14px; }
+
+@media (max-width: 900px) {
+  .bench { width: calc(100vw - 16px); }
+  .viewport { aspect-ratio: 4 / 4.6; min-height:380px; }
+  .tlm { height:92px; padding:0 8px; gap:6px; }
+  .tlm-icon, .tlm-bars { display:none; }
+  .tlm-eng { width:52px; height:52px; }
+  .tlm-nums { min-width:0; font-size:15px; }
+  .tlm-nums div { grid-template-columns: 62px 1fr 30px; }
+  .tlm-nums span { font-size:12px; } .tlm-nums b { font-size:16px; } .tlm-nums i { font-size:10px; }
+  .tlm-clock { font-size:20px; } .tlm-title { font-size:10px; }
+  body { font-size:16px; }
+  .wrap { padding:0 16px; }
+  nav.stages ol { padding:0 10px; }
+  nav.stages button { padding:12px 9px 9px; font-size:14px; }
+  .editor { height:380px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+</style>
+</head>
+<body>
+<button class="theme-btn" id="themeBtn" type="button">화면 테마</button>
+
+<header class="top wrap">
+  <p class="kicker">로봇 AI 알고리즘 사례 연구: 재사용 로켓의 유도, 항법, 제어</p>
+  <h1>착륙하는 로켓 만들기</h1>
+  <p class="lede">그래스호퍼로 제자리 비행부터 시작해, 팰컨 9을 쏘아 올리고, 마지막에는 1단을 드론십에 내려앉히면서 2단으로 스타링크를 궤도에 올립니다. 모든 기체는 남은 연료에 따라 무게중심과 관성모멘트가 바뀌는 강체로 움직입니다. 지금까지 배운 PID, 베이즈 필터(칼만 필터), 탐색 알고리즘이 실제 비행 소프트웨어 안에서 어떻게 맞물리는지 직접 코드를 고쳐 가며 확인합니다.</p>
+
+  <div class="prose">
+    <h3>엔진이 하나면 무엇으로 방향을 바꿀까</h3>
+    <p>로켓의 주된 조향 수단은 엔진 노즐 자체를 기울이는 <b>짐벌(추력 편향, TVC)</b>입니다. 그런데 엔진이 하나뿐이면 노즐을 아무리 돌려도 기체를 축 둘레로 비트는 <b>롤</b>은 만들 수 없습니다. 그래서 냉가스 추력기(RCS)가 롤과 무추력 구간의 자세를 맡고, 공기가 있는 하강 구간에서는 <b>그리드 핀</b>이 날개 역할을 합니다. 비행 단계마다 쓸 수 있는 액추에이터가 바뀐다는 점이 이번 실습의 출발점입니다.</p>
+  </div>
+  <div class="scroll-x">
+  <table class="act-table">
+    <thead><tr><th>비행 단계</th><th>쓰는 액추에이터</th><th>이 페이지에서</th></tr></thead>
+    <tbody>
+      <tr><td>그래스호퍼 호버·이동</td><td><span class="pill tvc">짐벌 TVC</span><span class="pill rcs">냉가스 RCS(롤)</span></td><td>1·2단계 — 스로틀과 짐벌로 고도·수평 위치 제어</td></tr>
+      <tr><td>팰컨 9 상승</td><td><span class="pill tvc">9기 짐벌 TVC</span></td><td>3단계 — 중력 선회 유도, Max-Q, 하중 경감</td></tr>
+      <tr><td>2단 (MVac 1기)</td><td><span class="pill tvc">짐벌 TVC(피치·요)</span><span class="pill rcs">냉가스 RCS(롤·관성비행)</span></td><td>3단계 끝 — 단 분리 장면</td></tr>
+      <tr><td>1단 분리 직후</td><td><span class="pill rcs">냉가스 RCS</span></td><td>4단계 — 한 번 뒤집어 엔트리 자세로 유지</td></tr>
+      <tr><td>엔트리 번 (3기)</td><td><span class="pill tvc">짐벌 TVC</span><span class="pill tvc">차동 추력</span></td><td>4단계 — 재진입 가열 줄이기, 엔진 고장 보상</td></tr>
+      <tr><td>1단 대기권 하강</td><td><span class="pill fin">그리드 핀</span><span class="pill fin">받음각(몸체 양력)</span></td><td>4단계 — 예상 착지점을 드론십에 맞추기</td></tr>
+      <tr><td>착륙 연소 (1기)</td><td><span class="pill tvc">짐벌 TVC</span><span class="pill fin">그리드 핀</span><span class="pill rcs">RCS</span></td><td>4단계 — 호버슬램(제자리 호버링 없이 바로 내려앉는 착륙)</td></tr>
+    </tbody>
+  </table>
+  </div>
+</header>
+
+<nav class="stages" aria-label="실습 단계">
+  <ol role="tablist">
+    <li><button role="tab" aria-selected="true" data-go="s1"><span class="n">1</span>그래스호퍼 호버</button></li>
+    <li><button role="tab" aria-selected="false" data-go="s2"><span class="n">2</span>그래스호퍼 측면 이동</button></li>
+    <li><button role="tab" aria-selected="false" data-go="s3"><span class="n">3</span>팰컨 9 상승</button></li>
+    <li><button role="tab" aria-selected="false" data-go="s4"><span class="n">4</span>스타링크 미션 전체</button></li>
+    <li><button role="tab" aria-selected="false" data-go="s5"><span class="n">5</span>실제와 다른 점</button></li>
+  </ol>
+</nav>
+
+<!-- ================================================================ 1단계 -->
+<section class="stage active" id="s1">
+<div class="wrap">
+  <h2>1단계 · 그래스호퍼 제자리 비행</h2>
+  <p class="stage-sub">축 하나(고도)만 다룹니다. 추력으로 고도를 맞추는 PID와, 잡음 섞인 고도계를 믿을 만한 값으로 바꾸는 칼만 필터를 만듭니다.</p>
+
+  <div class="prose">
+    <p>2012~2013년 스페이스X는 팰컨 9 1단 탱크에 엔진 하나를 단 시험기 <b>그래스호퍼</b>로 수직 이착륙을 시험했고, 마지막 비행에서 744 m까지 올라갔다 내려왔습니다. 여기서는 위아래로만 움직이는 기체로 시작합니다.</p>
+
+    <h3>운동 모델</h3>
+    <p>기체에 작용하는 힘은 위로 미는 추력 $T$와 아래로 당기는 중력 $mg$뿐입니다. 엔진은 명령을 받자마자 추력을 내지 못하고 약간 늦게 따라옵니다(시정수 $\tau$).</p>
+    <div class="eqbox">
+    \[ m\,\ddot h \;=\; T - m g, \qquad \dot T \;=\; \frac{T_{\text{cmd}} - T}{\tau}, \qquad 0.4\,T_{\max} \le T_{\text{cmd}} \le T_{\max} \]
+    </div>
+    <p>엔진은 40% 아래로 줄일 수 없습니다(최소 스로틀). 이 제약이 4단계에서 큰 문제가 됩니다. 연료를 태우면 질량 $m$도 계속 줄어듭니다.</p>
+
+    <h3>PID로 원하는 가속도를 만들고, $F = ma$로 추력을 정한다</h3>
+    <div class="eqbox">
+    \[ e = h_{\text{ref}} - \hat h, \qquad a_{\text{cmd}} = K_p\, e + K_i \!\int\! e\,dt + K_d\,\dot e, \qquad T_{\text{cmd}} = m\,\big(g + a_{\text{cmd}}\big) \]
+    </div>
+    <p>괄호 안의 $g$가 <b>피드포워드</b>입니다. 떠 있으려면 중력만큼은 늘 밀어야 한다는 사실을 미리 알려 주는 것이죠. 이게 없으면 적분항이 천천히 그 몫을 찾아내야 합니다. 또 추력이 한계에 걸린 동안 적분을 계속 쌓으면 나중에 크게 튀므로(<b>와인드업</b>) 그때는 적분을 멈춥니다.</p>
+
+    <h3>엔진은 정확히 명령대로 밀지 않는다</h3>
+    <p>실제 엔진의 추력은 연소 불안정과 밸브 떨림 때문에 늘 조금씩 흔들립니다. 여기서는 명령 추력에 1~2% 크기의 잡음 $\varepsilon(t)$를 곱하고, 공기 저항도 넣었습니다. 제어기는 이 잡음을 모르고, IMU를 통해 그 결과만 봅니다.</p>
+    <div class="eqbox">
+    \[ T_{\text{실제}} = T\,\big(1 + \varepsilon(t)\big), \qquad \dot\varepsilon = -\frac{\varepsilon}{0.15} + \text{잡음}, \qquad D = \tfrac12 \rho v |v|\, C_d A \]
+    </div>
+
+    <h3>미분항의 함정: 잡음을 미분하면</h3>
+    <p>고도계는 0.05초마다 표준편차 $\sigma_z$의 잡음이 섞인 값을 줍니다. 속도를 얻으려고 두 측정값의 차이를 나누면</p>
+    <div class="eqbox">
+    \[ \hat v = \frac{z_k - z_{k-1}}{\Delta t} \quad\Rightarrow\quad \sigma_{\hat v} = \frac{\sqrt 2\,\sigma_z}{\Delta t} = \frac{\sqrt2 \times 1.5}{0.05} \approx 42\ \text{m/s} \]
+    </div>
+    <p>시속 150 km짜리 잡음이 $K_d$에 곱해져 엔진으로 들어갑니다. 아래 시뮬레이터에서 칼만 필터를 끄면 실제로 이렇게 됩니다.</p>
+
+    <h3>칼만 필터: IMU로 예측하고, 고도계로 보정한다</h3>
+    <p>7장의 베이즈 필터를 상태가 정규분포라고 가정하고 쓴 것이 칼만 필터입니다. 상태는 위치와 속도 두 개, 입력은 100 Hz IMU 가속도, 측정은 20 Hz 고도계입니다.</p>
+    <div class="eqbox">
+    \[ \mathbf x = \begin{bmatrix} h \\ v \end{bmatrix},\qquad
+       F = \begin{bmatrix} 1 & \Delta t \\ 0 & 1 \end{bmatrix},\qquad
+       G = \begin{bmatrix} \tfrac12 \Delta t^2 \\ \Delta t \end{bmatrix} \]
+    \[ Q = G G^{\mathsf T} \sigma_a^2,\qquad H = \begin{bmatrix} 1 & 0 \end{bmatrix},\qquad R = \sigma_z^2 \]
+    \[ \text{예측:}\quad \hat{\mathbf x} \leftarrow F\hat{\mathbf x} + G\,a_{\text{IMU}}, \qquad P \leftarrow F P F^{\mathsf T} + Q \]
+    \[ \text{보정:}\quad K = \frac{P H^{\mathsf T}}{H P H^{\mathsf T} + R} \]
+    \[ \hat{\mathbf x} \leftarrow \hat{\mathbf x} + K\,(z - H\hat{\mathbf x}), \qquad P \leftarrow (I - K H)\,P \]
+    </div>
+    <p>$P$는 "내 추정이 얼마나 불확실한가"입니다. 예측할 때마다 커지고, 측정이 들어오면 줄어듭니다. 아래 행렬 칸 색이 진할수록 값이 큽니다. 고도계 잡음 $\sigma_z$를 키우면 $K$가 작아져 측정을 덜 믿는 모습을 볼 수 있습니다.</p>
+  </div>
+
+  <div class="prose">
+    <h3>착지 판정: 다리가 버틸 수 있는가</h3>
+    <p>다리 끝의 완충재는 거리 $s$(그래스호퍼 약 0.3 m)만큼 찌그러지며 충격을 흡수합니다. 접지 속도 $v$를 그 거리 안에서 0으로 만들려면 기체가 받는 하중배수는</p>
+    <div class="eqbox">
+    \[ n = 1 + \frac{v^2}{2\,g\,s} \qquad \begin{cases} n \le 1.7\,g & \text{정상} \\ 1.7 < n \le 3.0\,g & \text{손상 — 완충재 교체} \\ n > 3.0\,g & \text{폭발} \end{cases} \]
+    </div>
+    <p>그래스호퍼 기준으로 접지 속도 약 2 m/s까지가 정상, 3.4 m/s를 넘으면 다리가 꺾이고 탱크가 터집니다(교육용 근사값).</p>
+  </div>
+
+  <div class="bench" id="s1-bench"></div>
+  <div class="telemetry" id="s1-plots"></div>
+
+  <h3>칼만 필터 내부 들여다보기</h3>
+  <div class="mats" id="s1-mats"></div>
+
+  <h3>코드</h3>
+  <p class="prose">아래 코드가 그대로 시뮬레이터에서 실행됩니다. 고치고 <b>코드 적용</b>을 누른 뒤 다시 비행하세요. 칼만 필터 코드는 2·4단계에서도 그대로 재사용됩니다.</p>
+  <div id="s1-editor"></div>
+
+  <h3>과제</h3>
+  <ol class="tasks">
+    <li>$K_d = 0$으로 비행해 보고, 왜 착지 직전에 속도가 붙는지 고도 그래프로 설명하세요.</li>
+    <li>칼만 필터를 끄고 비행해 보세요. 스로틀 그래프가 어떻게 변하나요? 위의 42 m/s 계산과 연결해 설명하세요.</li>
+    <li>피드포워드를 끄고 $K_i$만으로 버텨 보세요. 상승 초기 추종 오차가 얼마나 커지나요? $K_i$를 키우면 무엇이 나빠지나요?</li>
+    <li>목표 고도를 744 m로 올려 그래스호퍼의 마지막 비행을 재현하고, 남은 연료를 최대로 만드는 게인을 찾아보세요.</li>
+    <li>칼만 필터 대신 고도계 값에 1차 저역통과 필터 $y_k = \alpha y_{k-1} + (1-\alpha) z_k$를 써서 속도를 구해 보세요. 칼만 필터와 무엇이 다른가요? <span class="tag">코드</span></li>
+  </ol>
+</div>
+</section>
+
+<!-- ================================================================ 2단계 -->
+<section class="stage" id="s2">
+<div class="wrap">
+  <h2>2단계 · 그래스호퍼 측면 이동</h2>
+  <p class="stage-sub">이제 기체가 기울고 옆으로 움직입니다. 입력은 추력과 짐벌 각 두 개인데 움직임은 세 개(x, y, θ)입니다. 해법은 제어기를 겹겹이 쌓는 캐스케이드 구조입니다.</p>
+
+  <div class="prose">
+    <p>2013년 8월 그래스호퍼는 250 m 위로 올라가 옆으로 100 m 이동한 뒤 출발점으로 돌아와 착지했습니다. 같은 비행을 해 봅니다.</p>
+
+    <h3>강체 2차원 모델</h3>
+    <p>노즐을 $\delta$만큼 꺾으면 추력의 방향이 바뀌고, 엔진이 무게중심에서 $L$만큼 아래 있으므로 기체를 돌리는 토크도 생깁니다. 바람은 옆으로 미는 힘 $F_w$를 만들고, 그 힘이 무게중심보다 위에 작용해 기체를 기울이기도 합니다.</p>
+    <div class="eqbox">
+    \[ m\ddot x_{cg} = T\sin(\theta + \delta) + F_w, \qquad m\ddot y_{cg} = T\cos(\theta+\delta) - mg, \qquad I\ddot\theta = -\,T z_{cg}\sin\delta + F_w\,(z_{cp} - z_{cg})\cos\theta \]
+    </div>
+
+    <h3>질량 특성: 무게중심과 관성모멘트는 연료에 따라 바뀐다</h3>
+    <p>기체를 엔진·추력 구조, 다리, 탱크 구조, 배관·전장, 그리고 두 탱크(액체 산소, RP-1 등유) 속 추진제로 나눕니다. 추진제는 탱크 바닥부터 차 있고, 산화제:연료 = 2.36:1 비율로 함께 줄어듭니다. 부품 $i$가 바닥에서 $[z_{0,i}, z_{1,i}]$ 구간에 고르게 퍼져 있다고 보면</p>
+    <div class="eqbox">
+    \[ m = \sum_i m_i, \qquad z_{cg} = \frac{1}{m}\sum_i m_i\,\bar z_i, \qquad I = \sum_i m_i\left(\frac{L_i^2}{12} + \frac{D^2}{16} + (\bar z_i - z_{cg})^2\right) \]
+    </div>
+    <p>마지막 항이 평행축 정리입니다. 위치 $(x, y)$는 무게중심의 위치이고 회전도 무게중심 둘레로 일어납니다. 착지·센서처럼 바닥이 필요한 곳에서만 $\text{바닥} = \text{무게중심} - z_{cg}\,\mathbf b$로 바꿉니다. 짐벌의 팔 길이 $L$도 바로 $z_{cg}$입니다. 그래서 제어기는 고정값이 아니라 매 순간의 <code>k.I</code>, <code>k.L</code>을 받아 씁니다. 화면 왼쪽 아래의 질량 분포 패널과 기체 위의 ◐ 표시가 지금의 무게중심입니다.</p>
+
+    <h3>캐스케이드: 바깥 루프가 안쪽 루프의 목표를 정한다</h3>
+    <p>기체는 기울어져야만 옆으로 갑니다. 그래서 "x를 맞추려면 얼마나 기울여야 하나"를 바깥 루프가 정하고, "그 기울기를 만들려면 노즐을 얼마나 꺾어야 하나"를 안쪽 루프가 정합니다.</p>
+    <div class="eqbox">
+    \[ \underbrace{a_x = K_{px}(x_{\text{ref}} - \hat x) + K_{dx}(v_{x,\text{ref}} - \hat v_x)}_{\text{바깥: 위치} \to \text{가속도}}
+       \;\;\Rightarrow\;\; \theta_{\text{cmd}} = \arctan\frac{a_x}{g} \]
+    \[ \underbrace{\alpha = K_{p\theta}(\theta_{\text{cmd}} - \theta) - K_{d\theta}\,\omega}_{\text{안쪽: 기울기} \to \text{각가속도}}
+       \;\;\Rightarrow\;\; \delta = \arcsin\!\left(\frac{-I\alpha}{T L}\right) \]
+    </div>
+    <p>안쪽 루프는 바깥 루프보다 3~5배 이상 빨라야 합니다. 바깥 루프 입장에서 안쪽 루프가 "명령하면 바로 그 각도가 되는 장치"처럼 보여야 하기 때문입니다. 슬라이더로 두 루프의 빠르기를 바꿔 이 규칙이 깨지면 어떻게 되는지 확인하세요.</p>
+
+    <div class="note"><b>비최소 위상.</b> 오른쪽으로 가려면 먼저 오른쪽으로 기울어야 하고, 그러려면 노즐을 반대로 꺾어 꼬리를 밀어야 합니다. 그 순간 추력의 옆 성분이 기체를 <i>왼쪽</i>으로 살짝 밉니다. 출발 직후 x 그래프가 반대쪽으로 잠깐 내려가는지 찾아보세요. 로켓·자전거·후진 주차에서 공통으로 나타나는 성질입니다.</div>
+
+    <h3>환경: 풍향은 거의 일정하고, 세기는 요동한다</h3>
+    <p>바람의 세기 $w$는 평균값 둘레에서 흔들리는 1차 마르코프(Ornstein–Uhlenbeck) 과정으로 만듭니다. 풍향은 ±8° 정도만 천천히 흔들리고, 높이 올라갈수록 지면 마찰이 줄어 바람이 세집니다.</p>
+    <div class="eqbox">
+    \[ dw = -\frac{w - \bar w}{\tau}\,dt + \sigma\sqrt{\frac{2}{\tau}}\,dW, \qquad w(h) = w_{10}\left(\frac{h}{10\ \text{m}}\right)^{0.14} \]
+    </div>
+    <div class="scroll-x"><table class="cmp" style="min-width:0">
+      <thead><tr><th>바람 상태</th><th>평균</th><th>요동 $\sigma$</th><th>상관시간 $\tau$</th><th>특징</th></tr></thead>
+      <tbody>
+        <tr><td>잔잔</td><td>설정값의 25%</td><td>25%</td><td>8 s</td><td>거의 무풍</td></tr>
+        <tr><td>일정</td><td>설정값</td><td>8%</td><td>20 s</td><td>꾸준한 바람</td></tr>
+        <tr><td>돌풍</td><td>설정값</td><td>30%</td><td>4 s</td><td>평균 12초마다 3초짜리 돌풍(+40~90%)</td></tr>
+      </tbody>
+    </table></div>
+
+    <p>센서는 GPS(10 Hz, 수평 위치)와 IMU, 관성항법 자세값입니다. 축마다 1단계의 칼만 필터를 하나씩 그대로 씁니다. 엔진이 하나라 롤은 짐벌로 못 잡지만, 이 2차원 모델에는 롤 축이 없으므로 RCS는 생략했습니다.</p>
+  </div>
+
+  <div class="prose">
+    <h3>착지 판정: 부러지거나, 넘어지거나</h3>
+    <p>1단계의 수직 충격 판정에 두 가지가 더해집니다. 첫째, 기울어진 채 닿으면 다리 하나가 먼저 하중을 다 받아 충격이 1.6배가 됩니다. 둘째, 수평 속도가 남아 있으면 다리 끝을 축으로 기체가 돌기 시작합니다. 접지 순간의 각운동량이 보존되므로 넘어가는 쪽의 초기 각속도는</p>
+    <div class="eqbox">
+    \[ \omega_0 = \frac{h_{cg}\, v_x + I_{cg}\,\omega}{I_p}, \qquad I_p = I_{cg} + m\,(r^2 + h_{cg}^2) \]
+    \[ I_p\,\ddot\beta = m g\,\big(h_{cg}\sin\beta - r\cos\beta\big) \]
+    </div>
+    <p>$r$은 다리 끝까지의 거리, $h_{cg}$는 무게중심 높이, $\beta$는 다리 끝을 축으로 기운 각입니다. 괄호 안이 음수면 중력이 기체를 다시 세우고, 무게중심이 다리 끝 바깥으로 넘어가면($\beta > \arctan(r/h_{cg})$) 그대로 쓰러져 폭발합니다. 수평 속도가 다리 한계(그래스호퍼 2.5 m/s)를 넘으면 다리가 부러져 $r$이 줄어든 상태로 계산합니다. 2016년 1월 팰컨 9이 드론십에 내려앉은 뒤 다리 하나가 잠기지 않아 넘어지며 폭발한 사고가 바로 이 경우입니다.</p>
+  </div>
+
+  <div class="bench" id="s2-bench"></div>
+  <div class="telemetry" id="s2-plots"></div>
+
+  <h3>코드</h3>
+  <div id="s2-editor"></div>
+
+  <h3>과제</h3>
+  <ol class="tasks">
+    <li>안쪽 루프 게인 $K_{p\theta}, K_{d\theta}$를 줄여 바깥 루프보다 느리게 만들어 보세요. 무슨 일이 일어나나요?</li>
+    <li>$K_{d\theta} = 0$으로 비행해 보세요. 자세 루프에서 감쇠(미분항)가 왜 필수인가요?</li>
+    <li>바람을 "일정" 15 m/s로 올리면 착지 순간 수평 속도가 남아 다리가 부러지고 넘어집니다. 수평 루프에 적분항을 추가해 해결하세요. <span class="tag">코드</span></li>
+    <li>"돌풍" 모드에서 시드를 바꿔 가며 10번 비행해 보고 성공률을 기록하세요. 돌풍이 가장 위험한 순간은 비행의 어느 구간인가요?</li>
+    <li>x 그래프에서 비최소 위상 현상을 찾아 캡처하고, 짐벌 각 그래프와 함께 설명하세요.</li>
+    <li>최대 기울기 제한을 20°로 풀면 빨라지나요? 착지 정확도와 연료는 어떻게 되나요?</li>
+  </ol>
+</div>
+</section>
+
+<!-- ================================================================ 3단계 -->
+<section class="stage" id="s3">
+<div class="wrap">
+  <h2>3단계 · 팰컨 9 상승</h2>
+  <p class="stage-sub">엔진 9기로 549 t짜리 로켓을 고도 70 km까지 올립니다. 여기서 핵심은 제어보다 유도입니다. 어느 방향으로 밀지 정하는 규칙이 궤도와 구조 하중을 모두 결정합니다.</p>
+
+  <div class="prose">
+    <h3>점질량 모델과 대기</h3>
+    <div class="eqbox">
+    \[ m\,\dot{\mathbf v} = \mathbf T + \mathbf D + m\mathbf g, \qquad D = \tfrac12 \rho v_{\text{air}}^2\, C_d A, \qquad \rho(h) = \rho_0\, e^{-h/8500} \]
+    \[ \dot m = -\frac{T_{\text{vac}}\cdot\text{throttle}}{I_{sp,\text{vac}}\, g_0}, \qquad T(h) = T_{\text{vac}} - \big(T_{\text{vac}} - T_{\text{sl}}\big)\, \frac{p(h)}{p_0} \]
+    </div>
+    <p>항력 계수는 속도에 따라 바뀝니다. 음속 근처(마하 0.8~1.2)에서 충격파가 생기며 항력이 크게 늘어나는데, 이 구간이 Max-Q와 거의 겹칩니다.</p>
+    <div class="eqbox">
+    \[ C_d(M) = C_{d0}\cdot f(M), \qquad M = \frac{v_{\text{air}}}{a(h)}, \qquad f(M) \approx \begin{cases} 1 & M < 0.8 \\ \text{최대 } 1.6 & M \approx 1.1 \\ 1.0 \sim 1.25 & M > 2 \end{cases} \]
+    </div>
+    <p>같은 엔진이라도 공기가 옅어지면 추력이 커집니다. 연료를 다 쓰면 얼마나 빨라질 수 있는지는 로켓 방정식이 정합니다.</p>
+    <div class="eqbox">
+    \[ \Delta v = I_{sp}\, g_0 \ln \frac{m_0}{m_f} \]
+    </div>
+    <p>1단을 다시 쓰려면 착륙용 연료를 남겨야 하므로 $m_f$가 커지고 $\Delta v$가 줄어듭니다. 재사용의 대가입니다.</p>
+
+    <h3>전체 스택을 강체로: 앞이 뾰족한 로켓은 불안정하다</h3>
+    <p>1단, 2단, 페이로드를 합친 70 m 스택의 무게중심은 이륙 때 바닥에서 약 31 m입니다. 1단 연료가 줄면서 43 m까지 올라갑니다. 공기력의 압력 중심은 뾰족한 앞쪽에 있어 무게중심보다 앞이므로, 받음각이 생기면 기체를 더 돌리려 합니다(날개 없는 로켓은 공력적으로 불안정). 그래서 비행 컴퓨터가 9기의 짐벌(±5°)로 쉬지 않고 자세를 잡습니다. 유도가 정한 피치를 자세 제어기가 따라가며, 짐벌 각은 그래프에서 볼 수 있습니다.</p>
+
+    <h3>중력 선회</h3>
+    <p>처음 몇 초는 똑바로 올라 발사대를 벗어나고(수직 상승), 몇 도 기울인 뒤(피치 킥), 그 다음부터는 추력을 속도 방향에 맞춥니다. 그러면 중력이 알아서 궤적을 눕혀 줍니다. 기체가 공기를 정면으로 받으므로 받음각 $\alpha \approx 0$이 되어 옆으로 꺾는 공력 하중이 거의 생기지 않습니다.</p>
+    <div class="eqbox">
+    \[ \text{pitch} = \operatorname{atan2}(v_x,\, v_y), \qquad q = \tfrac12 \rho v^2, \qquad \text{구조 하중} \propto q\cdot\alpha \]
+    </div>
+    <p>동압 $q$는 속도가 빨라지면 커지고 공기가 옅어지면 작아지므로, 고도 10 km 근방에서 최대가 됩니다(<b>Max-Q</b>). 이때 잠깐 스로틀을 줄이는 것이 <b>스로틀 버킷</b>입니다.</p>
+
+    <h3>하중 경감: 바람을 보고 방향을 정한다</h3>
+    <p>고도 11 km 부근의 제트기류(발사 방향과 반대로 부는 바람)처럼 강한 바람이 불면, 땅 기준 속도로 방향을 정해도 공기는 비스듬히 부딪힙니다. 공기 기준 속도 $\mathbf v_{\text{air}} = \mathbf v - \mathbf w$ 쪽으로 틀면 받음각이 줄어듭니다. 다만 느린 저공에서 지상풍을 그대로 따라가면 로켓이 거꾸로 눕기 때문에, 유도 코드는 고도 3 km 위에서만 최대 6°까지 틀도록 제한합니다. 실제 발사에서는 당일 기상 관측으로 이 바람 정보를 갱신하고, 바람이 한계를 넘으면 발사를 미룹니다. "돌풍" 모드에서 하중이 한계를 넘는 경우가 바로 그 상황입니다.</p>
+
+    <div class="note"><b>단 분리 이후.</b> MECO(1단 엔진 정지) 몇 초 뒤 단이 분리되면 2단의 진공용 멀린(MVac) 1기가 점화됩니다. 엔진이 하나뿐이므로 피치·요는 짐벌로, 롤은 냉가스 RCS로 잡습니다. 1단 회수는 4단계에서 다룹니다.</div>
+  </div>
+
+  <div class="bench" id="s3-bench"></div>
+  <div class="telemetry" id="s3-plots"></div>
+
+  <h3>코드</h3>
+  <div id="s3-editor"></div>
+
+  <h3>과제</h3>
+  <ol class="tasks">
+    <li>피치 킥 각도를 1°부터 6°까지 바꾸며 MECO 고도와 비행경로각을 표로 정리하세요. 왜 이렇게 민감할까요?</li>
+    <li>바람 상태를 "돌풍"으로 바꾸고 시드를 여러 번 뽑아 보세요. 공중 분해가 일어나는 비율은? 발사 책임자라면 어떤 바람 기준으로 발사를 미루겠습니까?</li>
+    <li>하중 경감을 끄고 바람을 30 m/s로 두면 기체가 부서집니다. $q\cdot\alpha$ 그래프에서 원인을 찾으세요.</li>
+    <li>스로틀 버킷을 끄면(버킷 시작 동압을 최대로) 최대 동압이 한계를 넘습니다. 버킷 깊이와 MECO 속도의 관계를 확인하세요.</li>
+    <li>착륙용 예비 연료를 10 t에서 60 t까지 바꾸며 MECO 속도를 기록하고, 로켓 방정식으로 검산하세요.</li>
+    <li>피치 킥을 "속도가 60 m/s가 되면" 시작하도록 유도 코드를 바꿔 보세요. 시간 기준보다 나은 점은? <span class="tag">코드</span></li>
+  </ol>
+</div>
+</section>
+
+<!-- ================================================================ 4단계 -->
+<section class="stage" id="s4">
+<div class="wrap">
+  <h2>4단계 · 팰컨 9 스타링크 미션 전체</h2>
+  <p class="stage-sub">발사부터 끝까지 한 번에 날립니다. 상승 → MECO와 단 분리 → 1단은 드론십으로 돌아오고, 2단은 같은 시각에 궤도로 올라가 스타링크 6기를 차례로 내려놓습니다. 화면 위 버튼으로 카메라를 1단, 2단, 지도로 바꿀 수 있습니다.</p>
+
+  <div class="prose">
+    <h3>미션 순서</h3>
+    <p>상승 구간은 3단계의 유도 코드(<code>guidance()</code>)를 그대로 씁니다. 3단계에서 고친 코드는 여기에도 반영됩니다. 1단 연료가 착륙용 예비량까지 줄면 MECO, 3초 뒤 단 분리입니다. 그 뒤로는 두 기체가 따로 날아가며, 아래 상태도의 두 줄이 동시에 진행됩니다.</p>
+    <div class="note"><b>중계 화면 띠.</b> 아래쪽 띠의 왼쪽은 1단, 오른쪽은 2단입니다. 엔진 배치도에서 흰 원은 켜진 엔진, 빈 원은 꺼진 엔진, 빨간 X는 고장입니다. <b>엔진을 누르면 그 엔진이 바로 고장 납니다.</b> 상승 중 엔진 하나를 꺼 보고, 비행 컴퓨터가 차동 추력을 어떻게 보상하는지 짐벌 그래프로 확인하세요.</div>
+
+    <h3>둥근 지구: 궤도에 오르려면</h3>
+    <p>2단은 수백 km 고도에서 초속 7.7 km로 지구를 돌아야 합니다. 그래서 4단계는 지구를 둥글게 다룹니다. $x$를 지표를 따라 잰 거리, $y$를 고도라 하면, 평평한 지구의 식에 원운동 항 두 개가 붙습니다.</p>
+    <div class="eqbox">
+    \[ \dot v_y = \frac{F_y}{m} - \frac{\mu}{(R+y)^2} + \frac{v_x^2}{R+y}, \qquad \dot v_x = \frac{F_x}{m} - \frac{v_x v_y}{R+y}, \qquad \dot x = v_x \frac{R}{R+y} \]
+    </div>
+    <p>셋째 항(원심 효과)이 중력과 같아지는 속도 $v_{\text{circ}} = \sqrt{\mu/(R+y)}$가 원궤도 속도입니다. 지금 엔진을 끄면 그려질 궤도의 근지점·원지점은 에너지와 각운동량으로 바로 계산됩니다.</p>
+    <div class="eqbox">
+    \[ \varepsilon = \frac{v^2}{2} - \frac{\mu}{r}, \quad h = r\,v_x, \quad a = -\frac{\mu}{2\varepsilon}, \quad e = \sqrt{1 + \frac{2\varepsilon h^2}{\mu^2}}, \quad r_{p,a} = a(1 \mp e) \]
+    </div>
+
+    <h3>2단 유도: 1단 착륙과 같은 꼴</h3>
+    <p>2단의 남은 연소 시간은 "수평 속도를 원궤도 속도까지 올리는 데 걸리는 시간"으로 어림할 수 있습니다. 그 시간 안에 목표 고도에 닿으면서 수직 속도를 0으로 만드는 수직 가속도를 1단 착륙과 같은 ZEM/ZEV 식으로 구합니다. 추력이 맡을 수직 성분은 여기에 중력을 더하고 원심 효과를 뺀 만큼입니다.</p>
+    <div class="eqbox">
+    \[ t_{go} = \frac{v_{\text{circ}} - v_x}{T/m}, \qquad a_r = \frac{6\,(h_T - h)}{t_{go}^2} - \frac{4\,v_y}{t_{go}}, \qquad \sin\gamma_T = \frac{a_r + g - v_x^2/r}{T/m} \]
+    </div>
+    <p>근지점이 목표 고도에 닿으면 엔진을 끕니다(SECO). 공기가 거의 없어지는 고도 110 km에서 페어링을 버리고, SECO 뒤 정해진 시간을 기다렸다가 스타링크를 내려놓습니다.</p>
+
+    <h3>스타링크 배치: 한꺼번에 놓아도 하나씩 떠난다</h3>
+    <p>팰컨 9의 스타링크는 납작한 위성을 층층이 쌓고 네 귀퉁이의 텐션 로드로 묶어 실어 갑니다. 배치 직전 2단이 냉가스 추진기로 천천히 돌기 시작하고, 로드를 풀면 스택 전체가 <b>한꺼번에</b> 풀려납니다. 그런데 회전하는 기체에서 각 층이 받는 속도는 회전 중심(무게중심)에서의 거리에 비례합니다.</p>
+    <div class="eqbox">
+    \[ v_i = \omega\, z_i \qquad (z_i: \text{무게중심에서 } i\text{번째 층까지의 거리}) \]
+    </div>
+    <p>그래서 맨 위층이 가장 빨리, 그다음 층이 조금 늦게 멀어지며 카드 덱을 펼치듯 하나씩 떨어져 나갑니다. 따로 밀어내는 장치가 필요 없는 단순한 방식입니다.</p>
+    <p>떨어져 나간 위성은 스스로 깨어납니다. 먼저 2단에서 받은 회전을 반작용 휠로 멈추고, 접혀 있던 태양전지판을 아코디언처럼 펼친 뒤, 판이 태양을 보도록 자세를 돌립니다. 마지막으로 홀 추진기(전기 추진, 보라색 빛)를 켜서 투입 궤도(약 280 km)에서 운용 궤도(500 km대)까지 몇 주에 걸쳐 천천히 올라갑니다. 화면에서는 이 과정을 1~2분으로 줄여 보여 주며, "위성" 카메라로 맨 위층 위성을 가까이서 볼 수 있습니다. 날개 두 장 모양은 교육용으로 단순화한 것입니다. 첨부해 주신 것 같은 장면, 곧 화물칸 옆 틈으로 위성을 한 기씩 밀어내는 방식은 스타십의 디스펜서이고 팰컨 9과는 다릅니다. 위성 6기 × 800 kg은 교육용 값입니다(실제로는 20기 남짓).</p>
+    <p> 지구 자전은 넣지 않았습니다.</p>
+
+    <h3>1단 귀환</h3>
+    <h3>뒤집기는 한 번만: 분리 직후 엔트리 자세로</h3>
+    <p>분리 3초 뒤 1단은 질소 냉가스 추진기(RCS)로 몸을 돌려 엔진이 진행 방향을 보게 합니다. 이때 목표 자세는 "지금의 속도 반대 방향"이 아니라, <b>엔트리 번을 시작할 순간의 속도 반대 방향</b>입니다. 예측기로 그 순간의 속도를 미리 계산해 한 번 돌려 놓고 그대로 유지합니다. 속도 방향을 계속 쫓아가게 만들면, 정점 근처에서 속도 방향이 위→옆→아래로 크게 돌기 때문에 기체가 빙글 돌거나 진자처럼 흔들립니다.</p>
+    <p>자세 제어기는 2단계와 같은 캐스케이드(각도 → 회전 속도 → 토크)인데 하나가 더 있습니다. RCS처럼 토크가 약한 수단으로 돌 때는, 남은 각도 안에서 멈출 수 있는 속도까지만 돌아야 지나치지 않습니다.</p>
+    <div class="eqbox">
+    \[ \omega_{\text{des}} = \operatorname{clamp}\!\Big(K_{p\theta}\, e,\; \pm\min\big(\omega_{\max},\, \sqrt{2\cdot 0.6\,\alpha_{\max}\,|e|}\big)\Big), \qquad \tau = I\,K_{d\theta}\,(\omega_{\text{des}} - \omega) \]
+    </div>
+    <p>$\alpha_{\max}$는 지금 쓸 수 있는 짐벌·그리드 핀·RCS가 낼 수 있는 최대 각가속도입니다. 진공에서는 RCS뿐이라 작고, 엔진이 켜지면 커집니다.</p>
+
+    <h3>질량이 줄면 기체가 달라진다</h3>
+    <p>분리 시점의 1단에는 약 32 t의 추진제가 남아 탱크 바닥에 깔려 있습니다. 엔트리 번과 착륙 연소로 연료가 줄면 무게중심이 위로 올라가고(약 16 m → 17.5 m) 관성모멘트는 줄어듭니다. 짐벌의 팔 길이가 무게중심 높이이므로 같은 짐벌 각으로 내는 토크도 바뀝니다. 질량 분포 패널과 "무게중심 높이" 그래프에서 확인하세요.</p>
+
+    <h3>엔진 클러스터: 엔트리 번 3기, 착륙 1기</h3>
+    <p>옥타웹은 가운데 1기와 바깥 8기입니다. 엔트리 번은 가운데와 서로 마주 보는 바깥 2기, 착륙 연소는 가운데 1기만 씁니다. 2D 투영에서 엔진 $i$는 중심에서 $d_i$만큼 떨어져 있어, 바깥 엔진 하나가 꺼지면 차동 추력 토크가 생깁니다.</p>
+    <div class="eqbox">
+    \[ \tau_{\text{엔진}} = -\,z_{cg}\,T\sin\delta \;-\; \sum_i d_i T_i\cos\delta \]
+    </div>
+    <p>비행 컴퓨터는 어느 엔진이 꺼졌는지 알므로 둘째 항을 미리 빼고 짐벌 각을 정합니다. "엔트리 번 중 1기" 고장 시나리오에서 짐벌 그래프로 확인할 수 있습니다.</p>
+
+    <h3>엔트리 번과 재진입 가열</h3>
+    <div class="eqbox">
+    \[ \dot q_{\text{heat}} \;\propto\; \sqrt{\rho}\; v^3 \]
+    </div>
+    <p>엔트리 번을 짧게 하면 연료는 아끼지만 엔진부가 과열됩니다.</p>
+
+    <h3>공력: 몸통 양력과 그리드 핀</h3>
+    <p>엔진이 앞장서 떨어질 때 기체가 받는 법선력은 두 가지입니다. 세장체 양력은 앞장선 끝(엔진 쪽)에 작용해 기체를 더 기울이려 하고(불안정), 횡류 항력은 몸통 가운데에 작용해 다시 세우려 합니다. 꼭대기의 그리드 핀은 무게중심에서 멀어 토크를 크게 냅니다.</p>
+    <div class="eqbox">
+    \[ F_N = -\,q\Big[\,A\,C_{N\alpha}|u_b| + L D\, C_{dc}|u_n|\,\Big]u_n, \qquad \tau = (z - z_{cg})\,F_n \]
+    </div>
+    <div class="note"><b>받음각으로 조종하기.</b> 엔진 쪽 끝을 가고 싶은 방향으로 살짝 기울이면 몸통 전체가 그쪽으로 양력을 만듭니다. 그리드 핀이 그 자세를 붙잡는 동안 기체는 예상 착지점을 수 km 옮길 수 있습니다. 최대 받음각을 0°로 두고 비행해 보세요.</div>
+
+    <h3>호버슬램: 제자리에 멈춰 떠 있을 수 없는 착륙</h3>
+    <div class="eqbox">
+    \[ \frac{T_{\min}}{m g} \approx \frac{0.4 \times 845\ \text{kN}}{29\ \text{t} \times 9.81} \approx 1.2 \;>\; 1 \]
+    </div>
+    <p>제자리에 떠 있으려면(호버링) 추력이 무게와 <b>정확히 같아야</b> 합니다. 그런데 거의 빈 1단은 엔진 1기를 최소(약 40%)까지 줄여도 추력이 무게보다 큽니다. 추력을 무게만큼 낮출 방법이 없으니, 엔진이 켜져 있는 한 기체는 계속 감속하고, 속도가 0이 된 뒤에는 다시 위로 올라갑니다. 엔진을 껐다 다시 켜는 것도 마지막 몇 초 사이에는 할 수 없습니다. 그래서 팰컨 9은 공중에서 기다리지 못하고, 속도가 <b>정확히 땅 높이에서</b> 0이 되도록 점화 시점과 추력을 맞춥니다(호버슬램). 이 시뮬레이터의 그래스호퍼(47 t, 최소 추력 240 kN)는 최소 추력이 무게보다 작아서 호버링이 가능합니다. 1단계의 T/W 판독값이 1 근처에서 오르내리는 것과 비교해 보세요. 그래서 "지금부터 순감속 $a$로 내려가면 어디서 멈출까"를 짧은 시뮬레이션으로 계산하고, 그 높이가 0이 되는 $a$를 <b>이분 탐색</b>으로 찾습니다. 점화도, 추력도 매 순간 이 값으로 정합니다.</p>
+    <p>수평 방향은 착지 직전에 옆 속도가 0이 되도록 감속 계획을 세웁니다. 남은 시간 동안 일정하게 줄이는 속도($2\,dx/t_{go}$)와 최대 감속으로 멈출 수 있는 속도($\sqrt{2a\,dx}$) 중 느린 쪽을 따르고, 계획의 감속도를 피드포워드로 미리 넣습니다. 공력이 미는 몫은 모델 대신 <b>IMU로 잰 공력 가속도</b>로 상쇄합니다. 비행 소프트웨어의 공력 모델은 축 방향 항력만 알기 때문입니다.</p>
+    <div class="note"><b>실제 팰컨 9은?</b> 스페이스X의 착륙 유도는 이 문제를 볼록 최적화로 바꿔 비행 중에 반복해서 푸는 방식으로 알려져 있습니다(L. Blackmore, 2016). 여기의 예측 + 이분 탐색 + 감속 계획은 같은 아이디어의 단순한 형태입니다.</div>
+
+    <h3>착지 판정</h3>
+    <p>드론십 갑판은 길이 90 m이고, 중심에서 45 m를 벗어나면 바다에 떨어집니다. 갑판 위에서는 2단계와 같은 판정을 팰컨 9 값으로 합니다. 넘어짐 계산의 무게중심 높이는 그 순간의 실제 값을 씁니다.</p>
+  </div>
+
+  <div class="bench" id="s4-bench"></div>
+  <h3>비행 소프트웨어 상태</h3>
+  <div class="fsm" id="s4-fsm"></div>
+  <div class="fsm" id="s4-fsm2"></div>
+  <ul class="events" id="s4-events"></ul>
+  <div class="telemetry" id="s4-plots"></div>
+
+  <h3>코드</h3>
+  <p class="prose">탭이 넷입니다: 1단 귀환, 2단 궤도 투입, 상승 유도(3단계와 공유), 칼만 필터. <code>k.alphaMax</code>는 지금 낼 수 있는 최대 각가속도, <code>k.zcg</code>와 <code>k.I</code>는 지금의 무게중심 높이와 관성모멘트, <code>k.aeroAcc</code>는 IMU로 잰 공력 가속도입니다. <code>k.predictImpact</code>와 <code>k.dragAcc</code>는 비행 소프트웨어 안의 공력 모델로, 축 방향 항력만 알고 양력과 바람은 모릅니다.</p>
+  <div id="s4-editor"></div>
+
+  <h3>과제</h3>
+  <ol class="tasks">
+    <li><code>flipAttitude()</code>가 지금 속도의 반대 방향(<code>k.retro(est)</code>)을 돌려주도록 바꿔 보세요. 정점 근처에서 무슨 일이 일어나나요? <span class="tag">코드</span></li>
+    <li><code>attitude()</code>에서 $\sqrt{2\alpha|e|}$ 한계를 빼고 비행해 보세요. RCS만 쓰는 구간에서 자세 그래프가 어떻게 바뀌나요? <span class="tag">코드</span></li>
+    <li>엔트리 번 종료 속도를 1200, 1500 m/s로 올려 보세요. 연료는 얼마나 남고 가열 지표는 어떻게 되나요?</li>
+    <li>점화 여유(margin)를 0.4와 0.95로 바꿔 착륙해 보고, 남은 연료와 실패 이유를 비교하세요.</li>
+    <li>"엔트리 번 중 1기" 고장으로 비행하고, 짐벌 그래프에서 차동 추력 토크가 보상되는 구간을 찾으세요. 비행 컴퓨터가 고장 엔진을 모른다고 가정하면 어떻게 될까요?</li>
+    <li>해상 바람과 제트기류를 모두 0으로 두면 오히려 넘어지는 경우가 생깁니다. 착륙 연소 시작 상태와 수평 감속 계획을 비교해 원인을 찾고, <code>landingBurn()</code>을 고쳐 보세요. <span class="tag">코드</span></li>
+    <li>상승 중 T+60 s쯤 1단 엔진 하나를 눌러 고장 내 보세요. MECO 시각, 2단 궤도, 1단 착륙은 각각 어떻게 바뀌나요? 두 개를 꺼도 궤도에 갈 수 있나요?</li>
+    <li>목표 궤도 고도를 200, 280, 400 km로 바꾸고 2단 남은 연료를 비교하세요. 어느 고도부터 스타링크 6기를 다 싣고 갈 수 없나요?</li>
+    <li>배치 회전 속도를 0.5°/s와 4°/s로 바꿔 보세요. 위성 사이 간격이 어떻게 달라지나요? 맨 위층과 맨 아래층의 분리 속도를 $v = \omega z$로 계산해 화면과 비교하세요.</li>
+    <li><code>upperGuidance()</code>의 SECO 조건을 "수평 속도 ≥ 원궤도 속도"로 바꿔 보세요. 궤도가 왜 찌그러지나요? <span class="tag">코드</span></li>
+    <li>도전: 분리 직후 엔진 3기로 되돌아가는 부스트백 단계를 상태 기계에 추가해, 발사장 근처(x = 10 km)에 착륙시켜 보세요. <span class="tag">설계</span></li>
+  </ol>
+</div>
+</section>
+
+<!-- ================================================================ 5 -->
+<section class="stage" id="s5">
+<div class="wrap">
+  <h2>실제 비행과 이 시뮬레이터의 차이</h2>
+  <p class="stage-sub">수업용으로 무엇을 단순화했는지 알아야, 결과를 어디까지 믿을지도 정할 수 있습니다. 수치는 공개 자료를 바탕으로 한 교육용 근사값입니다.</p>
+  <div class="scroll-x">
+  <table class="cmp">
+    <thead><tr><th>항목</th><th>실제</th><th>이 시뮬레이터</th></tr></thead>
+    <tbody>
+      <tr><td>차원</td><td>3차원 6자유도, 롤 포함</td><td>1단계 1차원, 2·3·4단계 강체 2차원(x, y, θ). 위치는 무게중심, 회전도 무게중심 둘레</td></tr>
+      <tr><td>질량 특성</td><td>설계 도면 기반, 추진제 출렁임(슬로싱) 포함</td><td>부품 6~8개를 축 방향 구간 질량으로 근사, 추진제는 탱크 바닥부터 채움, 슬로싱 없음</td></tr>
+      <tr><td>엔진 클러스터</td><td>엔진별 짐벌·스로틀, 고장 시 재배분</td><td>3단계는 9기를 하나로 묶은 공통 짐벌. 4단계는 옥타웹 배치를 2D로 투영(엔트리 3기, 착륙 1기), 차동 추력 토크와 엔진 고장 포함</td></tr>
+      <tr><td>지구</td><td>둥글고 자전함</td><td>1·2단계 평평한 지구. 3·4단계 둥근 지구(원심·코리올리 항, 고도별 중력), 자전 없음</td></tr>
+      <tr><td>2단·궤도</td><td>유도 알고리즘 비공개, 여러 번 연소, 위성 20기 남짓</td><td>점질량 + 자세 속도 제한, ZEM/ZEV 꼴 수직 유도, 근지점 기준 SECO, 위성 6기 × 800 kg</td></tr>
+      <tr><td>대기·공력</td><td>마하수·받음각에 따라 변하는 항력과 양력, 풍동·CFD 데이터</td><td>지수 대기, 마하수에 따른 축력 배율. 3·4단계는 세장체 양력 + 횡류 항력(압력 중심 위치 포함), 4단계는 그리드 핀까지</td></tr>
+      <tr><td>역추진 중 공기 흐름</td><td>엔진 화염이 충격파를 앞으로 밀어내 항력과 가열이 크게 줄어듦(초음속 역추진). 엔트리 번이 가열을 막는 이유 중 하나</td><td>넣지 않음 — 엔진이 켜져 있어도 화염이 없는 것처럼 항력·가열을 계산. 그래서 착륙 연소 때 항력이 실제보다 감속을 더 도와준다</td></tr>
+      <tr><td>엔진</td><td>점화·정지 과도 현상, 엔진별 고장 대응</td><td>1차 지연(그래스호퍼), 즉시 반응(팰컨 9), 추력 잡음 1~2%</td></tr>
+      <tr><td>항법</td><td>INS·GPS·레이더 다중 융합, 자세까지 추정</td><td>축별 2상태 칼만 필터, 자세는 거의 정확히 안다고 가정</td></tr>
+      <tr><td>착륙 유도</td><td>볼록 최적화 기반 궤적 재계획</td><td>예측 + 이분 탐색, 감속 계획 + 피드포워드, IMU 측정 공력 상쇄</td></tr>
+      <tr><td>기체 수치</td><td>공개되지 않은 설계값</td><td>1단 건조 질량 22.2 t, 멀린 845 kN(해면), 탱크 길이 등 공개 자료를 바탕으로 한 교육용 근사</td></tr>
+      <tr><td>바람</td><td>고도별 실측 풍향·풍속, 난류</td><td>풍향 거의 고정 + 세기 OU 요동(잔잔·일정·돌풍), 경계층 지수 법칙, 제트기류 하나</td></tr>
+      <tr><td>구조·가열 한계</td><td>비공개 설계값</td><td>$q\cdot\alpha \le 60$ kPa·°, 최대 동압 32 kPa, 가열 지표 0.75 — 교육용 임의값</td></tr>
+      <tr><td>착지·캐치 손상</td><td>구조 해석, 팔의 능동 완충</td><td>완충 거리로 계산한 충격 g, 다리 끝 피벗 기준 넘어짐 강체 모델(그 순간의 무게중심 높이 사용)</td></tr>
+      <tr><td>비행 컴퓨터</td><td>다중화된 컴퓨터가 서로 결과를 비교</td><td>브라우저의 자바스크립트 함수 하나</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="prose">
+    <h3>수업에서 이어 갈 거리</h3>
+    <p>이 페이지의 함수들은 모두 순수 함수에 가까워서 그대로 파이썬으로 옮길 수 있습니다. 2~4단계의 질량 특성과 강체 모델은 MuJoCo에 같은 형상과 관성을 넣어 3차원으로 확장해 볼 수도 있습니다. 칼만 필터를 3상태(위치·속도·가속도계 바이어스)로 늘리면 GPS 음영 문제를 상당 부분 해결할 수 있고, 착륙 유도를 cvxpy로 푸는 볼록 최적화 버전과 비교하는 것도 좋은 프로젝트가 됩니다.</p>
+  </div>
+</div>
+</section>
+
+<footer class="wrap">
+  경북대학교 컴퓨터학부 · 로봇 AI 알고리즘 실습 자료. 모든 기체 파라미터는 공개 자료를 바탕으로 한 교육용 근사값이며, 실제 비행 데이터가 아닙니다.
+</footer>
+
+<script>
+// ====================================================================
+//  시뮬레이션 코어 — DOM 없음 (node 에서도 테스트 가능)
+// ====================================================================
+const G0 = 9.80665, GRAV = 9.81;
+const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function makeGauss(rng) {
+  let spare = null;
+  return function () {
+    if (spare !== null) { const s = spare; spare = null; return s; }
+    let u, v, s;
+    do { u = rng() * 2 - 1; v = rng() * 2 - 1; s = u * u + v * v; } while (s >= 1 || s === 0);
+    const m = Math.sqrt(-2 * Math.log(s) / s);
+    spare = v * m; return u * m;
+  };
+}
+const rhoAt = h => 1.225 * Math.exp(-Math.max(h, 0) / 8500);
+function minJerk(t, T) {
+  if (t <= 0) return [0, 0];
+  if (t >= T) return [1, 0];
+  const s = t / T;
+  return [10 * s ** 3 - 15 * s ** 4 + 6 * s ** 5, (30 * s ** 2 - 60 * s ** 3 + 30 * s ** 4) / T];
+}
+
+// --------------------------------------------------------------------
+//  학생이 편집하는 기본 코드 (문자열 = 화면에 보이는 코드 = 실행되는 코드)
+// --------------------------------------------------------------------
+const CODE = {};
+
+CODE.up = `// 2단 궤도 투입 유도 — 50 Hz
+// st: {t, h(고도), vx(수평 속도), vy(수직 속도), r(지구 중심 거리), g(그 고도의 중력), vCirc(원궤도 속도),
+//      peri, apo: 지금 엔진을 끄면 그려질 궤도의 근지점·원지점 고도 [m]}
+// k:  {m(지금 질량), T(MVac 추력)}     p: 슬라이더 {hTarget [km], Kh}
+// 반환: { pitch: 추력 방향 [deg, 국소 수직 = 0, 하류 쪽 +], cutoff: true 면 엔진 정지(SECO) }
+function upperGuidance(st, k, p, s) {
+  const aT = k.T / k.m;
+  // ① 남은 연소 시간 추정: 수평 속도를 원궤도 속도까지 올리는 데 걸리는 시간
+  const tgo = Math.max((st.vCirc - st.vx) / aT, 5);
+  // ② 그때까지 '목표 고도, 수직 속도 0' 에 닿게 하는 수직 가속도 (1단 착륙의 ZEM/ZEV 와 같은 꼴)
+  const ar = p.Kh * (6 * (p.hTarget * 1000 - st.h) / (tgo * tgo) - 4 * st.vy / tgo);
+  // ③ 추력이 맡아야 할 수직 성분 = 원하는 가속 + 중력 − 원심 효과(vx²/r)
+  //    수평 속도가 원궤도 속도에 가까워질수록 원심 효과가 중력을 대신한다
+  const need = ar + st.g - st.vx * st.vx / st.r;
+  const sinUp = clamp(need / aT, -0.3, 0.9);               // 추력 중 위로 향하는 비율
+  const pitch = 90 - Math.asin(sinUp) * 180 / Math.PI;     // 국소 수직에서 잰 각도
+  // ④ 지금 끄면 그려질 궤도의 근지점이 목표에 닿으면 끈다 (SECO)
+  return { pitch, cutoff: st.peri >= (p.hTarget - 10) * 1000 };
+}
+`;
+
+CODE.kf = `// 2상태 칼만 필터: 상태 x = [위치, 속도]
+// f = { x: [p, v], P: [[P00, P01], [P10, P11]] }
+
+// ① 예측: IMU 가속도 a 로 한 스텝 앞을 내다본다
+function kfPredict(f, a, dt, sa) {
+  const p = f.x[0], v = f.x[1];
+  // x ← F x + B a      (등가속도 운동)
+  f.x = [p + v*dt + 0.5*a*dt*dt, v + a*dt];
+
+  // P ← F P Fᵀ + Q      (불확실성은 커진다)
+  const P = f.P, q = sa*sa;
+  const g0 = 0.5*dt*dt, g1 = dt;           // G = [dt²/2, dt]ᵀ
+  const n00 = P[0][0] + 2*dt*P[0][1] + dt*dt*P[1][1];
+  const n01 = P[0][1] + dt*P[1][1];
+  const n11 = P[1][1];
+  f.P = [[n00 + g0*g0*q, n01 + g0*g1*q],
+         [n01 + g0*g1*q, n11 + g1*g1*q]];
+}
+
+// ② 보정: 위치 측정값 z (분산 r) 가 들어오면 고친다
+function kfUpdate(f, z, r) {
+  const P = f.P;
+  const S = P[0][0] + r;                    // 혁신 공분산  H P Hᵀ + R
+  const K = [P[0][0] / S, P[1][0] / S];     // 칼만 이득    P Hᵀ S⁻¹
+  const y = z - f.x[0];                     // 혁신(잔차)   z − H x
+  f.x = [f.x[0] + K[0]*y, f.x[1] + K[1]*y];
+  f.P = [[(1-K[0])*P[0][0], (1-K[0])*P[0][1]],
+         [P[1][0] - K[1]*P[0][0], P[1][1] - K[1]*P[0][1]]];
+  f.K = K; f.y = y;                         // 화면 표시용
+}`;
+
+CODE.s1 = `// 고도 제어기 — 100 Hz 로 호출된다
+// est: 추정 상태 {h, v}     ref: 기준 궤적 {h, v}
+// p: 슬라이더 {Kp, Ki, Kd, ff}   k: 기체 상수 {m, g, Tmax, Tmin, dt}
+// s: 매 호출 사이에 값을 기억하는 상자 (처음엔 {I: 0})
+function control(est, ref, p, k, s) {
+  const e  = ref.h - est.h;          // 위치 오차
+  const de = ref.v - est.v;          // 오차의 미분 (= 속도 오차)
+
+  let a = p.Kp*e + p.Ki*s.I + p.Kd*de;   // PID → 원하는 가속도
+
+  // 피드포워드: 중력 g 만큼은 미리 더해 둔다
+  if (p.ff) a += k.g;
+
+  let T = k.m * a;                   // F = m a → 필요한 추력 [N]
+
+  // 스로틀 한계에 걸리면 적분을 멈춘다 (와인드업 방지)
+  const saturated = T > k.Tmax || T < k.Tmin;
+  if (!saturated) s.I += e * k.dt;
+
+  return clamp(T, k.Tmin, k.Tmax);
+}`;
+
+CODE.s2 = `// 캐스케이드 제어기 — 100 Hz
+// est: {x, y, vx, vy, th, om}  th: 기울기(+는 오른쪽), om: 각속도
+// ref: {x, y, vx, vy}   k: {m, g, I, L, Tmax, Tmin, dMax, dt}
+//   I: 지금의 관성모멘트, L: 엔진~무게중심 거리 — 연료가 줄면 둘 다 바뀐다
+// 반환: { T: 추력 [N], delta: 짐벌 각 [rad] }
+function control(est, ref, p, k, s) {
+  // ── 바깥 루프 ①  고도 → 추력 (1단계에서 튜닝한 PID)
+  const ey = ref.y - est.y;
+  const ay = 0.6*ey + 0.05*s.Iy + 1.2*(ref.vy - est.vy);
+  let T = k.m * (ay + k.g) / Math.cos(est.th);  // 기운 만큼 더 밀어 준다
+  if (T < k.Tmax && T > k.Tmin) s.Iy += ey * k.dt;
+  T = clamp(T, k.Tmin, k.Tmax);
+
+  // ── 바깥 루프 ②  수평 위치 → 원하는 기울기
+  const ax = p.Kpx*(ref.x - est.x) + p.Kdx*(ref.vx - est.vx);
+  const thCmd = clamp(Math.atan2(ax, k.g), -p.thMax, p.thMax);
+
+  // ── 안쪽 루프  기울기 → 짐벌 각
+  const alpha = p.Kpt*(thCmd - est.th) - p.Kdt*est.om;  // 원하는 각가속도
+  // 토크: −T·L·sin δ = I·α   →   δ = asin(−I·α / (T·L))
+  const sd = clamp(-k.I*alpha / (T*k.L), -1, 1);
+  const delta = clamp(Math.asin(sd), -k.dMax, k.dMax);
+
+  return { T, delta };
+}`;
+
+CODE.s3 = `// 상승 유도 — 50 Hz
+// st: {t, h, x, v:{x,y}, vAir:{x,y}, q, speed}
+//      v    : 지면 기준 속도     vAir : 공기 기준 속도 (바람 반영)
+// p:  {tKick, kick, qBucket, bucket, loadRelief}
+// 반환: { pitch: 추력 방향 [deg, 수직=0, 하류 방향 +], throttle: 0.4~1 }
+function guidance(st, p, k, s) {
+  // ① 수직 상승: 발사대 구조물을 벗어날 때까지
+  if (st.t < p.tKick) return { pitch: 0, throttle: 1 };
+
+  // ② 피치 킥: 몇 초 동안 살짝 기울여 선회를 시작
+  if (st.t < p.tKick + 6) return { pitch: p.kick, throttle: 1 };
+
+  // ③ 중력 선회: 추력을 속도 방향에 맞춘다 → 받음각 ≈ 0
+  let pitch = Math.atan2(st.v.x, st.v.y) * 180 / Math.PI;
+
+  //    하중 경감: 바람이 센 고공(h > 3 km)에서는 '공기 기준' 속도 쪽으로
+  //    최대 6° 까지 틀어 받음각을 줄인다 (느린 저공에서 따라가면 뒤로 눕는다)
+  if (p.loadRelief && st.h > 3000) {
+    const pAir = Math.atan2(st.vAir.x, st.vAir.y) * 180 / Math.PI;
+    pitch += clamp(pAir - pitch, -6, 6);
+  }
+
+  // ④ Max-Q 스로틀 버킷: 동압이 크면 잠깐 추력을 줄인다
+  const throttle = st.q > p.qBucket ? p.bucket : 1;
+
+  return { pitch, throttle };
+}`;
+
+CODE.s4 = `// 팰컨 9 1단 귀환 비행 소프트웨어 — 유도 20 Hz, 자세 제어 100 Hz
+// est: {x, y, vx, vy, th, om}   th: 기울기 [rad] (+는 꼭대기가 하류(+x) 쪽)
+// k:   {m, g, I(관성모멘트), zcg(무게중심 높이), alphaMax(지금 낼 수 있는 최대 각가속도),
+//       T1(엔진 1기 추력), xTarget(드론십), retro(e), predictAt(e, y),
+//       predictImpact(e), dragAcc(e), liftPerRad(e), aeroAcc(IMU 로 잰 공력 가속도 {x, y})}
+// p:   슬라이더 값.  s: 호출 사이에 값을 기억하는 상자
+
+// ① 뒤집기 (분리 3초 뒤 한 번): 엔트리 번을 시작할 때 필요한 자세를 미리 계산해
+//    RCS 로 한 번만 돌려 놓고 유지한다. 속도 방향을 계속 쫓아가면 정점 근처에서 빙글 돈다
+function flipAttitude(est, k, p, s) {
+  const e = k.predictAt(est, p.entryAlt * 1000);     // 엔트리 고도에 닿을 때의 상태 예측
+  return k.retro(e);                                 // 그때의 역방향 = 엔진이 진행 방향
+}
+
+// ② 자세 제어 (100 Hz): 각도 오차 → 원하는 회전 속도 → 각가속도 → 토크
+//    회전 속도 한계: 남은 각도 안에서 멈출 수 있는 만큼(√(2·α·|e|))만 돈다.
+//    이게 없으면 힘이 약한 RCS 로 빠르게 돌다가 목표를 지나쳐 진자처럼 흔들린다.
+//    토크를 짐벌 → 그리드 핀 → RCS 로 나누는 일(제어 할당)은 비행 컴퓨터 몫
+function attitude(est, thCmd, k, p, s) {
+  let e = thCmd - est.th;
+  e = Math.atan2(Math.sin(e), Math.cos(e));          // −π ~ π, 짧은 쪽으로 돈다
+  const wLim = Math.min(p.wMax * Math.PI / 180, Math.sqrt(2 * 0.6 * k.alphaMax * Math.abs(e)));
+  const wDes = clamp(p.Kpt * e, -wLim, wLim);
+  return k.I * p.Kdt * (wDes - est.om);
+}
+
+// ③ 공력 하강: 받음각으로 몸통 양력을 만들어 예상 착지점을 드론십에 맞춘다
+function aeroGuidance(est, k, p, s) {
+  const miss = k.xTarget - k.predictImpact(est);     // 예상 착지점 오차
+  const tgo  = est.y / Math.max(-est.vy, 1);
+  const aWant = p.Kaero * 2 * miss / (tgo * tgo);     // 원하는 수평 가속도
+  // 엔진이 앞장설 때: 엔진 쪽을 가고 싶은 방향으로 기울이면 양력이 그쪽으로 생긴다
+  const lim = p.aoaMax * Math.PI / 180;
+  const aoa = clamp(aWant / Math.max(k.liftPerRad(est), 1e-3), -lim, lim);
+  return k.retro(est) - aoa;
+}
+
+// ④ 예측기: 지금부터 엔진 순감속 a 를 유지하면 어디서 멈출까?
+function predictStop(est, k, a) {
+  const e = { y: est.y, vx: est.vx, vy: est.vy };
+  const h = clamp(est.y / Math.max(-est.vy, 1) / 60, 0.005, 0.1);
+  let t = 0;
+  while (e.vy < -1.5 && t < 120) {
+    const d = k.dragAcc(e);
+    e.vy += (a + d.y) * h; e.vx += d.x * h; e.y += e.vy * h; t += h;
+  }
+  return { y: e.y, t };
+}
+
+// ⑤ 이분 탐색: 정확히 지면에서 멈추게 하는 감속도
+function requiredDecel(est, k) {
+  let lo = 0, hi = 60;
+  for (let i = 0; i < 18; i++) {
+    const mid = (lo + hi) / 2;
+    if (predictStop(est, k, mid).y < 0) lo = mid; else hi = mid;
+  }
+  return hi;
+}
+
+// ⑥ 착륙 연소 점화: 필요한 감속이 엔진 1기 능력의 margin 배에 닿는 순간
+function ignite(est, k, p, s) {
+  return requiredDecel(est, k) >= p.margin * (k.T1 / k.m - k.g);
+}
+
+// ⑦ 착륙 연소 (엔진 1기): { throttle: 0.4~1, th: 기울기 [rad] }
+function landingBurn(est, k, p, s) {
+  if (est.y < 0.3 || est.vy > -1.5) return { throttle: 0, th: 0 };   // 마지막은 최소 추력
+  const a = requiredDecel(est, k);                   // 매 순간 다시 푼다 (피드백)
+  // 수평: 착지 직전에 드론십 위에서 옆 속도가 0 이 되도록 '감속 계획'을 세운다.
+  //   ㉠ 남은 시간 tgo 동안 일정하게 줄이면: v = 2·dx/tgo  (감속도 v/tgo)
+  //   ㉡ 최대 aLat 로 줄여 멈출 수 있는 속도: v = √(2·aLat·dx)
+  //   둘 중 느린 쪽을 따르고, 계획의 감속도를 피드포워드로 미리 넣는다
+  const tgo = Math.max(predictStop(est, k, a).t - 1, 1);
+  const dx = k.xTarget - est.x, adx = Math.abs(dx), sg = Math.sign(dx);
+  const vLin = 2 * adx / tgo, vMax = Math.sqrt(2 * p.aLat * adx);
+  const vxDes = sg * Math.min(vLin, vMax);
+  const aFF = -sg * (vLin < vMax ? vLin / tgo : p.aLat);
+  const ax = aFF + p.Kx * (vxDes - est.vx) - k.aeroAcc.x;   // 공력은 모델 대신 IMU 측정값으로 상쇄
+  // 가속도 벡터 → 기울기. 지면 가까이에선 똑바로 세운다
+  const tMax = clamp((est.y - 5) / 5, 0, p.tiltMax) * Math.PI / 180;
+  const th = clamp(Math.atan2(ax, a + k.g), -tMax, tMax);
+  const T = k.m * (a + k.g) / Math.cos(th);
+  return { throttle: T / k.T1, th };
+}
+`;
+
+function compile(code, names) {
+  // eslint-disable-next-line no-new-func
+  const fn = new Function('clamp', code + '\n;return {' + names.map(n => `${n}: typeof ${n}==='function'?${n}:undefined`).join(',') + '};');
+  const out = fn(clamp);
+  for (const n of names) if (!out[n]) throw new Error(`함수 ${n}() 를 찾을 수 없습니다`);
+  return out;
+}
+
+// --------------------------------------------------------------------
+//  환경 모델 (모든 단계 공통)
+// --------------------------------------------------------------------
+// 바람: 풍향은 거의 일정(±8° 흔들림), 세기는 1차 마르코프(OU) 과정으로 요동.
+//   잔잔: 평균의 25 %만, 일정: ±8 % 요동, 돌풍: ±30 % 요동 + 가끔 3초짜리 돌풍
+const WIND_MODES = {
+  calm:   { name: '잔잔', k: 0.25, sig: 0.25, tau: 8,  burst: 0 },
+  steady: { name: '일정', k: 1.0,  sig: 0.08, tau: 20, burst: 0 },
+  gusty:  { name: '돌풍', k: 1.0,  sig: 0.30, tau: 4,  burst: 1 / 12 }
+};
+function windCreate() { return { g: 0, psi: 0, bt: -1, ba: 0, cur: 0, ratio: 1 }; }
+function windStep(W, mode, mean, dt, gs, rng) {
+  const M = WIND_MODES[mode] || WIND_MODES.steady;
+  const m = Math.abs(mean) * M.k, sgn = mean < 0 ? -1 : 1;
+  W.g += -W.g / M.tau * dt + M.sig * m * Math.sqrt(2 * dt / M.tau) * gs();
+  W.psi += -W.psi / 30 * dt + 8 * D2R * Math.sqrt(2 * dt / 30) * gs();
+  if (M.burst && W.bt < 0 && rng() < M.burst * dt) { W.bt = 0; W.ba = (0.4 + 0.5 * rng()) * m; }
+  let b = 0;
+  if (W.bt >= 0) { b = W.ba * 0.5 * (1 - Math.cos(2 * Math.PI * W.bt / 3)); W.bt += dt; if (W.bt > 3) W.bt = -1; }
+  const speed = Math.max(0, m + W.g + b);
+  W.ratio = M.k * (m > 0.01 ? speed / m : 1);
+  W.cur = sgn * speed * Math.cos(W.psi);
+  return W.cur;                 // 지상 10 m 높이 기준 풍속 (+x 방향이 양수)
+}
+const blProfile = h => Math.pow(clamp(h, 2, 300) / 10, 0.14);         // 지표 경계층: 높을수록 강해짐
+const jetAt = (h, J) => -J * Math.exp(-(((h - 11000) / 4000) ** 2));   // 고도 11 km 제트기류 (−x 방향)
+// 엔진 추력 잡음: 연소 불안정·밸브 떨림을 상관시간 0.15 s 의 잡음으로
+function engNoise(S, dt, sigma) {
+  S.en += -S.en / 0.15 * dt + sigma * Math.sqrt(2 * dt / 0.15) * S.gs();
+  return 1 + S.en;
+}
+// 공력: 음속과 마하수에 따른 항력 계수 배율 (천음속에서 급증)
+const soundAt = h => h < 11000 ? 340.3 - 0.0041 * h : 295;
+function cdMach(M) {
+  if (M < 0.8) return 1;
+  if (M < 1.1) return 1 + 0.6 * (M - 0.8) / 0.3;
+  if (M < 2) return 1.6 - 0.35 * (M - 1.1) / 0.9;
+  return Math.max(1.0, 1.25 - 0.08 * (M - 2));
+}
+
+// --------------------------------------------------------------------
+//  착지 손상 판정 · 넘어짐 · 폭발
+// --------------------------------------------------------------------
+//  r: 다리 끝 반폭, hc: 무게중심 높이, len: 길이, stroke: 다리 완충 거리
+//  nSoft 넘으면 손상(완충재 교체), nHard 넘으면 폭발, vhLeg 넘는 수평 속도면 다리 파손
+const GEO_GH = { r: 5, hc: 12, len: 32, stroke: 0.3, nSoft: 1.7, nHard: 3.0, vhLeg: 2.5, boomR: 18 };
+const GEO_F9 = { r: 8.5, hc: 15, len: 47, stroke: 0.45, nSoft: 2.05, nHard: 3.4, vhLeg: 3.5, boomR: 30 };
+const impactLoad = (vv, geo) => 1 + vv * vv / (2 * GRAV * geo.stroke);
+
+function boom(S, msg, extra) {
+  S.boom = { t0: S.t, x: S.x || 0, y: Math.max(S.y ?? S.h ?? 0, 0) };
+  S.pending = Object.assign({ ok: false, boom: true, msg }, extra || {});
+}
+function boomTick(S, dt) {
+  S.t += dt;
+  if (S.t - S.boom.t0 > 2.6) { S.done = true; S.result = S.pending; }
+}
+// 착지 순간: 수직 충격 → 넘어짐 계산 준비
+function touchdown(S, geo, o) {
+  let n = impactLoad(o.vv, geo);
+  if (Math.abs(o.tilt) > 3 * D2R) n *= 1.6;          // 기울어 닿으면 다리 하나가 먼저 다 받는다
+  S.impactG = n;
+  if (n > geo.nHard) { boom(S, `폭발 — 착지 충격 ${n.toFixed(1)} g (한계 ${geo.nHard} g): 다리가 꺾이고 탱크가 터졌습니다`, o.extra); return; }
+  const legBroken = Math.abs(o.vh) > geo.vhLeg;
+  const side = Math.abs(o.vh) > 0.3 ? Math.sign(o.vh) : (Math.sign(o.tilt) || 1);
+  const r = legBroken ? geo.r * 0.25 : geo.r, hc = geo.hc;
+  const Icg = geo.len * geo.len / 12, Ip = Icg + r * r + hc * hc;   // 단위 질량당 관성모멘트
+  // 다리 끝(피벗) 기준 각운동량 보존 → 넘어지는 쪽 초기 각속도
+  const omega = Math.max(0, (hc * side * o.vh + Icg * side * (o.om || 0)) / Ip);
+  S.post = { side, r, hc, Ip, beta: Math.max(0, side * o.tilt), omega, pivot: o.base + side * geo.r, t0: S.t, n, geo, o, legBroken };
+}
+// 착지 뒤 몇 초: 다리 끝을 축으로 흔들리다 서거나, 넘어져 폭발
+function postStep(S, dt, setPose) {
+  const P = S.post;
+  const acc = GRAV * (P.hc * Math.sin(P.beta) - P.r * Math.cos(P.beta)) / P.Ip;
+  P.omega += acc * dt; P.beta += P.omega * dt;
+  if (P.beta <= 0) { P.beta = 0; P.omega = Math.max(0, -0.3 * P.omega); }
+  setPose(P.pivot - P.side * P.r * Math.cos(P.beta), P.r * Math.sin(P.beta), P.side * P.beta);
+  S.t += dt;
+  if (P.beta > 1.15) {
+    const vh = Math.abs(P.o.vh).toFixed(1);
+    boom(S, P.legBroken ? `다리 파손 → 넘어짐 → 폭발 — 수평 속도 ${vh} m/s (다리 한계 ${P.geo.vhLeg} m/s)`
+      : `넘어짐 → 폭발 — 수평 속도 ${vh} m/s, 기울기 ${(Math.abs(P.o.tilt) * R2D).toFixed(1)}°: 무게중심이 다리 바깥으로 넘어갔습니다`, P.o.extra);
+  } else if (S.t - P.t0 > 3 && P.beta < 0.01 && P.omega < 0.01) {
+    S.done = true; S.result = P.o.final(P.n, P.legBroken);
+  } else if (S.t - P.t0 > 12) { S.done = true; S.result = P.o.final(P.n, P.legBroken); }
+}
+
+// --------------------------------------------------------------------
+//  1단계: 그래스호퍼 1D 호버
+// --------------------------------------------------------------------
+const K1 = { m0: 47000, mDry: 25000, Tmax: 600000, Tmin: 240000, Isp: 282, tau: 0.25, dt: 0.01, g: GRAV, CdA: 8.4 };
+
+function s1Ref(t, H) {
+  const Tup = 8 + H / 12, hold = 6, Tdn = 8 + H / 12, hLow = 3;
+  if (t < Tup) { const [a, b] = minJerk(t, Tup); return { h: H * a, v: H * b, phase: '상승' }; }
+  t -= Tup;
+  if (t < hold) return { h: H, v: 0, phase: '호버' };
+  t -= hold;
+  if (t < Tdn) { const [a, b] = minJerk(t, Tdn); return { h: H - (H - hLow) * a, v: -(H - hLow) * b, phase: '하강' }; }
+  t -= Tdn;
+  return { h: hLow - 1.0 * t, v: -1.0, phase: '착지' };
+}
+
+function s1Create(p, seed, fns) {
+  const rng = mulberry32(seed), gs = makeGauss(rng);
+  return {
+    t: 0, h: 0, v: 0, x: 0, m: K1.m0, T: 0, Tact: 0, Tcmd: 0, onGround: true, airborne: false, done: false, result: null,
+    f: { x: [0, 0], P: [[0.25, 0], [0, 0.01]], K: [0, 0], y: 0 },
+    bias: 0.04 * gs(), zHold: 0, zPrev: 0, vRaw: 0, lastZ: -1, mem: { I: 0 }, fns, p, gs, rng, seed, en: 0,
+    log: { t: [], h: [], ref: [], z: [], est: [], v: [], vEst: [], thr: [] }, logEvery: 5, n: 0,
+    maxT: 400, hMax: 0
+  };
+}
+
+function s1Step(S) {
+  const p = S.p, dt = K1.dt, gs = S.gs;
+  if (S.boom) return boomTick(S, dt);
+  const ref = s1Ref(S.t, p.H);
+  // --- ① 측정 갱신 (시각 t 의 고도계)
+  const altPeriod = 0.05;
+  if (S.t - S.lastZ >= altPeriod - 1e-9) {
+    S.lastZ = S.t;
+    const z = S.h + p.sz * gs();
+    S.zPrev = S.zHold; S.zHold = z; S.vRaw = (S.zHold - S.zPrev) / altPeriod;
+    S.fns.kfUpdate(S.f, z, p.sz * p.sz);
+  }
+  const est = p.useKF ? { h: S.f.x[0], v: S.f.x[1] } : { h: S.zHold, v: S.vRaw };
+  // --- ② 제어
+  const k = { m: S.m, g: K1.g, Tmax: K1.Tmax, Tmin: K1.Tmin, dt };
+  let Tcmd = S.fns.control(est, { h: ref.h, v: ref.v }, p, k, S.mem);
+  if (!isFinite(Tcmd)) Tcmd = K1.Tmin;
+  Tcmd = clamp(Tcmd, K1.Tmin, K1.Tmax);
+  if (S.m <= K1.mDry || S.engFailed) Tcmd = 0;
+  S.Tcmd = Tcmd;
+  // --- ③ 엔진: 1차 지연 + 추력 잡음
+  const target = S.t < 1.0 ? Math.min(Tcmd, K1.Tmax * S.t) : Tcmd;
+  S.T += (target - S.T) * dt / K1.tau;
+  if (S.m <= K1.mDry || S.engFailed) S.T = 0;
+  S.Tact = S.T * engNoise(S, dt, p.en / 100);
+  const drag = 0.5 * rhoAt(S.h) * K1.CdA * S.v * Math.abs(S.v);
+  let a = (S.Tact - drag) / S.m - K1.g;
+  if (S.h <= 0 && a < 0) a = 0;
+  // --- ④ IMU 로 예측 (t → t+dt)
+  S.fns.kfPredict(S.f, a + S.bias + p.sa * gs(), dt, p.sa);
+  // --- ⑤ 실제 운동
+  S.v += a * dt; S.h += S.v * dt;
+  S.onGround = false;
+  if (S.h <= 0) {
+    if (S.airborne && S.v < 0) {
+      const vTD = -S.v, n = impactLoad(vTD, GEO_GH), early = ref.h > 5;
+      S.h = 0; S.v = 0; S.T = 0; S.Tact = 0; S.f.x[1] = 0; S.impactG = n;
+      if (n > GEO_GH.nHard) boom(S, `폭발 — 접지 속도 ${vTD.toFixed(1)} m/s, 충격 ${n.toFixed(1)} g (한계 ${GEO_GH.nHard} g)`, { vTD });
+      else {
+        S.done = true;
+        const tag = `접지 ${vTD.toFixed(2)} m/s, 충격 ${n.toFixed(2)} g`;
+        S.result = early ? { ok: false, msg: `계획보다 일찍 땅에 닿았습니다 (${ref.phase} 단계) — ${tag}` }
+          : n > GEO_GH.nSoft ? { ok: false, warn: true, msg: `착지는 했지만 손상 — ${tag}: 다리 완충재 교체 필요` }
+            : { ok: true, msg: `착지 성공 — ${tag}` };
+      }
+    } else { S.h = 0; S.v = Math.max(S.v, 0); S.onGround = true; }
+  }
+  if (S.h > 0.5) S.airborne = true;
+  S.hMax = Math.max(S.hMax, S.h);
+  S.m -= S.T / (K1.Isp * G0) * dt;
+  S.t += dt;
+  if (!S.done && !S.boom && S.t > S.maxT) { S.done = true; S.result = { ok: false, msg: '시간 초과 — 착지하지 못했습니다' }; }
+  if (!S.done && !S.boom && S.h > 3000) { S.done = true; S.result = { ok: false, msg: '고도 이탈 — 제어 발산' }; }
+  if (S.n++ % S.logEvery === 0 || S.done) {
+    const L = S.log; L.t.push(S.t); L.h.push(S.h); L.ref.push(ref.h); L.z.push(S.zHold); L.est.push(est.h);
+    L.v.push(S.v); L.vEst.push(est.v); L.thr.push(S.Tact / K1.Tmax * 100);
+  }
+  S.ref = ref; S.est = S.done || S.boom ? { h: S.f.x[0], v: S.f.x[1] } : est;
+  S.MP = vehicleProps(VEH_GH, S.m - K1.mDry);
+}
+
+// --------------------------------------------------------------------
+//  질량 특성 — 부품 배치로 무게중심과 관성모멘트를 매 순간 계산
+// --------------------------------------------------------------------
+//  z: 기체 바닥(엔진 짐벌점)에서 잰 축 방향 위치 [m]
+//  부품 하나 = 구간 [z0, z1] 에 고르게 퍼진 질량. 탱크 속 추진제는 바닥부터 채워져 있다
+function massProps(parts, D) {
+  let m = 0, mz = 0;
+  for (const q of parts) if (q.m > 0) { m += q.m; mz += q.m * (q.z0 + q.z1) / 2; }
+  const zcg = mz / m;
+  let I = 0;
+  for (const q of parts) if (q.m > 0) { const L = q.z1 - q.z0, zc = (q.z0 + q.z1) / 2; I += q.m * (L * L / 12 + D * D / 16 + (zc - zcg) ** 2); }
+  return { m, zcg, I };
+}
+const tankPart = (z0, z1, cap, left, kind) => { const f = clamp(left / cap, 0, 1); return { m: Math.max(left, 0), z0, z1: z0 + (z1 - z0) * f, kind, fill: f, top: z1 }; };
+function vehicleProps(V, prop, extra) {
+  const lox = Math.max(prop, 0) * V.OF / (1 + V.OF), rp = Math.max(prop, 0) / (1 + V.OF);
+  const tanks = [tankPart(V.rpTank[0], V.rpTank[1], V.propCap / (1 + V.OF), rp, 'rp'), tankPart(V.loxTank[0], V.loxTank[1], V.propCap * V.OF / (1 + V.OF), lox, 'lox')];
+  const r = massProps(V.dryParts.concat(tanks, extra || []), V.D);
+  r.tanks = tanks; r.prop = Math.max(prop, 0);
+  return r;
+}
+// 교육용 근사: 엔진·추력 구조, 다리, 탱크 구조, 인터스테이지·그리드 핀, 배관·전장
+const VEH_GH = { name: '그래스호퍼', len: 32, D: 3.66, OF: 2.36, propCap: 260000,
+  dryParts: [{ m: 3500, z0: 0, z1: 2 }, { m: 3000, z0: 0, z1: 8 }, { m: 12000, z0: 2, z1: 30 }, { m: 6500, z0: 2, z1: 30 }],
+  rpTank: [3, 11], loxTank: [12, 29] };
+const VEH_F9 = { name: '팰컨 9 1단', len: 47, D: 3.66, OF: 2.36, propCap: 396800,
+  dryParts: [{ m: 5500, z0: 0, z1: 3 }, { m: 2000, z0: 2, z1: 12 }, { m: 3000, z0: 3, z1: 17 }, { m: 6000, z0: 18, z1: 41 }, { m: 2700, z0: 41, z1: 47 }, { m: 3000, z0: 3, z1: 41 }],
+  rpTank: [3, 17], loxTank: [18, 41] };
+const UPPER_F9 = [{ m: 113100, z0: 47, z1: 60 }, { m: 6700, z0: 60, z1: 70 }];   // 2단(추진제 포함) + 스타링크 6기·페어링
+// 둥근 지구: x 는 지표를 따라 잰 거리, y 는 고도. 원운동 효과(원심·코리올리)를 더하면 궤도까지 같은 식으로 풀린다
+const RE = 6371000, MU = 3.986004e14;
+const gAt = y => MU / ((RE + y) ** 2);
+const curvAx = (vx, vy, y) => -vx * vy / (RE + y);      // 수평: 고도가 오르면 수평 속도가 줄어든다(각운동량 보존)
+const curvAy = (vx, y) => vx * vx / (RE + y);           // 수직: 원심 효과 — 이게 중력과 같아지면 궤도
+const surfX = (vx, y) => vx * RE / (RE + y);            // 지표 거리 변화율
+const wrapA = a => Math.atan2(Math.sin(a), Math.cos(a));
+
+// --------------------------------------------------------------------
+//  2단계: 그래스호퍼 2D 강체 (위치는 무게중심, 착지는 바닥으로 판정)
+// --------------------------------------------------------------------
+const K2 = { mDry: 25000, prop0: 20000, Tmax: 600000, Tmin: 240000, Isp: 282, tau: 0.25, dt: 0.01, g: GRAV,
+  dMax: 7 * D2R, dRate: 25 * D2R, H: 250, zcp: 18, sideCdA: 110 };
+
+function s2Ref(t, D) {
+  const H = K2.H, Tc = 6 + H / 15, Tx = 8 + Math.abs(D) / 8;
+  const seg = [['상승', Tc], ['호버', 4], ['측면 이동', Tx], ['호버', 5], ['복귀', Tx], ['호버', 3], ['하강', Tc]];
+  let x = 0, vx = 0, y = 0, vy = 0, ph = null, tt = t;
+  for (const [name, dur] of seg) { if (tt < dur) { ph = name; break; } tt -= dur; }
+  if (t < Tc) { const [a, b] = minJerk(t, Tc); y = H * a; vy = H * b; }
+  else {
+    const tDn = t - (Tc + 4 + Tx + 5 + Tx + 3);
+    if (tDn < 0) { y = H; vy = 0; }
+    else if (tDn < Tc) { const [a, b] = minJerk(tDn, Tc); y = H - (H - 3) * a; vy = -(H - 3) * b; }
+    else { y = 3 - (tDn - Tc); vy = -1; }
+  }
+  const tx1 = t - (Tc + 4), tx2 = t - (Tc + 4 + Tx + 5);
+  if (tx1 > 0 && tx1 < Tx) { const [a, b] = minJerk(tx1, Tx); x = D * a; vx = D * b; }
+  else if (tx1 >= Tx && tx2 < 0) { x = D; }
+  else if (tx2 >= 0 && tx2 < Tx) { const [a, b] = minJerk(tx2, Tx); x = D - D * a; vx = -D * b; }
+  return { x, vx, y, vy, phase: ph || '착지' };
+}
+
+function s2Create(p, seed, fns) {
+  const rng = mulberry32(seed), gs = makeGauss(rng);
+  const MP = vehicleProps(VEH_GH, K2.prop0);
+  return {
+    t: 0, x: 0, y: MP.zcg, vx: 0, vy: 0, th: 0, om: 0, prop: K2.prop0, MP, bx: 0, by: 0,
+    T: 0, Tact: 0, delta: 0, airborne: false, done: false, result: null,
+    fx: { x: [0, 0], P: [[1, 0], [0, 0.01]] }, fy: { x: [0, 0], P: [[0.25, 0], [0, 0.01]] },
+    bxs: 0.03 * gs(), bys: 0.03 * gs(), lastG: -1, lastA: -1, W: windCreate(), en: 0,
+    mem: { Iy: 0 }, fns, p, gs, rng, seed, n: 0, logEvery: 5, maxT: 400,
+    log: { t: [], x: [], xRef: [], xEst: [], y: [], yRef: [], th: [], delta: [], thr: [], wind: [], zcg: [] },
+    maxTh: 0, maxXerr: 0
+  };
+}
+function s2Base(S) { const z = S.MP.zcg; S.bx = S.x - z * Math.sin(S.th); S.by = S.y - z * Math.cos(S.th); }
+
+function s2Step(S) {
+  const p = S.p, dt = K2.dt, gs = S.gs;
+  if (S.boom) return boomTick(S, dt);
+  if (S.post) return postStep(S, dt, (x, y, a) => { const z = S.MP.zcg; S.th = a; S.x = x + z * Math.sin(a); S.y = y + z * Math.cos(a); S.bx = x; S.by = y; });
+  const MP = S.MP = vehicleProps(VEH_GH, S.prop), m = MP.m, zcg = MP.zcg, I = MP.I;
+  s2Base(S);
+  const ref = s2Ref(S.t, p.D);
+  // --- 바람 (풍압 중심은 바닥에서 18 m — 무게중심보다 위라서 기체를 기울인다)
+  const w = windStep(S.W, p.windMode, p.wind, dt, gs, S.rng) * blProfile(S.by + 16);
+  const vrel = w - S.vx;
+  const Fw = S.by > 0.1 ? 0.5 * rhoAt(S.by) * K2.sideCdA * vrel * Math.abs(vrel) : 0;
+  // --- ① 측정 갱신 (GPS·고도계는 바닥 위치를 잰다)
+  if (S.t - S.lastG >= 0.1 - 1e-9) { S.lastG = S.t; S.fns.kfUpdate(S.fx, S.bx + p.sg * gs(), p.sg * p.sg); }
+  if (S.t - S.lastA >= 0.05 - 1e-9) { S.lastA = S.t; S.fns.kfUpdate(S.fy, S.by + 0.5 * gs(), 0.25); }
+  const est = { x: S.fx.x[0], vx: S.fx.x[1], y: S.fy.x[0], vy: S.fy.x[1], th: S.th + 0.1 * D2R * gs(), om: S.om + 0.2 * D2R * gs() };
+  // --- ② 제어 (지금의 질량·무게중심·관성모멘트를 알려 준다)
+  const k = { m, g: K2.g, I, L: zcg, Tmax: K2.Tmax, Tmin: K2.Tmin, dMax: K2.dMax, dt };
+  const pp = Object.assign({}, p, { thMax: p.thMaxDeg * D2R });
+  const out = S.fns.control(est, ref, pp, k, S.mem) || {};
+  let Tc = isFinite(out.T) ? clamp(out.T, K2.Tmin, K2.Tmax) : K2.Tmin;
+  const dc = isFinite(out.delta) ? clamp(out.delta, -K2.dMax, K2.dMax) : 0;
+  if (S.prop <= 0 || S.engFailed) Tc = 0;
+  const target = S.t < 1.0 ? Math.min(Tc, K2.Tmax * S.t) : Tc;
+  S.T += (target - S.T) * dt / K2.tau;
+  if (S.prop <= 0 || S.engFailed) S.T = 0;
+  S.delta += clamp(dc - S.delta, -K2.dRate * dt, K2.dRate * dt);
+  // --- ③ 힘과 토크 (무게중심 기준)
+  S.Tact = S.T * engNoise(S, dt, p.en / 100);
+  const dEff = S.delta + 0.15 * D2R * (p.en / 1.5) * gs();
+  let ax = (S.Tact * Math.sin(S.th + dEff) + Fw) / m;
+  let ay = S.Tact * Math.cos(S.th + dEff) / m - K2.g;
+  let al = (-S.Tact * zcg * Math.sin(dEff) + Fw * (K2.zcp - zcg) * Math.cos(S.th)) / I;
+  if (S.by <= 0.001 && ay <= 0) { ax = 0; ay = 0; al = 0; }
+  // --- ④ IMU 로 예측
+  S.fns.kfPredict(S.fx, ax + S.bxs + p.sa * gs(), dt, p.sa);
+  S.fns.kfPredict(S.fy, ay + S.bys + p.sa * gs(), dt, p.sa);
+  // --- ⑤ 적분
+  S.vx += ax * dt; S.vy += ay * dt; S.om += al * dt;
+  S.x += S.vx * dt; S.y += S.vy * dt; S.th += S.om * dt;
+  S.prop -= S.T / (K2.Isp * G0) * dt;
+  S.t += dt;
+  s2Base(S);
+  S.w = w; S.Fw = Fw; S.ref = ref; S.est = est;
+  if (S.by <= 0) {
+    if (S.airborne && S.vy < 0) {
+      const vv = -S.vy, vh = S.vx, tilt = S.th, om = S.om, xe = Math.abs(S.bx), early = ref.y > 5, bx = S.bx;
+      S.vy = 0; S.vx = 0; S.om = 0; S.T = 0; S.Tact = 0; S.fx.x[1] = 0; S.fy.x[1] = 0;
+      touchdown(S, Object.assign({}, GEO_GH, { hc: zcg }), { vv, vh, tilt, om, base: bx, extra: { xe },
+        final: (n, leg) => {
+          const tag = `수직 ${vv.toFixed(2)} m/s, 수평 ${Math.abs(vh).toFixed(2)} m/s, 충격 ${n.toFixed(2)} g, 패드 오차 ${xe.toFixed(1)} m`;
+          if (leg) return { ok: false, warn: true, msg: `다리 파손 — 서 있긴 하지만 재사용 불가 (${tag})` };
+          if (early) return { ok: false, msg: `계획보다 일찍 접지 (${ref.phase} 단계) — ${tag}` };
+          if (xe > 5) return { ok: false, warn: true, msg: `패드 밖에 착지 — ${tag}` };
+          if (n > GEO_GH.nSoft) return { ok: false, warn: true, msg: `착지는 했지만 손상 — ${tag}: 다리 완충재 교체 필요` };
+          return { ok: true, msg: `착지 성공 — ${tag}` };
+        } });
+    } else { S.y += -S.by; S.vy = Math.max(0, S.vy); S.vx = 0; S.om = 0; s2Base(S); }
+  }
+  if (S.by > 0.5) S.airborne = true;
+  S.maxTh = Math.max(S.maxTh, Math.abs(S.th) * R2D);
+  if (S.airborne && !S.post) S.maxXerr = Math.max(S.maxXerr, Math.abs(S.bx - ref.x));
+  if (!S.boom && !S.post && Math.abs(S.th) > 35 * D2R) boom(S, '자세 발산 — 기울기가 35°를 넘어 공중에서 기체가 부서졌습니다');
+  if (!S.done && !S.boom && !S.post && S.t > S.maxT) { S.done = true; S.result = { ok: false, msg: '시간 초과' }; }
+  if (S.n++ % S.logEvery === 0 || S.done) {
+    const L = S.log; L.t.push(S.t); L.x.push(S.bx); L.xRef.push(ref.x); L.xEst.push(est.x); L.y.push(S.by); L.yRef.push(ref.y);
+    L.th.push(S.th * R2D); L.delta.push(S.delta * R2D); L.thr.push(S.Tact / K2.Tmax * 100); L.wind.push(w); L.zcg.push(zcg);
+  }
+}
+
+// --------------------------------------------------------------------
+//  3단계: 팰컨 9 상승 — 전체 스택 강체, 9기 짐벌로 자세 제어
+// --------------------------------------------------------------------
+const K3 = { Tsl: 9 * 845000, Tvac: 9 * 914000, IspVac: 311, A: 10.52, Cd: 0.3, CNa: 2.0, Cdc: 1.2, len: 70,
+  dt: 0.02, g: GRAV, gMax: 5 * D2R, gRate: 10 * D2R, pitchRate: 3 * D2R, qaLimit: 60, qLimit: 32 };
+
+function s3Create(p, seed, fns) {
+  const rng = mulberry32(seed), gs = makeGauss(rng);
+  const MP = vehicleProps(VEH_F9, VEH_F9.propCap, UPPER_F9);
+  return { t: 0, x: 0, y: MP.zcg, vx: 0, vy: 0, th: 0, om: 0, thRef: 0, delta: 0, thr: 1, prop: VEH_F9.propCap, MP, bx: 0, by: 0,
+    done: false, result: null, fns, p, gs, rng, mem: {}, n: 0, logEvery: 5, phase: '이륙', W: windCreate(), en: 0, events: [],
+    eng: F9_ENG.map(e => ({ ...e, failed: false, on: true })),
+    log: { t: [], y: [], x: [], speed: [], q: [], qa: [], pitch: [], thr: [], gamma: [], wind: [], zcg: [], delta: [] },
+    maxQ: 0, maxQa: 0, tMaxQ: 0, sep: null };
+}
+function s3Base(S) { const z = S.MP.zcg; S.bx = S.x - z * Math.sin(S.th); S.by = S.y - z * Math.cos(S.th); }
+
+function s3Step(S) {
+  const p = S.p, dt = K3.dt;
+  if (S.boom) return boomTick(S, dt);
+  const MP = S.MP = vehicleProps(VEH_F9, S.prop, S.mecoT ? [] : UPPER_F9), m = MP.m, zcg = MP.zcg, I = MP.I;
+  s3Base(S);
+  const sfc = windStep(S.W, p.windMode, p.sfc, dt, S.gs, S.rng);
+  const w = sfc * blProfile(S.by) + jetAt(S.y, p.wind) * S.W.ratio;
+  const vax = S.vx - w, vay = S.vy, sp = Math.hypot(vax, vay), rho = rhoAt(S.y), q = 0.5 * rho * sp * sp;
+  const st = { t: S.t, h: S.by, x: S.bx, v: { x: S.vx, y: S.vy }, vAir: { x: vax, y: vay }, q, speed: Math.hypot(S.vx, S.vy), mach: sp / soundAt(S.y) };
+  // ---------- 유도 (학생 코드) → 피치 명령은 초당 3° 까지만 바뀐다
+  if (!S.mecoT) {
+    const out = S.fns.guidance(st, p, {}, S.mem) || {};
+    const pc = isFinite(out.pitch) ? out.pitch * D2R : S.thRef;
+    S.thr = isFinite(out.throttle) ? clamp(out.throttle, 0.4, 1) : 1;
+    S.thRef += clamp(pc - S.thRef, -K3.pitchRate * dt, K3.pitchRate * dt);
+  }
+  const Tfull = K3.Tvac - (K3.Tvac - K3.Tsl) * Math.exp(-S.y / 8500);
+  const nz = engNoise(S, dt, p.en / 100), T1 = Tfull / 9 * S.thr * nz;
+  let nAlive = 0, tauDiff = 0;
+  S.eng.forEach(e => { e.on = !S.mecoT && S.prop > 0 && !e.failed; if (e.on) { nAlive++; tauDiff += -e.d * T1; } });
+  const T = T1 * nAlive;
+  const mdot = T > 0 ? K3.Tvac / 9 * nAlive * S.thr / (K3.IspVac * G0) : 0;
+  // ---------- 자세 제어 (비행 컴퓨터): 각도 → 회전 속도 → 토크 → 짐벌
+  const aMax = T > 0 ? zcg * T * Math.sin(K3.gMax) / I : 0;
+  const e = wrapA(S.thRef - S.th);
+  const wLim = Math.min(5 * D2R, Math.sqrt(2 * 0.6 * Math.max(aMax, 1e-4) * Math.abs(e)));
+  const wDes = clamp(1.5 * e, -wLim, wLim);
+  const tauReq = I * 3 * (wDes - S.om);
+  const dCmd = T > 0 ? clamp(Math.asin(clamp(-(tauReq - tauDiff) / (zcg * T), -1, 1)), -K3.gMax, K3.gMax) : 0;   // 고장 엔진의 차동 토크는 미리 뺀다
+  S.delta += clamp(dCmd - S.delta, -K3.gRate * dt, K3.gRate * dt);
+  // ---------- 힘과 토크 (무게중심 기준). 앞이 뾰족한 로켓은 압력 중심이 무게중심보다 앞 → 불안정
+  const b = { x: Math.sin(S.th), y: Math.cos(S.th) }, nn = { x: Math.cos(S.th), y: -Math.sin(S.th) };
+  let Fx = T * Math.sin(S.th + S.delta), Fy = T * Math.cos(S.th + S.delta);
+  let tau = -zcg * T * Math.sin(S.delta) + tauDiff * Math.cos(S.delta);
+  let aoa = 0;
+  if (sp > 1) {
+    const ub = (vax * b.x + vay * b.y) / sp, un = (vax * nn.x + vay * nn.y) / sp;
+    const Fa = -q * K3.A * K3.Cd * cdMach(st.mach) * ub * Math.abs(ub);
+    const Fpot = -q * K3.A * K3.CNa * Math.abs(ub) * un;
+    const Fcross = -q * K3.len * VEH_F9.D * K3.Cdc * un * Math.abs(un);
+    Fx += Fa * b.x + (Fpot + Fcross) * nn.x; Fy += Fa * b.y + (Fpot + Fcross) * nn.y;
+    const zLead = ub >= 0 ? (S.mecoT ? 45 : K3.len - 4) : 3;
+    tau += (zLead - zcg) * Fpot + ((S.mecoT ? 23 : K3.len / 2) - zcg) * Fcross;
+    aoa = Math.atan2(Math.abs(un), Math.abs(ub)) * R2D;
+  }
+  let ax = Fx / m + curvAx(S.vx, S.vy, S.y), ay = Fy / m - gAt(S.y) + curvAy(S.vx, S.y), al = tau / I;
+  if (S.by <= 0.001 && ay < 0) { ax = 0; ay = 0; al = 0; }
+  S.vx += ax * dt; S.vy += ay * dt; S.om += al * dt;
+  S.x += surfX(S.vx, S.y) * dt; S.y += S.vy * dt; S.th += (S.om - S.vx / (RE + S.y)) * dt;   // 국소 수직도 같이 돈다
+  S.prop -= mdot * dt;
+  s3Base(S);
+  if (S.by < 0) { S.y -= S.by; S.vy = Math.max(0, S.vy); s3Base(S); }
+  const qa = q / 1000 * aoa;
+  if (q > S.maxQ) { S.maxQ = q; S.tMaxQ = S.t; }
+  S.maxQa = Math.max(S.maxQa, qa);
+  S.t += dt;
+  S.phase = S.mecoT ? '단 분리' : (S.t < p.tKick ? '수직 상승' : S.t < p.tKick + 6 ? '피치 킥' : (q > p.qBucket && S.thr < 1 ? 'Max-Q 스로틀 다운' : '중력 선회'));
+  if (!S.mecoT && S.prop <= p.reserve * 1000) { S.mecoT = S.t; S.phase = 'MECO'; }
+  const gamma = Math.atan2(S.vy, S.vx) * R2D;
+  S.aoa = aoa; S.qa = qa; S.gamma = gamma; S.st = st; S.T = T; S.w = w; S.phi = S.th;
+  if (qa > K3.qaLimit) {
+    S.phase = '공중 분해';
+    boom(S, `공중 분해 — 공력 하중 q·α = ${qa.toFixed(0)} kPa·° (구조 한계 ${K3.qaLimit})`, { maxQ: S.maxQ, maxQa: S.maxQa });
+  }
+  if (!S.boom && S.mecoT && S.t >= S.mecoT + 3) {
+    S.done = true;
+    const bad = [];
+    if (S.maxQ / 1000 > K3.qLimit) bad.push(`최대 동압 ${(S.maxQ / 1000).toFixed(1)} kPa > ${K3.qLimit}`);
+    if (S.y < 55000 || S.y > 95000) bad.push(`MECO 고도 ${(S.y / 1000).toFixed(1)} km (55–95 km)`);
+    if (gamma < 20 || gamma > 50) bad.push(`비행경로각 ${gamma.toFixed(1)}° (20–50°)`);
+    // 분리된 1단만의 무게중심 위치로 넘겨준다
+    const z1 = vehicleProps(VEH_F9, S.prop).zcg;
+    S.sep = { x: S.bx + z1 * Math.sin(S.th), y: S.by + z1 * Math.cos(S.th), vx: S.vx, vy: S.vy, th: S.th, om: S.om, prop: S.prop };
+    S.result = { ok: bad.length === 0, maxQ: S.maxQ, maxQa: S.maxQa, gamma,
+      msg: bad.length ? '궤도 조건 미달 — ' + bad.join(', ') : `MECO 성공 — 고도 ${(S.y / 1000).toFixed(1)} km, 속도 ${(st.speed / 1000).toFixed(2)} km/s, 경로각 ${gamma.toFixed(1)}°` };
+  }
+  if (!S.done && !S.boom && S.t > 400) { S.done = true; S.result = { ok: false, msg: '시간 초과' }; }
+  if (S.n++ % S.logEvery === 0 || S.done) {
+    const L = S.log; L.t.push(S.t); L.y.push(S.y / 1000); L.x.push(S.x / 1000); L.speed.push(st.speed); L.q.push(q / 1000);
+    L.qa.push(qa); L.pitch.push(S.th * R2D); L.thr.push(T > 0 ? S.thr * 100 : 0); L.gamma.push(gamma); L.wind.push(w); L.zcg.push(zcg); L.delta.push(S.delta * R2D);
+  }
+}
+
+// --------------------------------------------------------------------
+//  4단계: 팰컨 9 1단 귀환 — 강체 2D(x, y, θ), 9기 클러스터, 양력·항력·그리드 핀, 드론십 착륙
+// --------------------------------------------------------------------
+//  좌표: x 하류(+), y 고도, θ 기울기(꼭대기가 +x 쪽이면 +). b = 바닥→꼭대기 축, n = 오른쪽 법선
+const F9R = {
+  len: 47, D: 3.66, A: 10.52, dry: 22200,
+  Tsl: 845000, Tvac: 914000, Isp: 311, minThr: 0.4, gMax: 8 * D2R, gRate: 20 * D2R,
+  CA0: 1.0, CAfwd: 0.4, CNa: 2.0, Cdc: 1.2, zFin: 44, finS: 4.0, rcsT: 1.5e5, rcsF: 600,
+  dt: 0.01, deckHalf: 45, heatLimit: 0.75, legsY: 1000
+};
+// 옥타웹: 가운데 1기 + 바깥 8기(반지름 1.25 m). 2D 에서는 옆 거리 d 만 남는다
+const F9_ENG = (() => {
+  const e = [{ ring: 0, d: 0 }];
+  for (let i = 0; i < 8; i++) e.push({ ring: 1, d: 1.25 * Math.cos((22.5 + 45 * i) * D2R) });
+  return e;
+})();
+const F9_ENTRY = [0, 1, 5];    // 엔트리 번: 가운데 + 마주 보는 바깥 2기
+const f9T1 = y => F9R.Tvac - (F9R.Tvac - F9R.Tsl) * Math.exp(-Math.max(y, 0) / 8500);
+
+// 비행 소프트웨어가 아는 공력 모델: 엔진이 앞장선 축방향 항력 (양력·바람은 모름)
+function f9DragAcc(e, m) {
+  const v = Math.hypot(e.vx, e.vy);
+  const c = 0.5 * rhoAt(e.y) * v * F9R.CA0 * cdMach(v / soundAt(e.y)) * F9R.A / m;
+  return { x: -c * e.vx, y: -c * e.vy };
+}
+// 탄도 예측: 고도 yStop 아래로 내려갈 때까지 적분해 그때의 상태를 돌려준다
+function f9Predict(e, m, yStop) {
+  let x = e.x, y = e.y, vx = e.vx, vy = e.vy;
+  const h = 0.5;
+  for (let i = 0; i < 4000 && !(y <= yStop && vy < 0); i++) {
+    const d = f9DragAcc({ y, vx, vy }, m);
+    vx += (d.x + curvAx(vx, vy, y)) * h; vy += (d.y - gAt(y) + curvAy(vx, y)) * h; x += surfX(vx, y) * h; y += vy * h;
+  }
+  return { x, y, vx, vy };
+}
+
+function s4bCreate(p, seed, fns, init) {
+  const rng = mulberry32(seed), gs = makeGauss(rng);
+  const th0 = init.th ?? Math.atan2(init.vx, init.vy);
+  const MP = vehicleProps(VEH_F9, init.prop);
+  const S = {
+    t: 0, x: init.x, y: init.y, vx: init.vx, vy: init.vy, th: th0, om: init.om || 0, prop: init.prop, xTarget: init.xTarget, MP, bx: 0, by: 0,
+    phase: 'SEP', done: false, result: null, fns, p, gs, rng, mem: {}, n: 0, logEvery: 20,
+    eng: F9_ENG.map(e => ({ ...e, failed: false, on: false })), thr: 0, delta: 0, fin: 0, rcs: 0, thCmd: th0,
+    bias: [0.03 * gs(), 0.03 * gs()], W: windCreate(), en: 0, w: 0,
+    fx: { x: [init.x - MP.zcg * Math.sin(th0) + 5 * gs(), init.vx + 0.2 * gs()], P: [[25, 0], [0, 0.04]] },
+    fy: { x: [init.y - MP.zcg * Math.cos(th0) + 5 * gs(), init.vy + 0.2 * gs()], P: [[25, 0], [0, 0.04]] },
+    lastG: -1, lastR: -1, lastC: -1, events: [[0, '단 분리 — 2단 MVac 점화']],
+    failT: Infinity, failIdx: rng() < 0.5 ? 1 : 5, maxHeat: 0, maxQ: 0, aoa: 0, legs: 0,
+    log: { t: [], y: [], x: [], speed: [], thr: [], nLit: [], th: [], thCmd: [], delta: [], aoa: [], fin: [], estErr: [], wind: [], q: [], heat: [], errX: [], zcg: [] }
+  };
+  S.m = MP.m; f9Base(S);
+  return S;
+}
+function f9Base(S) { const z = S.MP.zcg; S.bx = S.x - z * Math.sin(S.th); S.by = S.y - z * Math.cos(S.th); }
+
+function s4bStep(S) {
+  const p = S.p, dt = F9R.dt, gs = S.gs;
+  if (S.boom) return boomTick(S, dt);
+  if (S.post) return postStep(S, dt, (x, y, a) => { const z = S.MP.zcg; S.th = a; S.x = x + z * Math.sin(a); S.y = y + z * Math.cos(a); S.bx = x; S.by = y; });
+  const MP = S.MP = vehicleProps(VEH_F9, S.prop), m = MP.m, I = MP.I, zcg = MP.zcg;
+  f9Base(S);
+  // ---------- 바람과 공기
+  const sfc = windStep(S.W, p.windMode, p.sfc, dt, gs, S.rng);
+  const w = sfc * blProfile(S.by) + jetAt(S.y, p.jet) * S.W.ratio;
+  const vax = S.vx - w, vay = S.vy, sp = Math.hypot(vax, vay), rho = rhoAt(S.y), q = 0.5 * rho * sp * sp;
+  const b = { x: Math.sin(S.th), y: Math.cos(S.th) }, nn = { x: Math.cos(S.th), y: -Math.sin(S.th) };
+  // ---------- 측정 갱신 (GPS 10 Hz, 레이더 고도계 20 Hz)
+  const gpsOut = p.gpsOut && S.y < 30000 && S.y > 4000;
+  if (!gpsOut && S.t - S.lastG >= 0.1 - 1e-9) {
+    S.lastG = S.t;
+    S.fns.kfUpdate(S.fx, S.bx + p.sg * gs(), p.sg * p.sg);
+    S.fns.kfUpdate(S.fy, S.by + p.sg * 1.5 * gs(), (p.sg * 1.5) ** 2);
+  }
+  if (S.by < 3000 && S.t - S.lastR >= 0.05 - 1e-9) { S.lastR = S.t; S.fns.kfUpdate(S.fy, S.by + 0.3 * gs(), 0.09); }
+  S.gpsOut = gpsOut;
+  const est = { x: S.fx.x[0], vx: S.fx.x[1], y: S.fy.x[0], vy: S.fy.x[1], th: S.th + 0.05 * D2R * gs(), om: S.om + 0.1 * D2R * gs() };
+  // ---------- 엔진 고장
+  if (S.t >= S.failT && !S.eng[S.failIdx].failed) { S.eng[S.failIdx].failed = true; S.events.push([S.t, '엔진 고장 — 엔트리 번 바깥 엔진 1기 정지']); }
+  const T1 = f9T1(S.y);
+  const finArm = F9R.zFin - zcg;
+  const nOn = S.eng.filter(e => e.on).length;
+  const k = {
+    m, g: GRAV, I, zcg, T1, xTarget: S.xTarget, nLit: nOn,
+    // 지금 쓸 수 있는 최대 각가속도: 짐벌 + 그리드 핀 + RCS
+    alphaMax: ((nOn ? zcg * nOn * T1 * S.thr * Math.sin(F9R.gMax) : 0) + (q > 50 ? q * F9R.finS * finArm : 0) + F9R.rcsT) / I,
+    retro: e => Math.atan2(-e.vx, -e.vy),
+    predictAt: (e, yStop) => f9Predict(e, m, yStop),
+    predictImpact: e => f9Predict(e, m, 0).x,
+    dragAcc: e => f9DragAcc(e, m),
+    liftPerRad: e => { const v = Math.hypot(e.vx, e.vy); return 0.5 * rhoAt(e.y) * v * v * F9R.A * F9R.CNa / m; },
+    aeroAcc: S.aeroMeas || { x: 0, y: 0 }
+  };
+  // ---------- 비행 소프트웨어: 상태 기계 (20 Hz)
+  let lit = [];
+  if (S.t - S.lastC >= 0.05 - 1e-9) {
+    S.lastC = S.t;
+    if (S.phase === 'SEP') {
+      if (S.t > 3) { S.thCmd = S.fns.flipAttitude(est, k, p, S.mem); S.phase = 'FLIP'; S.events.push([S.t, `RCS 뒤집기 → 엔트리 자세 ${(S.thCmd * R2D).toFixed(0)}° 로 돌려 놓고 유지`]); }
+    } else if (S.phase === 'FLIP') {
+      if (est.vy < 0 && est.y < p.entryAlt * 1000) {
+        S.phase = 'ENTRY'; S.events.push([S.t, '엔트리 번 점화 (엔진 3기)']);
+        if (p.engFail === 'entry') S.failT = S.t + 2 + 6 * S.rng();
+      }
+    } else if (S.phase === 'ENTRY') {
+      S.thCmd = k.retro(est); S.thr = 1;
+      if (Math.hypot(est.vx, est.vy) < p.entryEnd) { S.phase = 'AERO'; S.events.push([S.t, '엔트리 번 종료 → 그리드 핀 + 받음각 조종']); }
+    } else if (S.phase === 'AERO') {
+      const th = S.fns.aeroGuidance(est, k, p, S.mem);
+      S.thCmd = isFinite(th) ? th : k.retro(est);
+      if (est.y < 15000 && S.fns.ignite(est, k, p, S.mem)) { S.phase = 'LANDING'; S.events.push([S.t, '착륙 연소 점화 (엔진 1기)']); }
+    } else if (S.phase === 'LANDING') {
+      const o = S.fns.landingBurn(est, k, p, S.mem) || {};
+      S.thr = isFinite(o.throttle) ? clamp(o.throttle, F9R.minThr, 1) : 1;
+      S.thCmd = isFinite(o.th) ? clamp(o.th, -0.5, 0.5) : 0;
+    }
+  }
+  S.eng.forEach((e, i) => { e.on = S.prop > 0 && !e.failed && (S.phase === 'ENTRY' ? F9_ENTRY.includes(i) : S.phase === 'LANDING' ? i === 0 : false); });
+  if (S.phase === 'LANDING' && S.by < F9R.legsY) S.legs = Math.min(1, S.legs + dt / 3);
+  // ---------- 자세 제어 (100 Hz) → 제어 할당: 짐벌 → 그리드 핀 → RCS
+  const tauReq = S.fns.attitude(est, S.thCmd, k, p, S.mem);
+  const noise = engNoise(S, dt, p.en / 100);
+  let Tsum = 0, tauDiff = 0;
+  S.eng.forEach(e => { if (e.on) { const T = T1 * S.thr * noise; Tsum += T; tauDiff += -e.d * T; } });
+  let rem = isFinite(tauReq) ? tauReq : 0, dCmd = 0;
+  if (Tsum > 0) dCmd = clamp(Math.asin(clamp(-(rem - tauDiff) / (zcg * Tsum), -1, 1)), -F9R.gMax, F9R.gMax);
+  S.delta += clamp(dCmd - S.delta, -F9R.gRate * dt, F9R.gRate * dt);
+  const tauEng = -zcg * Tsum * Math.sin(S.delta) + tauDiff * Math.cos(S.delta);
+  rem -= tauEng;
+  S.fin = q > 50 && S.phase !== 'SEP' ? clamp(rem / (q * F9R.finS * finArm), -1, 1) : 0;
+  rem -= q * F9R.finS * finArm * S.fin;
+  S.rcs = S.phase === 'SEP' ? 0 : clamp(rem / F9R.rcsT, -1, 1);
+  // ---------- 힘
+  let Fx = Tsum * Math.sin(S.th + S.delta), Fy = Tsum * Math.cos(S.th + S.delta);
+  let tau = tauEng + q * F9R.finS * finArm * S.fin + S.rcs * F9R.rcsT;
+  S.aoa = 0;
+  if (sp > 1) {
+    const ub = (vax * b.x + vay * b.y) / sp, un = (vax * nn.x + vay * nn.y) / sp, M = sp / soundAt(S.y);
+    const Fa = -q * F9R.A * (ub < 0 ? F9R.CA0 : F9R.CAfwd) * cdMach(M) * ub * Math.abs(ub);
+    const Fpot = -q * F9R.A * F9R.CNa * Math.abs(ub) * un;
+    const Fcross = -q * F9R.len * F9R.D * F9R.Cdc * un * Math.abs(un);
+    const Fn = Fpot + Fcross + q * F9R.finS * S.fin;
+    Fx += Fa * b.x + Fn * nn.x; Fy += Fa * b.y + Fn * nn.y;
+    tau += ((ub < 0 ? 2 : F9R.len - 3) - zcg) * Fpot + (F9R.len / 2 - zcg) * Fcross;
+    S.aoa = Math.atan2(un, -ub) * R2D;
+    // IMU 가 잰 가속도에서 (알고 있는) 추력을 빼면 공력 가속도를 '측정'할 수 있다 (1차 저역통과)
+    const ax_ = (Fa * b.x + Fn * nn.x) / m, ay_ = (Fa * b.y + Fn * nn.y) / m, f = 0.1, M0 = S.aeroMeas || { x: 0, y: 0 };
+    S.aeroMeas = { x: M0.x + f * (ax_ + p.sa * gs() - M0.x), y: M0.y + f * (ay_ + p.sa * gs() - M0.y) };
+  }
+  // ---------- IMU 로 예측 → 적분
+  S.fns.kfPredict(S.fx, Fx / m + S.bias[0] + p.sa * gs(), dt, p.sa);
+  S.fns.kfPredict(S.fy, Fy / m + S.bias[1] + p.sa * gs() - GRAV, dt, p.sa);
+  S.vx += (Fx / m + curvAx(S.vx, S.vy, S.y)) * dt; S.vy += (Fy / m - gAt(S.y) + curvAy(S.vx, S.y)) * dt; S.om += tau / I * dt;
+  S.x += surfX(S.vx, S.y) * dt; S.y += S.vy * dt; S.th = wrapA(S.th + (S.om - S.vx / (RE + S.y)) * dt);
+  S.prop -= S.eng.reduce((a, e) => a + (e.on ? F9R.Tvac * S.thr / (F9R.Isp * G0) : 0), 0) * dt + Math.abs(S.rcs) * F9R.rcsF / (70 * G0) * dt;
+  S.t += dt;
+  f9Base(S);
+  const heat = Math.sqrt(rho / 1.225) * (sp / 1000) ** 3;
+  S.maxHeat = Math.max(S.maxHeat, heat); S.maxQ = Math.max(S.maxQ, q);
+  S.m = m; S.q = q; S.w = w; S.k = k; S.Tsum = Tsum; S.heat = heat;
+  S.est = { x: S.fx.x[0], vx: S.fx.x[1], y: S.fy.x[0], vy: S.fy.x[1], th: S.th, om: S.om };
+  // ---------- 종료 판정
+  if (heat > F9R.heatLimit) boom(S, `공중 폭발 — 엔진부 과열 (가열 지표 ${heat.toFixed(2)}, 한계 ${F9R.heatLimit}). 엔트리 번이 부족합니다`);
+  else if (S.phase === 'LANDING' && S.vy > 0.5 && S.by > 2) { S.done = true; S.result = { ok: false, msg: '착륙 중단 — 다시 상승: 최소 추력도 무게보다 커서 감속이 멈추지 않고 위로 올라갔습니다 (너무 일찍 점화)' }; }
+  else if (S.by <= 0) {
+    const vv = -S.vy, vh = S.vx, tilt = S.th, xe = S.bx - S.xTarget, om = S.om, bx = S.bx;
+    S.y -= S.by; S.by = 0; S.vy = 0; S.vx = 0; S.om = 0; S.phase = 'TOUCHDOWN'; S.Tsum = 0; S.eng.forEach(e => e.on = false);
+    const extra = { xe, prop: S.prop, maxHeat: S.maxHeat };
+    if (Math.abs(xe) > F9R.deckHalf) boom(S, `바다에 추락 — 드론십 갑판에서 ${(Math.abs(xe) - F9R.deckHalf).toFixed(0)} m 벗어남${S.prop <= 0 ? ' (연료 고갈)' : ''}`, extra);
+    else if (S.legs < 0.95) boom(S, '착륙 다리가 다 펴지기 전에 닿았습니다 → 폭발', extra);
+    else touchdown(S, Object.assign({}, GEO_F9, { hc: zcg }), { vv, vh, tilt, om, base: bx, extra,
+      final: (n, leg) => {
+        const tag = `수직 ${vv.toFixed(1)} m/s, 수평 ${Math.abs(vh).toFixed(1)} m/s, 기울기 ${(Math.abs(tilt) * R2D).toFixed(1)}°, 충격 ${n.toFixed(2)} g, 갑판 중심에서 ${Math.abs(xe).toFixed(1)} m, 남은 연료 ${(Math.max(S.prop, 0) / 1000).toFixed(2)} t`;
+        if (leg) return { ok: false, warn: true, msg: `다리 파손 — 서 있긴 하지만 재사용 불가 (${tag})` };
+        if (n > GEO_F9.nSoft) return { ok: false, warn: true, msg: `착륙은 했지만 손상 — ${tag}: 다리 완충재 교체 필요` };
+        if (Math.abs(xe) > 20) return { ok: true, warn: true, msg: `갑판 가장자리에 착륙 — ${tag}` };
+        return { ok: true, msg: `착륙 성공 — ${tag}` };
+      } });
+  }
+  if (!S.done && !S.boom && !S.post && S.t > 900) { S.done = true; S.result = { ok: false, msg: '시간 초과' }; }
+  if (S.n++ % S.logEvery === 0 || S.done || S.post) {
+    const L = S.log; L.t.push(S.t); L.y.push(S.by / 1000); L.x.push(S.bx / 1000); L.speed.push(Math.hypot(S.vx, S.vy)); L.thr.push(Tsum > 0 ? S.thr * 100 : 0);
+    L.nLit.push(S.eng.filter(e => e.on).length); L.th.push(S.th * R2D); L.thCmd.push(S.thCmd * R2D); L.delta.push(S.delta * R2D); L.aoa.push(S.phase === 'AERO' ? S.aoa : NaN);
+    L.fin.push(S.fin * 100); L.estErr.push(Math.hypot(S.fx.x[0] - S.bx, S.fy.x[0] - S.by)); L.wind.push(w); L.q.push(q / 1000); L.heat.push(heat); L.errX.push((S.bx - S.xTarget) / 1000); L.zcg.push(zcg);
+  }
+}
+
+// 드론십 배치용: 핀·양력 없이, 엔트리 번만 하고 떨어지면 어디에 닿을까 (바람·잡음 없음)
+function s4PredictImpact(p, init) {
+  const m0 = F9R.dry + init.prop, z = vehicleProps(VEH_F9, init.prop).zcg, th = init.th ?? 0;
+  let e = f9Predict({ x: init.x - z * Math.sin(th), y: init.y - z * Math.cos(th), vx: init.vx, vy: init.vy }, m0, p.entryAlt * 1000), m = m0;
+  // 엔트리 번: 3기, 역방향, entryEnd 까지
+  const h = 0.05;
+  while (Math.hypot(e.vx, e.vy) > p.entryEnd && m > F9R.dry) {
+    const sp = Math.hypot(e.vx, e.vy), T = 3 * f9T1(e.y), d = f9DragAcc(e, m);
+    e.vx += (-T / m * e.vx / sp + d.x + curvAx(e.vx, e.vy, e.y)) * h; e.vy += (-T / m * e.vy / sp + d.y - gAt(e.y) + curvAy(e.vx, e.y)) * h;
+    e.x += surfX(e.vx, e.y) * h; e.y += e.vy * h; m -= 3 * F9R.Tvac / (F9R.Isp * G0) * h;
+  }
+  return f9Predict(e, m, 0).x;
+}
+
+// --------------------------------------------------------------------
+//  4단계: 전체 미션 — 상승 → 단 분리 → (1단 귀환·착륙) ∥ (2단 궤도 투입·스타링크 배치)
+// --------------------------------------------------------------------
+const UP = { dry: 4000, prop: 109100, fairing: 1900, sat: 800, nSat: 6, T: 981000, Isp: 348, sesDelay: 7, fairingAlt: 110000, rate: 4 * D2R,
+  stackZ0: 13.3, layer: 0.9, zcg: 6.5, sunAngle: -0.6 };   // 스택은 2단 바닥에서 13.3 m 위부터 층마다 0.9 m, 배치 때 2단 무게중심 약 6.5 m
+// 궤도 요소: 위치 r, 수평 속도 vt, 수직 속도 vr → 근지점·원지점 고도
+function orbitOf(y, vt, vr) {
+  const r = RE + y, v2 = vt * vt + vr * vr, E = v2 / 2 - MU / r, h = r * vt;
+  if (E >= 0) return { peri: NaN, apo: Infinity, e: 1 };
+  const a = -MU / (2 * E), e = Math.sqrt(Math.max(0, 1 + 2 * E * h * h / (MU * MU)));
+  return { peri: a * (1 - e) - RE, apo: a * (1 + e) - RE, e, a };
+}
+function upCreate(sep, tSep) {
+  const U = { x: sep.bx2, y: sep.by2, vx: sep.vx, vy: sep.vy, th: sep.th, prop: UP.prop, fairing: true, sats: UP.nSat, failed: false,
+    phase: 'SEP', t0: tSep, tl: 0, on: false, thCmd: sep.th, deployed: [], fairings: [], mem: {}, orbit: null, seco: null };
+  U.m = UP.dry + U.prop + UP.fairing + UP.sat * UP.nSat;
+  return U;
+}
+function upStep(U, M, dt) {
+  const p = M.p;
+  U.tl += dt;
+  const oNow = orbitOf(U.y, U.vx, U.vy);
+  const st = { t: U.tl, h: U.y, vx: U.vx, vy: U.vy, r: RE + U.y, g: gAt(U.y), vCirc: Math.sqrt(MU / (RE + U.y)), peri: isFinite(oNow.peri) ? oNow.peri : -RE, apo: oNow.apo };
+  const k = { m: U.m, T: UP.T, g: st.g };
+  if (U.phase === 'SEP' && U.tl > UP.sesDelay) { U.phase = 'BURN'; M.ev(2, 'MVac 점화 (2단 엔진 1기)'); }
+  if (U.phase === 'BURN') {
+    const o = M.fns.upperGuidance(st, k, p, U.mem) || {};
+    if (isFinite(o.pitch)) U.thCmd = o.pitch * D2R;
+    if (o.cutoff || U.prop <= 0 || U.failed) {
+      U.phase = 'COAST'; U.tSeco = U.tl; U.orbit = orbitOf(U.y, U.vx, U.vy);
+      M.ev(2, U.failed ? 'MVac 고장 — 연소 중단' : U.prop <= 0 ? '연료 고갈 — SECO' : `SECO — 궤도 ${(U.orbit.peri / 1000).toFixed(0)} × ${(U.orbit.apo / 1000).toFixed(0)} km`);
+    }
+  }
+  U.on = U.phase === 'BURN' && !U.failed && U.prop > 0;
+  // 자세: 2단은 짐벌 + 냉가스로 빠르게 따라간다 (속도 제한 1차 추종)
+  if (U.spin !== undefined) U.th += U.spin * dt;                       // 배치 직전부터는 천천히 회전 (관성)
+  else U.th += clamp(wrapA(U.thCmd - U.th), -UP.rate * dt, UP.rate * dt);
+  const T = U.on ? UP.T : 0;
+  const rho = rhoAt(U.y), sp = Math.hypot(U.vx, U.vy), D = 0.5 * rho * sp * sp * 0.3 * 10.5;
+  const ax = (T * Math.sin(U.th) - (sp > 0 ? D * U.vx / sp : 0)) / U.m + curvAx(U.vx, U.vy, U.y);
+  const ay = (T * Math.cos(U.th) - (sp > 0 ? D * U.vy / sp : 0)) / U.m - gAt(U.y) + curvAy(U.vx, U.y);
+  U.vx += ax * dt; U.vy += ay * dt; U.x += surfX(U.vx, U.y) * dt; U.y += U.vy * dt;
+  U.th -= U.vx / (RE + U.y) * dt;
+  if (U.on) { const dm = T / (UP.Isp * G0) * dt; U.prop -= dm; U.m -= dm; }
+  // 페어링 분리: 공기가 거의 없어지면
+  if (U.fairing && U.y > UP.fairingAlt) {
+    U.fairing = false; U.m -= UP.fairing; M.ev(2, '페어링 분리');
+    U.fairings = [{ x: 0, y: 0, vx: -2.5, vy: 0.5, a: 0, w: -0.4 }, { x: 0, y: 0, vx: 2.5, vy: 0.5, a: 0, w: 0.4 }];
+  }
+  for (const f of U.fairings) { f.x += f.vx * dt; f.y += f.vy * dt; f.a += f.w * dt; }
+  // 스타링크 배치 (팰컨 9 방식):
+  //  ① SECO 뒤 coast 초 기다렸다가 RCS 로 기체를 천천히 돌리기 시작한다
+  //  ② 회전이 붙으면 스택을 묶던 텐션 로드를 풀어 6기를 '한꺼번에' 놓는다
+  //  ③ 각 층은 회전 중심에서 먼 만큼 빨리 떠나서(v = ω·z) 카드 펼치듯 하나씩 멀어진다
+  if (U.phase === 'COAST' && U.orbit && U.orbit.peri > 150000 && U.tl - U.tSeco > p.coast) {
+    U.phase = 'SPINUP'; U.tSpin = U.tl; U.spin = 0; M.ev(2, `배치 자세로 회전 시작 (RCS, ${p.spin.toFixed(1)}°/s)`);
+  }
+  if (U.phase === 'SPINUP') {
+    U.spin = Math.min(p.spin * D2R, U.spin + p.spin * D2R / 5 * dt);   // 5초에 걸쳐 회전 속도를 올린다
+    if (U.tl - U.tSpin > 6) {
+      U.phase = 'DEPLOY'; U.tDone = U.tl;
+      const b = { x: Math.sin(U.th), y: Math.cos(U.th) }, n = { x: Math.cos(U.th), y: -Math.sin(U.th) };
+      for (let i = 0; i < U.sats; i++) {
+        const z = UP.stackZ0 + (i + 0.5) * UP.layer - UP.zcg;           // 무게중심에서 이 층까지 거리
+        const vt = U.spin * z;                                          // 회전이 주는 속도
+        U.deployed.push({ i, x: z * b.x, y: z * b.y, vx: vt * n.x + 0.02 * b.x, vy: vt * n.y + 0.02 * b.y, a: U.th, w: U.spin, unfold: 0, st: 'tumble' });
+      }
+      U.m -= UP.sat * U.sats; U.sats = 0;
+      M.ev(2, '텐션 로드 해제 — 스타링크 6기 동시 분리');
+    }
+  }
+  // 분리 뒤 위성 하나하나의 순서 (교육용으로 시간을 줄였다 — 실제로는 몇 시간~며칠):
+  //  ① 굴러가던 회전을 반작용 휠로 멈춘다  ② 태양전지판을 아코디언처럼 편다
+  //  ③ 판이 태양을 보도록 돌린다          ④ 홀 추진기를 켜 궤도를 천천히 올린다
+  for (const d of U.deployed) {
+    d.x += d.vx * dt; d.y += d.vy * dt; d.a += d.w * dt;
+    const age = U.tl - U.tDone - (UP.nSat - 1 - d.i) * 3;            // 위층(먼저 떠난 위성)부터 차례로
+    const prev = d.st;
+    if (age < 15) d.st = 'tumble';
+    else if (age < 25) { d.st = 'detumble'; d.w *= Math.exp(-dt / 2); }
+    else if (age < 45) { d.st = 'unfold'; d.w *= Math.exp(-dt / 2); d.unfold = clamp((age - 25) / 20, 0, 1); }
+    else {
+      d.unfold = 1; d.w = 0;
+      const err = wrapA(UP.sunAngle - d.a);
+      d.a += clamp(err, -0.15 * dt, 0.15 * dt);                        // 판이 태양을 향하도록 천천히
+      d.st = Math.abs(err) > 0.02 || age < 58 ? 'sun' : 'thrust';
+    }
+    if (d.st === 'thrust') { d.vy += 0.002 * dt; }                   // 홀 추진기: 아주 작은 추력 (보이게 과장)
+    if (d.st !== prev && d.i === UP.nSat - 1) {
+      const msg = { detumble: '스타링크 6호 — 반작용 휠로 회전 정지', unfold: '스타링크 6호 — 태양전지판 전개 시작', sun: '스타링크 6호 — 전개 완료, 태양 쪽으로 자세 전환', thrust: '스타링크 6호 — 홀 추진기 점화 (궤도 올리기)' }[d.st];
+      if (msg) M.ev(2, msg);
+    }
+    if (d.st !== prev && d.i === 0 && d.st === 'thrust') M.ev(2, '6기 모두 전개 완료 · 홀 추진기 가동');
+  }
+  if (U.y < 0) { U.crashed = true; }
+  U.orbitNow = orbitOf(U.y, U.vx, U.vy);
+}
+
+function s4Create(p, seed, fns) {
+  const ascentP = { tKick: p.tKick, kick: p.kick, qBucket: p.qBucket, bucket: p.bucket, loadRelief: true, wind: p.jet, windMode: p.windMode, sfc: p.sfc, reserve: p.reserve, en: p.en };
+  const A = s3Create(ascentP, seed, { guidance: fns.guidance });
+  const M = { t: 0, phase: 'ASCENT', A, B: null, U: null, p, fns, seed, done: false, result: null, events1: [], events2: [], n: 0,
+    log: { t: [], y1: [], y2: [], v1: [], v2: [], th: [], thCmd: [], delta: [], aoa: [], fin: [], nLit: [], thr: [], heat: [], errX: [], zcg: [], estErr: [], peri: [], apo: [], x1: [], x2: [] } };
+  M.ev = (who, msg) => (who === 1 ? M.events1 : M.events2).push([M.t, msg]);
+  M.ev(1, '이륙 — 멀린 9기');
+  return M;
+}
+function s4Separate(M) {
+  const A = M.A, sep = A.sep;
+  M.tSep = M.t;
+  // 2단 위치: 1단 꼭대기(47 m) 위로 2단 길이의 절반쯤
+  const b = { x: Math.sin(A.th), y: Math.cos(A.th) };
+  const up = { bx2: A.bx + 54 * b.x, by2: A.by + 54 * b.y, vx: A.vx, vy: A.vy, th: A.th };
+  M.U = upCreate(up, M.t);
+  const init = Object.assign({}, sep);
+  init.xTarget = s4PredictImpact(M.p, init) + M.p.offset * 1000;
+  M.B = s4bCreate(M.p, M.seed + 7, M.fns, init);
+  M.B.eng.forEach((e, i) => { if (A.eng[i].failed) e.failed = true; });
+  M.phase = 'SPLIT';
+  M.ev(1, 'MECO · 단 분리'); M.ev(2, '단 분리');
+}
+function s4Step(M) {
+  const dt = F9R.dt;
+  if (M.phase === 'ASCENT') {
+    M.half = !M.half;                       // 상승 모델은 0.02 s 간격: 두 번에 한 번 진행
+    if (M.half) s3Step(M.A);
+    M.t = M.A.t;
+    if (M.A.mecoT && !M.mecoLogged) { M.mecoLogged = true; }
+    if (M.A.boom) { M.phase = 'BOOM'; }
+    else if (M.A.done) { if (M.A.sep) s4Separate(M); else { M.done = true; M.result = M.A.result; } }
+    mlog(M); return;
+  }
+  if (M.phase === 'BOOM') { M.half = !M.half; if (M.half) s3Step(M.A); M.t = M.A.t; if (M.A.done) { M.done = true; M.result = M.A.result; } return; }
+  // 분리 이후: 1단과 2단을 함께 진행
+  if (!M.B.done) { s4bStep(M.B); M.B.events.forEach(e => { if (!e.seen) { e.seen = true; if (e[0] > 0.01) M.events1.push([M.tSep + e[0], e[1]]); } }); }
+  upStep(M.U, M, dt);
+  M.t += dt;
+  if (M.n++ % 20 === 0) mlog(M);
+  const U = M.U;
+  const upDone = U.crashed || (U.phase === 'DEPLOY' && U.tl - U.tDone > M.p.watch) || (U.phase === 'COAST' && U.orbit && !(U.orbit.peri > 150000) && U.tl - U.tSeco > 30);
+  if (M.B.done && upDone) {
+    M.done = true;
+    const r1 = M.B.result, o = U.orbit;
+    const orbitOK = o && o.peri > 150000;
+    const msg2 = orbitOK ? `2단: 궤도 ${(o.peri / 1000).toFixed(0)} × ${(o.apo / 1000).toFixed(0)} km, 스타링크 ${UP.nSat - U.sats}기 배치` : `2단: 궤도 진입 실패${o ? ` (근지점 ${(o.peri / 1000).toFixed(0)} km)` : ''}`;
+    M.result = { ok: r1.ok && orbitOK, warn: r1.warn || (!r1.ok && orbitOK), boom: r1.boom, msg: `1단: ${r1.msg} · ${msg2}` };
+  }
+}
+function mlog(M) {
+  const L = M.log, A = M.A, B = M.B, U = M.U;
+  const one = B || A;
+  L.t.push(M.t);
+  L.y1.push((B ? B.by : A.by) / 1000); L.x1.push((B ? B.bx : A.bx) / 1000);
+  L.v1.push(Math.hypot(one.vx, one.vy));
+  L.y2.push(U ? U.y / 1000 : NaN); L.x2.push(U ? U.x / 1000 : NaN); L.v2.push(U ? Math.hypot(U.vx, U.vy) : NaN);
+  L.th.push(one.th * R2D); L.thCmd.push(B ? B.thCmd * R2D : (A.thRef || 0) * R2D); L.delta.push(one.delta * R2D);
+  L.aoa.push(B && B.phase === 'AERO' ? B.aoa : NaN); L.fin.push(B ? B.fin * 100 : NaN);
+  L.nLit.push(B ? B.eng.filter(e => e.on).length : A.eng.filter(e => e.on).length);
+  L.thr.push(B ? (B.Tsum > 0 ? B.thr * 100 : 0) : (A.T > 0 ? A.thr * 100 : 0));
+  L.heat.push(B ? B.heat || 0 : NaN); L.errX.push(B ? (B.bx - B.xTarget) / 1000 : NaN);
+  L.zcg.push(one.MP ? one.MP.zcg : NaN); L.estErr.push(B ? Math.hypot(B.fx.x[0] - B.bx, B.fy.x[0] - B.by) : NaN);
+  const o = U ? U.orbitNow : null;
+  L.peri.push(o && isFinite(o.peri) ? Math.max(o.peri / 1000, -100) : NaN); L.apo.push(o && isFinite(o.apo) ? Math.min(o.apo / 1000, 2000) : NaN);
+}
+
+if (typeof module !== 'undefined') module.exports = { s4bCreate, s4bStep, orbitOf, UP, RE, F9R, F9_ENG, s4PredictImpact, vehicleProps, VEH_F9, VEH_GH, UPPER_F9, WIND_MODES, GEO_F9, GEO_GH, CODE, compile, K1, K2, K3, s1Create, s1Step, s2Create, s2Step, s3Create, s3Step, s4Create, s4Step, s1Ref, s2Ref, D2R, R2D };
+
+</script>
+<script>
+// ====================================================================
+//  UI — 러너, 그래프, 장면 렌더러, 코드 편집기
+// ====================================================================
+const $ = (s, r = document) => r.querySelector(s);
+const el = (tag, attrs = {}, html) => { const e = document.createElement(tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (html !== undefined) e.innerHTML = html; return e; };
+const COL = {};
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ['paper', 'panel', 'ink', 'muted', 'rule', 'rule-soft', 'lox', 'kero', 'fault', 'ok', 'sky', 'space', 'ground', 'sea', 'lox-soft', 'kero-soft'])
+    COL[k] = cs.getPropertyValue('--' + k).trim();
+}
+readColors();
+const FONT = "'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif";
+const fmt = (v, d = 1) => (v === undefined || v === null || !isFinite(v)) ? '—' : v.toFixed(d);
+
+// ---------- 색 보간
+function hex2rgb(h) { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); const n = parseInt(h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function mix(a, b, t) { const A = hex2rgb(a), B = hex2rgb(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`; }
+
+// ---------- 캔버스 크기 맞추기
+function fitCanvas(cv) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+
+// ====================================================================
+//  코드 버퍼 (편집 가능한 코드 — 칼만 필터는 모든 단계가 공유)
+// ====================================================================
+const CODEBUF = { kf: CODE.kf, s1: CODE.s1, s2: CODE.s2, s3: CODE.s3, s4: CODE.s4, up: CODE.up };
+
+function highlight(code) {
+  if (window.Prism && Prism.languages && Prism.languages.javascript) return Prism.highlight(code, Prism.languages.javascript, 'javascript');
+  return code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function makeEditor(host, tabs, runner) {
+  const shell = el('div', { class: 'editor-shell' });
+  const bar = el('div', { class: 'editor-tabs', role: 'tablist' });
+  const edWrap = el('div', { class: 'editor' });
+  const pre = el('pre', { 'aria-hidden': 'true' }); const codeEl = el('code', { class: 'language-javascript' }); pre.appendChild(codeEl);
+  const ta = el('textarea', { class: 'code', spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off', 'aria-label': '코드 편집기' });
+  edWrap.append(pre, ta);
+  const msg = el('div', { class: 'code-msg' }, '코드를 고친 뒤 <b>코드 적용</b>을 누르세요. Tab 키는 들여쓰기입니다.');
+  let cur = tabs[0].key;
+  const tabBtns = tabs.map(t => {
+    const b = el('button', { class: 'tab', role: 'tab', type: 'button', 'aria-selected': String(t.key === cur) }, t.label);
+    b.onclick = () => { CODEBUF[cur] = ta.value; cur = t.key; tabBtns.forEach((x, i) => x.setAttribute('aria-selected', String(tabs[i].key === cur))); load(); };
+    bar.appendChild(b); return b;
+  });
+  bar.appendChild(el('span', { class: 'spacer' }));
+  const apply = el('button', { class: 'btn small primary', type: 'button' }, '코드 적용');
+  const reset = el('button', { class: 'btn small', type: 'button', style: 'margin:6px 4px' }, '기본 코드로');
+  bar.append(reset, apply);
+  shell.append(bar, edWrap, msg);
+  host.appendChild(shell);
+
+  function render() { codeEl.innerHTML = highlight(ta.value) + '\n'; pre.scrollTop = ta.scrollTop; pre.scrollLeft = ta.scrollLeft; }
+  function load() { ta.value = CODEBUF[cur]; render(); ta.scrollTop = 0; }
+  ta.addEventListener('input', render);
+  ta.addEventListener('scroll', () => { pre.scrollTop = ta.scrollTop; pre.scrollLeft = ta.scrollLeft; });
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const s = ta.selectionStart, en = ta.selectionEnd;
+      ta.value = ta.value.slice(0, s) + '  ' + ta.value.slice(en);
+      ta.selectionStart = ta.selectionEnd = s + 2; render();
+    }
+  });
+  apply.onclick = () => {
+    CODEBUF[cur] = ta.value;
+    try {
+      runner.compile();
+      runner.reset();
+      msg.className = 'code-msg ok'; msg.textContent = '적용했습니다. 다시 비행하면 새 코드로 돕니다.' + (cur === 'kf' ? ' (칼만 필터는 모든 단계에 공통으로 적용됩니다)' : '');
+    } catch (err) { msg.className = 'code-msg err'; msg.textContent = '컴파일 오류: ' + err.message; }
+  };
+  reset.onclick = () => { CODEBUF[cur] = CODE[cur]; load(); apply.onclick(); msg.textContent = '기본 코드로 되돌렸습니다.'; };
+  load();
+  return { refresh: load, msg };
+}
+
+// ====================================================================
+//  그래프
+// ====================================================================
+class Plot {
+  constructor(host, o) {
+    this.o = o;
+    const box = el('div', { class: 'plot' });
+    box.appendChild(el('h5', {}, o.title));
+    this.cv = el('canvas'); box.appendChild(this.cv);
+    const lg = el('div', { class: 'legend' });
+    o.series.forEach(s => {
+      const sw = s.style === 'dots' ? `<i style="width:6px;height:6px;border-radius:50%;background:var(--${s.color})"></i>` :
+        s.style === 'dash' ? `<i style="background:repeating-linear-gradient(90deg,var(--${s.color}) 0 4px,transparent 4px 7px)"></i>` :
+          `<i style="background:var(--${s.color})"></i>`;
+      lg.insertAdjacentHTML('beforeend', `<span>${sw}${s.label}</span>`);
+    });
+    if (o.hline) lg.insertAdjacentHTML('beforeend', `<span><i style="background:var(--fault)"></i>${o.hline.label}</span>`);
+    if (o.bandLabel) lg.insertAdjacentHTML('beforeend', `<span><i style="background:var(--kero-soft);height:9px"></i>${o.bandLabel}</span>`);
+    box.appendChild(lg);
+    host.appendChild(box);
+  }
+  draw(S) {
+    const { ctx, w, h } = fitCanvas(this.cv);
+    ctx.clearRect(0, 0, w, h);
+    const o = this.o, L = S ? S.log : null;
+    const padL = 44, padR = 8, padT = 6, padB = 20;
+    const t = L ? L.t : [];
+    const tmax = Math.max(o.tMin || 10, t.length ? t[t.length - 1] : 0);
+    let lo = Infinity, hi = -Infinity;
+    for (const s of o.series) { const a = L ? s.get(L) : []; for (let i = 0; i < a.length; i++) { const v = a[i]; if (isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } }
+    if (o.hline && isFinite(o.hline.y)) { hi = Math.max(hi, o.hline.y * 1.05); lo = Math.min(lo, 0); }
+    if (o.yMin !== undefined) lo = Math.min(lo, o.yMin);
+    if (o.yMax !== undefined) hi = Math.max(hi, o.yMax);
+    if (!isFinite(lo)) { lo = 0; hi = 1; }
+    if (hi - lo < (o.minSpan || 1e-6)) { const c = (hi + lo) / 2, sp = (o.minSpan || 1) / 2; lo = c - sp; hi = c + sp; }
+    const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+    const X = v => padL + (v / tmax) * (w - padL - padR);
+    const Y = v => padT + (1 - (v - lo) / (hi - lo)) * (h - padT - padB);
+    // 띠(구간 표시)
+    if (o.bands && S) {
+      ctx.fillStyle = COL['kero-soft'];
+      for (const [a, b] of o.bands(S)) ctx.fillRect(X(a), padT, Math.max(1, X(b) - X(a)), h - padT - padB);
+    }
+    // 격자
+    ctx.font = `11px ${FONT}`; ctx.fillStyle = COL.muted; ctx.strokeStyle = COL['rule-soft']; ctx.lineWidth = 1;
+    const step = niceStep((hi - lo) / 4);
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      const y = Math.round(Y(v)) + .5; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(niceNum(v, step), padL - 6, y);
+    }
+    const ts = niceStep(tmax / 5);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (let v = 0; v <= tmax + 1e-9; v += ts) ctx.fillText(niceNum(v, ts) + (v + ts > tmax ? ' s' : ''), X(v), h - padB + 4);
+    if (o.hline) {
+      ctx.strokeStyle = COL.fault; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(padL, Y(o.hline.y)); ctx.lineTo(w - padR, Y(o.hline.y)); ctx.stroke(); ctx.setLineDash([]);
+    }
+    if (!L) return;
+    for (const s of o.series) {
+      const a = s.get(L); ctx.strokeStyle = COL[s.color]; ctx.fillStyle = COL[s.color];
+      if (s.style === 'dots') {
+        const every = Math.max(1, Math.floor(a.length / 400));
+        for (let i = 0; i < a.length; i += every) if (isFinite(a[i])) ctx.fillRect(X(t[i]) - 1, Y(a[i]) - 1, 2, 2);
+        continue;
+      }
+      ctx.lineWidth = s.width || 1.6; ctx.setLineDash(s.style === 'dash' ? [5, 4] : []);
+      ctx.beginPath(); let pen = false;
+      for (let i = 0; i < a.length; i++) {
+        if (!isFinite(a[i])) { pen = false; continue; }
+        const x = X(t[i]), y = Y(clamp(a[i], lo - 1e9, hi + 1e9));
+        if (!pen) { ctx.moveTo(x, y); pen = true; } else ctx.lineTo(x, y);
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+}
+function niceStep(raw) { if (!(raw > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
+function niceNum(v, step) { const d = step >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(step))); return (Math.abs(v) < step / 1e6 ? 0 : v).toFixed(d); }
+
+// ====================================================================
+//  로켓 그리기
+// ====================================================================
+// (X, Y): 기체 바닥(엔진 짐벌점) 화면 좌표, s: px/m, ang: 기울기 [rad] (시계방향 +)
+function drawPlume(ctx, s, len, wid, thr, n, spread) {
+  if (thr <= 0.01) return;
+  for (let i = 0; i < n; i++) {
+    const off = n === 1 ? 0 : (i - (n - 1) / 2) * spread;
+    const L = len * (0.75 + 0.25 * Math.random()) * s, W0 = wid * s;
+    const g = ctx.createLinearGradient(0, 0, 0, L);
+    g.addColorStop(0, 'rgba(255,248,225,0.95)'); g.addColorStop(0.25, 'rgba(255,196,90,0.9)');
+    g.addColorStop(0.7, 'rgba(230,120,30,0.45)'); g.addColorStop(1, 'rgba(230,120,30,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(off * s - W0 / 2, 0); ctx.quadraticCurveTo(off * s - W0 * 1.4, L * 0.5, off * s, L); ctx.quadraticCurveTo(off * s + W0 * 1.4, L * 0.5, off * s + W0 / 2, 0); ctx.closePath(); ctx.fill();
+  }
+}
+function body(ctx, s, y0, y1, w, fill) { ctx.fillStyle = fill; ctx.fillRect(-w / 2 * s, -y1 * s, w * s, (y1 - y0) * s); }
+
+function drawGrasshopper(ctx, X, Y, s, ang, delta, thr) {
+  ctx.save(); ctx.translate(X, Y); ctx.rotate(ang);
+  // 노즐 + 화염 (짐벌은 3배 과장해 표시)
+  ctx.save(); ctx.rotate(delta * 3);
+  drawPlume(ctx, s, 6 + 26 * thr, 1.6, thr, 1, 0);
+  ctx.fillStyle = '#3A3F44'; ctx.beginPath(); ctx.moveTo(-0.5 * s, -0.2 * s); ctx.lineTo(0.5 * s, -0.2 * s); ctx.lineTo(0.9 * s, 1.6 * s); ctx.lineTo(-0.9 * s, 1.6 * s); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  // 다리
+  ctx.strokeStyle = '#5C646B'; ctx.lineWidth = Math.max(1.2, 0.35 * s);
+  for (const sg of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sg * 1.6 * s, -7 * s); ctx.lineTo(sg * 5.2 * s, 1.6 * s); ctx.lineTo(sg * 1.7 * s, -1 * s); ctx.stroke(); }
+  // 몸체
+  body(ctx, s, 0, 30, 3.66, '#F1F3F4');
+  body(ctx, s, 26, 30, 3.66, '#1E2328');
+  body(ctx, s, 0, 1.2, 3.66, '#2A2F34');
+  ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.strokeRect(-1.83 * s, -30 * s, 3.66 * s, 30 * s);
+  ctx.restore();
+}
+
+// 팰컨 9: opts {stack, eng, thr, expand, fins, legs(0..1), stage2Gap}
+function drawF9(ctx, X, Y, s, ang, o) {
+  ctx.save(); ctx.translate(X, Y); ctx.rotate(ang);
+  const n = o.eng || 0;
+  if (n > 0) drawPlume(ctx, s, (14 + 40 * o.thr) * (1 + 1.5 * (o.expand || 0)), (n > 1 ? 2.4 : 1.6) * (1 + 3 * (o.expand || 0)), o.thr, n === 9 ? 3 : n, 1.1);
+  ctx.fillStyle = '#2A2F34'; ctx.fillRect(-1.6 * s, 0, 3.2 * s, 1.2 * s);
+  // 다리 (전개 정도 legs)
+  const lg = o.legs || 0;
+  ctx.strokeStyle = '#2B3036'; ctx.lineWidth = Math.max(1.5, 0.5 * s);
+  for (const sg of [-1, 1]) {
+    const a = lg * 2.0; // 펴지는 각 (아래로 내려온다)
+    const L = 9.5; const bx = sg * 1.83, by = -1;
+    ctx.beginPath(); ctx.moveTo(bx * s, by * s); ctx.lineTo((bx + sg * Math.sin(a) * L) * s, (by - Math.cos(a) * L) * s); ctx.stroke();
+  }
+  body(ctx, s, 0, 42, 3.66, '#F1F3F4');
+  body(ctx, s, 0, 2, 3.66, '#2A2F34');
+  body(ctx, s, 42, 47, 3.66, '#1E2328');
+  if (o.fins) { ctx.fillStyle = '#6E777F'; for (const sg of [-1, 1]) ctx.fillRect((sg > 0 ? 1.83 : -1.83 - 1.4) * s, -45.5 * s, 1.4 * s, 1.2 * s); }
+  if (o.stack) {
+    const g = o.stage2Gap || 0;
+    ctx.save(); ctx.translate(0, -g * s);
+    if (g > 0.5) { drawPlume(ctx, s, 10, 1.2, 1, 1, 0); ctx.translate(0, 0); }
+    if (g > 0.5) { ctx.fillStyle = '#2A2F34'; ctx.beginPath(); ctx.moveTo(-0.6 * s, -47 * s); ctx.lineTo(0.6 * s, -47 * s); ctx.lineTo(1.2 * s, -44 * s); ctx.lineTo(-1.2 * s, -44 * s); ctx.fill(); }
+    body(ctx, s, 47, 60, 3.66, '#F1F3F4');
+    ctx.fillStyle = '#F1F3F4'; ctx.beginPath(); ctx.moveTo(-2.6 * s, -60 * s); ctx.lineTo(2.6 * s, -60 * s); ctx.lineTo(2.6 * s, -66 * s); ctx.quadraticCurveTo(2.4 * s, -70.5 * s, 0, -71 * s); ctx.quadraticCurveTo(-2.4 * s, -70.5 * s, -2.6 * s, -66 * s); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.restore();
+  }
+  ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1; ctx.strokeRect(-1.83 * s, -47 * s, 3.66 * s, 47 * s);
+  ctx.restore();
+}
+
+// 폭발: 섬광 → 불덩이 → 연기 · 파편
+function drawBoom(ctx, X, Y, s, age, R0) {
+  if (age < 0) return;
+  const R = Math.max(R0 * s, 46);
+  if (age < 0.18) { ctx.fillStyle = `rgba(255,252,235,${0.9 * (1 - age / 0.18)})`; ctx.beginPath(); ctx.arc(X, Y, R * 1.7, 0, 7); ctx.fill(); }
+  const sm = clamp(0.6 * (age - 0.25), 0, 0.55);
+  for (let i = 0; i < 8; i++) {
+    const a = i * 2.39, rr = R * (0.35 + 0.1 * i) * Math.min(1, age * 1.1);
+    ctx.fillStyle = `rgba(68,70,74,${sm})`;
+    ctx.beginPath(); ctx.arc(X + Math.cos(a) * R * 0.4, Y - R * 0.15 - age * R * 0.3 * (1 + i * 0.12) + Math.sin(a) * R * 0.2, rr, 0, 7); ctx.fill();
+  }
+  const fa = clamp(1 - (age - 0.45) / 1.6, 0, 1), fr = R * Math.min(1, 0.25 + age * 2.4);
+  if (fa > 0) {
+    const g = ctx.createRadialGradient(X, Y - fr * 0.15, 0, X, Y - fr * 0.15, fr);
+    g.addColorStop(0, `rgba(255,250,215,${fa})`); g.addColorStop(0.35, `rgba(255,185,70,${fa})`);
+    g.addColorStop(0.75, `rgba(215,85,25,${0.75 * fa})`); g.addColorStop(1, 'rgba(160,50,20,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(X, Y - fr * 0.15, fr, 0, 7); ctx.fill();
+  }
+  ctx.fillStyle = '#2C3136';
+  for (let i = 0; i < 12; i++) {
+    const a = -Math.PI / 2 + (i - 5.5) * 0.28, d = age * R * 1.3 * (0.6 + ((i * 37) % 10) / 14);
+    const px = X + Math.cos(a) * d, py = Y + Math.sin(a) * d + age * age * R * 0.5;
+    ctx.save(); ctx.translate(px, py); ctx.rotate(age * (3 + i)); ctx.fillRect(-3, -1.5, 6, 3); ctx.restore();
+  }
+}
+const showBody = S => !S.boom || S.t - S.boom.t0 < 0.1;
+
+// 무게중심 기호 (사분원 두 칸을 칠한 원)
+function cgMark(ctx, X, Y, r = 6) {
+  ctx.save(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#111'; ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(X, Y, r, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.moveTo(X, Y); ctx.arc(X, Y, r, 0, Math.PI / 2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(X, Y); ctx.arc(X, Y, r, Math.PI, Math.PI * 1.5); ctx.fill();
+  ctx.restore();
+}
+// 질량 분포 패널: 탱크에 남은 추진제(아래부터 차 있음)와 무게중심, 질량·관성모멘트
+function massInset(ctx, w, h, MP, V, totalLen) {
+  if (!MP) return;
+  const H = Math.min(150, h * 0.3), W = 128, x0 = 10, y0 = 66, L = totalLen || V.len;
+  ctx.fillStyle = 'rgba(8,14,20,.72)'; ctx.fillRect(x0, y0, W, H);
+  const bx = x0 + 18, bw = 16, top = y0 + 18, bot = y0 + H - 10, sc = (bot - top) / L, Y = z => bot - z * sc;
+  ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1; ctx.strokeRect(bx, Y(L), bw, L * sc);
+  for (const t of MP.tanks) {
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.strokeRect(bx + 2, Y(t.top), bw - 4, (t.top - t.z0) * sc);
+    ctx.fillStyle = t.kind === 'lox' ? 'rgba(116,171,216,.9)' : 'rgba(230,164,69,.9)';
+    ctx.fillRect(bx + 2, Y(t.z1), bw - 4, Math.max(0, (t.z1 - t.z0) * sc));
+  }
+  if (L > V.len + 1) { ctx.fillStyle = 'rgba(200,205,210,.55)'; ctx.fillRect(bx + 2, Y(L), bw - 4, (L - V.len) * sc); }
+  cgMark(ctx, bx + bw / 2, Y(MP.zcg), 5);
+  ctx.font = `10.5px ${FONT}`; ctx.fillStyle = 'rgba(255,255,255,.88)'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText('질량 분포', x0 + 8, y0 + 9);
+  const tx = bx + bw + 12;
+  ctx.fillText(`m ${(MP.m / 1000).toFixed(1)} t`, tx, top + 6);
+  ctx.fillText(`z_cg ${MP.zcg.toFixed(1)} m`, tx, clamp(Y(MP.zcg), top + 34, bot - 30));
+  ctx.fillText(`I ${(MP.I / 1e6).toFixed(1)}`, tx, bot - 18); ctx.fillText('×10⁶ kg·m²', tx, bot - 6);
+  ctx.fillStyle = 'rgba(116,171,216,.95)'; ctx.fillText('LOX', tx, top + 20); ctx.fillStyle = 'rgba(230,164,69,.95)'; ctx.fillText('RP-1', tx + 30, top + 20);
+}
+
+function label(ctx, txt, x, y, color, align = 'left', size = 12) {
+  ctx.font = `${size}px ${FONT}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineJoin = 'round'; ctx.strokeText(txt, x, y);
+  ctx.fillStyle = color; ctx.fillText(txt, x, y);
+}
+
+// ====================================================================
+//  스페이스X 중계 화면 같은 텔레메트리 띠: 엔진 배치, 속도·고도, 탱크, 자세 아이콘, T+ 시계
+// ====================================================================
+const ENG_LAYOUT = {
+  one: [{ x: 0, y: 0, r: 0.42 }],
+  f9: [{ x: 0, y: 0, r: 0.19 }].concat(Array.from({ length: 8 }, (_, i) => { const a = (22.5 + 45 * i) * D2R; return { x: 0.62 * Math.cos(a), y: -0.62 * Math.sin(a), r: 0.19 }; })),
+  mvac: [{ x: 0, y: 0, r: 0.6 }]
+};
+function drawEngines(cv, layout, states) {
+  const { ctx, w, h } = fitCanvas(cv); ctx.clearRect(0, 0, w, h);
+  if (w < 12 || h < 12) return;
+  const R = Math.min(w, h) / 2 - 2, cx = w / 2, cy = h / 2;
+  layout.forEach((e, i) => {
+    const s = states[i] || 'off', X = cx + e.x * R, Y = cy + e.y * R, r = e.r * R;
+    ctx.beginPath(); ctx.arc(X, Y, r, 0, 7);
+    if (s === 'on') { ctx.fillStyle = '#fff'; ctx.fill(); }
+    else if (s === 'failed') { ctx.fillStyle = '#E2554A'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X - r * 0.55, Y - r * 0.55); ctx.lineTo(X + r * 0.55, Y + r * 0.55); ctx.moveTo(X + r * 0.55, Y - r * 0.55); ctx.lineTo(X - r * 0.55, Y + r * 0.55); ctx.stroke(); }
+    else { ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 1.3; ctx.stroke(); }
+  });
+}
+// 기체 윤곽 아이콘 (중계 화면처럼 선으로)
+function drawIcon(cv, type, th) {
+  const { ctx, w, h } = fitCanvas(cv); ctx.clearRect(0, 0, w, h);
+  if (w < 12 || h < 12) return;
+  const shapes = {
+    gh: { L: 32, pts: [[-1.8, 0], [1.8, 0], [1.8, 30], [-1.8, 30]], legs: true },
+    f9: { L: 47, pts: [[-1.8, 0], [1.8, 0], [1.8, 47], [-1.8, 47]], fins: 44 },
+    stack: { L: 70, pts: [[-1.8, 0], [1.8, 0], [1.8, 60], [2.6, 60], [2.6, 66], [0, 71], [-2.6, 66], [-2.6, 60], [-1.8, 60]] },
+    up: { L: 26, pts: [[-1.8, 0], [1.8, 0], [1.8, 13], [2.6, 13], [2.6, 20], [0, 26], [-2.6, 20], [-2.6, 13], [-1.8, 13]], bell: true },
+    upOpen: { L: 18, pts: [[-1.8, 0], [1.8, 0], [1.8, 13], [-1.8, 13]], bell: true, sats: true }
+  };
+  const S = shapes[type] || shapes.f9, sc = (Math.min(w, h * 1.0) * 0.9) / S.L;
+  ctx.save(); ctx.translate(w / 2, h / 2); ctx.rotate(th); ctx.translate(0, S.L * sc / 2);
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.4; ctx.beginPath();
+  S.pts.forEach(([x, y], i) => i ? ctx.lineTo(x * sc, -y * sc) : ctx.moveTo(x * sc, -y * sc)); ctx.closePath(); ctx.stroke();
+  if (S.fins) { ctx.beginPath(); ctx.moveTo(-1.8 * sc, -S.fins * sc); ctx.lineTo(-3.2 * sc, -S.fins * sc); ctx.moveTo(1.8 * sc, -S.fins * sc); ctx.lineTo(3.2 * sc, -S.fins * sc); ctx.stroke(); }
+  if (S.legs) { ctx.beginPath(); ctx.moveTo(-1.8 * sc, -7 * sc); ctx.lineTo(-5 * sc, 1.5 * sc); ctx.moveTo(1.8 * sc, -7 * sc); ctx.lineTo(5 * sc, 1.5 * sc); ctx.stroke(); }
+  if (S.bell) { ctx.beginPath(); ctx.moveTo(-0.6 * sc, 0); ctx.lineTo(-1.4 * sc, 3 * sc); ctx.lineTo(1.4 * sc, 3 * sc); ctx.lineTo(0.6 * sc, 0); ctx.stroke(); }
+  if (S.sats) for (let i = 0; i < 4; i++) { ctx.strokeRect(-2.2 * sc, -(13.4 + i * 1.1) * sc, 4.4 * sc, 0.8 * sc); }
+  ctx.restore();
+}
+class Telemetry {
+  constructor(vp, sides, onEngine) {
+    this.el = el('div', { class: 'tlm' });
+    this.sides = {};
+    const mk = side => {
+      const box = el('div', { class: 'tlm-side ' + side });
+      const eng = el('canvas', { class: 'tlm-eng', title: '엔진을 누르면 고장 이벤트를 일으킵니다' });
+      const nums = el('div', { class: 'tlm-nums' });
+      const bars = el('div', { class: 'tlm-bars' });
+      const icon = el('canvas', { class: 'tlm-icon' });
+      if (side === 'left') box.append(eng, nums, bars, icon); else box.append(icon, nums, bars, eng);
+      eng.addEventListener('click', ev => {
+        const r = eng.getBoundingClientRect(), x = (ev.clientX - r.left) / r.width * 2 - 1, y = (ev.clientY - r.top) / r.height * 2 - 1;
+        const lay = this.sides[side].layout || [];
+        let best = -1, bd = 1e9; lay.forEach((e, i) => { const d = Math.hypot(e.x * 0.95 - x, e.y * 0.95 - y); if (d < bd) { bd = d; best = i; } });
+        if (best >= 0 && bd < 0.45 && onEngine) onEngine(side, best);
+      });
+      this.sides[side] = { box, eng, nums, bars, icon };
+      return box;
+    };
+    const mid = el('div', { class: 'tlm-mid' });
+    this.clock = el('div', { class: 'tlm-clock' }); this.title = el('div', { class: 'tlm-title' });
+    mid.append(this.clock, this.title);
+    this.el.append(mk('left'), mid, sides.includes('right') ? mk('right') : el('div', { class: 'tlm-side right empty' }));
+    vp.appendChild(this.el);
+  }
+  update(d) {
+    const t = Math.max(0, d.t), hh = Math.floor(t / 3600), mm = Math.floor(t / 60) % 60, ss = Math.floor(t) % 60;
+    this.clock.textContent = `T+${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+    this.title.textContent = d.title;
+    for (const side of ['left', 'right']) {
+      const S = this.sides[side], v = d[side]; if (!S) continue;
+      S.box.style.visibility = v ? 'visible' : 'hidden'; if (!v) continue;
+      S.layout = ENG_LAYOUT[v.layout];
+      drawEngines(S.eng, S.layout, v.engines);
+      const altTxt = v.alt >= 10000 ? [(v.alt / 1000).toFixed(0), 'KM'] : v.alt >= 1000 ? [(v.alt / 1000).toFixed(1), 'KM'] : [Math.max(0, v.alt).toFixed(0), 'M'];
+      S.nums.innerHTML = `<div><span>SPEED</span><b>${Math.round(v.speed * 3.6)}</b><i>KM/H</i></div><div><span>ALTITUDE</span><b>${altTxt[0]}</b><i>${altTxt[1]}</i></div>` + (v.extra ? `<div class="x"><span>${v.extra[0]}</span><b>${v.extra[1]}</b><i>${v.extra[2] || ''}</i></div>` : '');
+      S.bars.innerHTML = `<div><span>LOX</span><em><u style="width:${clamp(v.lox, 0, 1) * 100}%"></u></em></div><div><span>${v.fuelName || 'RP-1'}</span><em><u style="width:${clamp(v.fuel, 0, 1) * 100}%"></u></em></div>`;
+      drawIcon(S.icon, v.icon, v.th);
+    }
+  }
+}
+const engStates = eng => eng.map(e => e.failed ? 'failed' : e.on ? 'on' : 'off');
+
+// ====================================================================
+//  러너: 실행·정지·속도·슬라이더·코드 컴파일
+// ====================================================================
+class Runner {
+  constructor(cfg) {
+    this.cfg = cfg; this.p = Object.assign({}, cfg.params); this.seed = 1; this.speed = cfg.defaultSpeed; this.running = false;
+    const bench = $('#' + cfg.id + '-bench');
+    // 뷰포트 (가로 전체) + 텔레메트리 띠
+    this.vp = el('div', { class: 'viewport' });
+    this.cv = el('canvas', { role: 'img', 'aria-label': cfg.alt });
+    this.hud = el('div', { class: 'hud' });
+    this.vp.append(this.cv, this.hud);
+    if (cfg.tlm) this.tlm = new Telemetry(this.vp, cfg.tlmSides || ['left'], (side, i) => { if (cfg.onEngine && this.S && !this.S.done) { cfg.onEngine(this.S, side, i, this); this.draw(); } });
+    if (cfg.cams) {
+      this.cam = 'auto';
+      const cb = el('div', { class: 'cams', role: 'group', 'aria-label': '카메라' });
+      this.camBtns = cfg.cams.map(([v, name]) => { const b = el('button', { type: 'button', 'aria-pressed': String(v === 'auto') }, name); b.onclick = () => { this.cam = v; this.camBtns.forEach(x => x.setAttribute('aria-pressed', String(x === b))); this.draw(); }; cb.appendChild(b); return b; });
+      this.vp.appendChild(cb);
+    }
+    this.res = el('div', { class: 'result', role: 'status', 'aria-live': 'polite' });
+    // 조작 패널 (아래쪽, 가로 배치)
+    const ctl = el('div', { class: 'controls' });
+    const rb = el('div', { class: 'runbar' });
+    this.goBtn = el('button', { class: 'btn primary', type: 'button' }, cfg.goLabel || '발사');
+    this.rstBtn = el('button', { class: 'btn', type: 'button' }, '처음으로');
+    const sp = el('div', { class: 'speed', role: 'group', 'aria-label': '재생 속도' });
+    this.spBtns = cfg.speeds.map(v => {
+      const b = el('button', { type: 'button', 'aria-pressed': String(v === this.speed) }, v === Infinity ? '결과만' : v + '×');
+      b.onclick = () => { this.speed = v; this.spBtns.forEach(x => x.setAttribute('aria-pressed', String(x === b))); };
+      sp.appendChild(b); return b;
+    });
+    const sr = el('div', { class: 'seedrow' });
+    this.seedOut = el('span', {}, '잡음 시드 1');
+    const dice = el('button', { class: 'btn small', type: 'button' }, '잡음 다시 뽑기');
+    dice.onclick = () => { this.seed = 1 + Math.floor(Math.random() * 9999); this.seedOut.textContent = '잡음 시드 ' + this.seed; if (!this.running) this.reset(); };
+    sr.append(this.seedOut, dice);
+    rb.append(this.goBtn, this.rstBtn, sp, sr);
+    ctl.appendChild(rb);
+    if (cfg.intro !== undefined) ctl.appendChild(this.introEl = el('div', { class: 'intro-line' }, cfg.intro));
+    const groups = el('div', { class: 'groups' });
+    for (const g of cfg.sliders) {
+      const box = el('div', { class: 'group' });
+      box.appendChild(el('div', { class: 'group-title' }, g.group));
+      for (const sd of g.items) box.appendChild(this.makeSlider(sd));
+      groups.appendChild(box);
+    }
+    ctl.appendChild(groups);
+    this.ro = el('div', { class: 'readout' });
+    bench.append(this.vp, this.res, this.ro, ctl);
+    // 그래프
+    const ph = $('#' + cfg.id + '-plots');
+    this.plots = cfg.plots.map(o => new Plot(ph, o));
+    // 편집기
+    this.editor = makeEditor($('#' + cfg.id + '-editor'), cfg.tabs, this);
+    this.goBtn.onclick = () => this.toggle();
+    this.rstBtn.onclick = () => { this.running = false; this.reset(); };
+    this.compile();
+    this.reset();
+    new ResizeObserver(() => this.draw()).observe(this.vp);
+  }
+  makeSlider(sd) {
+    if (sd.type === 'select') {
+      const wrap = el('div', { class: 'slider' });
+      const id = this.cfg.id + '-' + sd.key;
+      wrap.appendChild(el('label', { for: id }, sd.label));
+      const seg = el('div', { class: 'seg', role: 'radiogroup', 'aria-label': sd.label.replace(/<[^>]+>/g, '') });
+      const btns = sd.options.map(([v, name]) => {
+        const b = el('button', { type: 'button', role: 'radio', 'aria-checked': String(this.p[sd.key] === v) }, name);
+        b.onclick = () => { this.p[sd.key] = v; btns.forEach((x, i) => x.setAttribute('aria-checked', String(sd.options[i][0] === v))); if (sd.reset && !this.running) this.reset(); };
+        seg.appendChild(b); return b;
+      });
+      wrap.appendChild(seg);
+      return wrap;
+    }
+    if (sd.type === 'toggle') {
+      const lab = el('label', { class: 'toggle' });
+      const inp = el('input', { type: 'checkbox' }); inp.checked = !!this.p[sd.key];
+      inp.onchange = () => { this.p[sd.key] = inp.checked; if (sd.reset && !this.running) this.reset(); };
+      lab.append(inp, document.createTextNode(sd.label));
+      return lab;
+    }
+    const wrap = el('div', { class: 'slider' });
+    const id = this.cfg.id + '-' + sd.key;
+    const lab = el('label', { for: id }, sd.label);
+    const out = el('output', { for: id });
+    const inp = el('input', { type: 'range', id, min: sd.min, max: sd.max, step: sd.step, value: this.p[sd.key] });
+    const show = () => { out.textContent = (sd.fmt ? sd.fmt(+inp.value) : (+inp.value).toFixed(sd.d ?? 2)) + (sd.unit ? ' ' + sd.unit : ''); };
+    inp.oninput = () => { this.p[sd.key] = +inp.value; show(); if (sd.reset && !this.running) this.reset(); };
+    show(); wrap.append(lab, out, inp);
+    return wrap;
+  }
+  compile() { this.fns = compile((this.cfg.codeKeys || ['kf', this.cfg.codeKey]).map(k => CODEBUF[k]).join('\n'), this.cfg.fnNames); }
+  reset() {
+    try { this.compile(); } catch (e) { this.showError('컴파일 오류: ' + e.message); return; }
+    this.running = false; this.goBtn.textContent = this.cfg.goLabel || '발사';
+    this.S = this.cfg.create(this.p, this.seed, this.fns);
+    this.res.className = 'result'; this.res.textContent = '';
+    this.draw();
+  }
+  showError(m) { this.running = false; this.goBtn.textContent = this.cfg.goLabel || '발사'; this.res.className = 'result bad'; this.res.textContent = m; }
+  toggle() {
+    if (this.S.done) this.reset();
+    this.running = !this.running;
+    this.goBtn.textContent = this.running ? '일시정지' : '계속';
+    if (this.running) { this.last = performance.now(); this.acc = 0; requestAnimationFrame(t => this.frame(t)); }
+  }
+  frame(now) {
+    if (!this.running) return;
+    const dtReal = Math.min(0.05, (now - this.last) / 1000); this.last = now;
+    const S = this.S, dt = this.cfg.dt;
+    try {
+      if (this.speed === Infinity) {
+        const t0 = performance.now();
+        while (!S.done && performance.now() - t0 < 40) for (let i = 0; i < 200 && !S.done; i++) this.cfg.step(S);
+      } else {
+        this.acc += dtReal * this.speed;
+        let n = 0;
+        while (this.acc >= dt && !S.done && n < 30000) { this.cfg.step(S); this.acc -= dt; n++; }
+      }
+    } catch (e) { this.showError('코드 실행 오류 (t = ' + fmt(S.t, 2) + ' s): ' + e.message); this.draw(); return; }
+    this.draw();
+    if (S.done) {
+      this.running = false; this.goBtn.textContent = '다시 발사';
+      const r = S.result; this.res.className = 'result ' + (r.warn ? 'warn' : r.ok ? 'ok' : 'bad'); this.res.textContent = r.msg;
+      if (this.cfg.onDone) this.cfg.onDone(S, this);
+      return;
+    }
+    requestAnimationFrame(t => this.frame(t));
+  }
+  draw() {
+    const S = this.S; if (!S) return;
+    const { ctx, w, h } = fitCanvas(this.cv);
+    this.cfg.render(ctx, S, w, h, this);
+    this.hud.innerHTML = this.cfg.hud(S);
+    this.ro.innerHTML = this.cfg.readout(S).map(([a, b]) => `<div><span>${a}</span><span>${b}</span></div>`).join('');
+    this.plots.forEach(p => p.draw(S));
+    if (this.cfg.extra) this.cfg.extra(S, this);
+    if (this.tlm) this.tlm.update(this.cfg.tlm(S, this));
+  }
+}
+
+// ====================================================================
+//  공통: 하늘·지면·눈금
+// ====================================================================
+function drawSkyGround(ctx, w, h, groundY, alt, sea) {
+  const t = clamp(alt / 45000, 0, 1);
+  const top = mix(COL.sky, COL.space, Math.min(1, t * 1.3)), bot = mix(COL.sky, COL.space, t * 0.85);
+  const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, top); g.addColorStop(1, bot);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  if (groundY < h) {
+    ctx.fillStyle = sea ? COL.sea : COL.ground; ctx.fillRect(0, groundY, w, h - groundY);
+    ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(0, groundY, w, 1.5);
+  }
+}
+function vRuler(ctx, w, h, toY, lo, hi, unit, every) {
+  const step = every || niceStep((hi - lo) / 6);
+  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1;
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+    const y = toY(v); if (y < 26 || y > h - 4) continue;
+    ctx.beginPath(); ctx.moveTo(w - 10, y); ctx.lineTo(w, y); ctx.stroke();
+    label(ctx, niceNum(unit === 'km' ? v / 1000 : v, unit === 'km' ? step / 1000 : step) + ' ' + unit, w - 14, y, 'rgba(255,255,255,.85)', 'right', 11);
+  }
+}
+
+// ====================================================================
+//  1단계
+// ====================================================================
+const s1Runner = new Runner({
+  id: 's1', alt: '그래스호퍼 1차원 호버 시뮬레이션', dt: K1.dt, defaultSpeed: 2, speeds: [1, 2, 5, 20, Infinity],
+  codeKey: 's1', fnNames: ['kfPredict', 'kfUpdate', 'control'],
+  tabs: [{ key: 's1', label: '고도 제어기 control()' }, { key: 'kf', label: '칼만 필터 kfPredict / kfUpdate' }],
+  params: { H: 100, Kp: 1.0, Ki: 0.1, Kd: 1.6, ff: true, useKF: true, sz: 1.5, sa: 0.2, en: 1.5 },
+  sliders: [
+    { group: '비행 계획', items: [{ key: 'H', label: '목표 고도', min: 30, max: 750, step: 1, d: 0, unit: 'm', reset: true }] },
+    { group: 'PID 게인', items: [
+      { key: 'Kp', label: '비례 <span class="sym">K<sub>p</sub></span>', min: 0, max: 3, step: 0.05 },
+      { key: 'Ki', label: '적분 <span class="sym">K<sub>i</sub></span>', min: 0, max: 0.6, step: 0.01 },
+      { key: 'Kd', label: '미분 <span class="sym">K<sub>d</sub></span>', min: 0, max: 4, step: 0.05 },
+      { key: 'ff', type: 'toggle', label: '중력 피드포워드 (+g)' }] },
+    { group: '센서와 필터', items: [
+      { key: 'useKF', type: 'toggle', label: '칼만 필터 사용 (끄면 고도계 + 수치 미분)' },
+      { key: 'sz', label: '고도계 잡음 <span class="sym">σ<sub>z</sub></span>', min: 0.1, max: 5, step: 0.1, unit: 'm', d: 1, reset: true },
+      { key: 'sa', label: 'IMU 잡음 <span class="sym">σ<sub>a</sub></span>', min: 0.02, max: 1, step: 0.02, unit: 'm/s²', reset: true }] },
+    { group: '엔진', items: [{ key: 'en', label: '추력 잡음 (표준편차)', min: 0, max: 6, step: 0.5, d: 1, unit: '%' }] }
+  ],
+  tlm: S => ({ t: S.t, title: 'GRASSHOPPER · HOVER TEST', left: { layout: 'one', engines: [S.engFailed ? 'failed' : S.Tact > 1000 ? 'on' : 'off'], speed: Math.abs(S.v), alt: S.h, lox: (S.m - K1.mDry) / (K1.m0 - K1.mDry), fuel: (S.m - K1.mDry) / (K1.m0 - K1.mDry), icon: 'gh', th: 0 } }),
+  onEngine: (S) => { S.engFailed = true; },
+  create: (p, seed, fns) => s1Create(p, seed, fns),
+  step: s1Step,
+  render(ctx, S, w, h) {
+    const V = 100, pxm = h / V, cy = Math.max(S.h + 18, V / 2 - 28);
+    const toY = y => h / 2 - (y - cy) * pxm;
+    drawSkyGround(ctx, w, h, toY(0), S.h, false);
+    vRuler(ctx, w, h, toY, cy - V / 2, cy + V / 2, 'm', S.p.H > 300 ? 20 : 10);
+    const X = w * 0.45;
+    // 발사대
+    if (toY(0) < h) { ctx.fillStyle = '#6F777D'; ctx.fillRect(X - 9 * pxm, toY(0), 18 * pxm, 2.5 * pxm); }
+    // 목표 고도선
+    if (S.ref) {
+      const y = toY(S.ref.h); ctx.strokeStyle = COL.kero; ctx.setLineDash([6, 5]); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(X - 60, y); ctx.lineTo(X + 70, y); ctx.stroke(); ctx.setLineDash([]);
+      label(ctx, '기준 ' + fmt(S.ref.h, 1) + ' m', X + 74, y, COL.kero);
+    }
+    if (S.est) {
+      const y = toY(S.est.h); ctx.fillStyle = COL.lox;
+      ctx.beginPath(); ctx.moveTo(X - 40, y); ctx.lineTo(X - 52, y - 6); ctx.lineTo(X - 52, y + 6); ctx.fill();
+      label(ctx, '추정', X - 56, y, '#fff', 'right');
+      ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fillRect(X - 34, toY(S.zHold) - 1.5, 6, 3);
+    }
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, toY(0)); ctx.clip();
+    if (showBody(S)) { drawGrasshopper(ctx, X, toY(S.h), pxm, 0, 0, S.Tact / K1.Tmax); if (S.MP) cgMark(ctx, X, toY(S.h + S.MP.zcg)); }
+    ctx.restore();
+    massInset(ctx, w, h, S.MP || vehicleProps(VEH_GH, K1.m0 - K1.mDry), VEH_GH);
+    if (S.boom) drawBoom(ctx, X, toY(S.boom.y + 8), pxm, S.t - S.boom.t0, GEO_GH.boomR);
+  },
+  hud: S => `<div class="phase">${S.boom ? '폭발' : S.ref ? S.ref.phase : '대기'}</div>t = ${fmt(S.t, 1)} s`,
+  readout: S => [['고도', fmt(S.h, 1) + ' m'], ['속도', fmt(S.v, 2) + ' m/s'], ['추정 고도', S.est ? fmt(S.est.h, 1) + ' m' : '—'], ['추정 속도', S.est ? fmt(S.est.v, 2) + ' m/s' : '—'],
+    ['스로틀', fmt(S.T / K1.Tmax * 100, 0) + ' %'], ['남은 연료', fmt((S.m - K1.mDry) / 1000, 2) + ' t'], ['T / W', fmt(S.Tact / (S.m * K1.g), 2)], ['최고 고도', fmt(S.hMax, 1) + ' m'], ['착지 충격', S.impactG ? fmt(S.impactG, 2) + ' g' : '—'], ['손상 한계', GEO_GH.nSoft + ' / ' + GEO_GH.nHard + ' g']],
+  plots: [
+    { title: '고도 [m]', series: [{ label: '기준', color: 'muted', style: 'dash', get: L => L.ref }, { label: '고도계 측정', color: 'kero', style: 'dots', get: L => L.z }, { label: '실제', color: 'ink', get: L => L.h }, { label: '추정', color: 'lox', get: L => L.est }] },
+    { title: '스로틀 [%]', yMin: 30, yMax: 100, series: [{ label: '실제 추력 / 최대', color: 'kero', get: L => L.thr }] },
+    { title: '속도 [m/s]', minSpan: 4, series: [{ label: '실제', color: 'ink', get: L => L.v }, { label: '제어기가 본 값', color: 'lox', get: L => L.vEst, width: 1 }] }
+  ],
+  extra: s1Mats
+});
+
+function s1Mats(S) {
+  const host = $('#s1-mats');
+  const P = S.f.P, K = S.f.K || [0, 0];
+  const shade = v => { const t = clamp((Math.log10(Math.abs(v) + 1e-9) + 4) / 6, 0, 1); return mix(COL.panel, COL.lox, t * 0.75); };
+  const ink = v => clamp((Math.log10(Math.abs(v) + 1e-9) + 4) / 6, 0, 1) > 0.55 ? '#fff' : COL.ink;
+  const cell = v => `<div class="cell" style="background:${shade(v)};color:${ink(v)}">${Math.abs(v) < 1e-3 ? v.toExponential(1) : v.toFixed(4)}</div>`;
+  host.innerHTML =
+    `<div class="mat"><span class="name">P</span><div class="grid" style="grid-template-columns:repeat(2,auto)">${cell(P[0][0])}${cell(P[0][1])}${cell(P[1][0])}${cell(P[1][1])}</div><span class="cap">추정 공분산. 왼쪽 위 = 고도 분산 [m²], 오른쪽 아래 = 속도 분산</span></div>` +
+    `<div class="mat"><span class="name">K</span><div class="grid">${cell(K[0])}${cell(K[1])}</div><span class="cap">칼만 이득. 고도계 잔차를 고도·속도에 얼마나 반영할지</span></div>` +
+    `<div class="mat"><span class="name">z − Hx̂</span><div class="grid">${cell(S.f.y || 0)}</div><span class="cap">혁신(잔차) [m]. 측정과 예측의 차이</span></div>` +
+    `<div class="mat"><span class="name">σ<sub>h</sub></span><div class="grid">${cell(Math.sqrt(P[0][0]))}</div><span class="cap">추정 고도의 표준편차 [m] — 고도계 σ<sub>z</sub> = ${fmt(S.p.sz, 1)} m 보다 작다</span></div>`;
+}
+
+// ====================================================================
+//  2단계
+// ====================================================================
+const s2Runner = new Runner({
+  id: 's2', alt: '그래스호퍼 2차원 측면 이동 시뮬레이션', dt: K2.dt, defaultSpeed: 2, speeds: [1, 2, 5, 20, Infinity],
+  codeKey: 's2', fnNames: ['kfPredict', 'kfUpdate', 'control'],
+  tabs: [{ key: 's2', label: '캐스케이드 control()' }, { key: 'kf', label: '칼만 필터 (1단계와 공유)' }],
+  params: { D: 100, Kpx: 0.08, Kdx: 0.5, thMaxDeg: 10, Kpt: 1.5, Kdt: 2.0, windMode: 'steady', wind: 5, sa: 0.2, sg: 1.0, en: 1.5 },
+  sliders: [
+    { group: '비행 계획 (고도 250 m)', items: [{ key: 'D', label: '측면 이동 거리', min: -150, max: 150, step: 5, d: 0, unit: 'm', reset: true }] },
+    { group: '바깥 루프 — 수평 위치', items: [
+      { key: 'Kpx', label: '<span class="sym">K<sub>px</sub></span>', min: 0, max: 0.5, step: 0.01 },
+      { key: 'Kdx', label: '<span class="sym">K<sub>dx</sub></span>', min: 0, max: 1.5, step: 0.05 },
+      { key: 'thMaxDeg', label: '최대 기울기', min: 2, max: 20, step: 1, d: 0, unit: '°' }] },
+    { group: '안쪽 루프 — 자세', items: [
+      { key: 'Kpt', label: '<span class="sym">K<sub>pθ</sub></span>', min: 0, max: 5, step: 0.05 },
+      { key: 'Kdt', label: '<span class="sym">K<sub>dθ</sub></span>', min: 0, max: 5, step: 0.05 }] },
+    { group: '환경과 센서', items: [
+      { key: 'windMode', type: 'select', label: '바람 상태', options: [['calm', '잔잔'], ['steady', '일정'], ['gusty', '돌풍']] },
+      { key: 'wind', label: '평균 지상풍 (오른쪽으로)', min: 0, max: 20, step: 0.5, d: 1, unit: 'm/s' },
+      { key: 'en', label: '엔진 추력 잡음', min: 0, max: 6, step: 0.5, d: 1, unit: '%' },
+      { key: 'sg', label: 'GPS 잡음', min: 0.2, max: 5, step: 0.1, d: 1, unit: 'm', reset: true }] }
+  ],
+  tlm: S => ({ t: S.t, title: 'GRASSHOPPER · DIVERT TEST', left: { layout: 'one', engines: [S.engFailed ? 'failed' : S.Tact > 1000 ? 'on' : 'off'], speed: Math.hypot(S.vx, S.vy), alt: S.by, lox: S.prop / K2.prop0, fuel: S.prop / K2.prop0, icon: 'gh', th: S.th } }),
+  onEngine: (S) => { S.engFailed = true; },
+  create: (p, seed, fns) => s2Create(p, seed, fns),
+  step: s2Step,
+  render(ctx, S, w, h, R) {
+    const V = 130, pxm = h / V;
+    const cy = Math.max(S.by + 18, V / 2 - 32);
+    R.cx = R.cx === undefined || S.t < 0.02 || Math.abs(S.bx - R.cx) > 40 ? S.bx : R.cx + (S.bx - R.cx) * 0.15;
+    const toY = y => h / 2 - (y - cy) * pxm, toX = x => w / 2 + (x - R.cx) * pxm;
+    drawSkyGround(ctx, w, h, toY(0), S.by, false);
+    vRuler(ctx, w, h, toY, cy - V / 2, cy + V / 2, 'm', 20);
+    // 패드
+    for (const [x, name] of [[0, '발사대'], [S.p.D, '이동 지점']]) {
+      if (name === '이동 지점' && Math.abs(S.p.D) < 1) continue;
+      const X = toX(x), Y0 = toY(0);
+      if (Y0 < h + 20) { ctx.fillStyle = name === '발사대' ? '#6F777D' : COL.kero; ctx.fillRect(X - 9 * pxm, Y0, 18 * pxm, 2 * pxm); label(ctx, name, X, Y0 + 2 * pxm + 14, '#fff', 'center'); }
+    }
+    // 기준점
+    if (S.ref) { const X = toX(S.ref.x), Y = toY(S.ref.y); ctx.strokeStyle = COL.kero; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(X, Y, 6, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.moveTo(X - 10, Y); ctx.lineTo(X + 10, Y); ctx.moveTo(X, Y - 10); ctx.lineTo(X, Y + 10); ctx.stroke(); }
+    if (S.est) { ctx.fillStyle = COL.lox; ctx.beginPath(); ctx.arc(toX(S.est.x), toY(S.est.y), 4, 0, 7); ctx.fill(); }
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, toY(0)); ctx.clip();
+    if (showBody(S)) { drawGrasshopper(ctx, toX(S.bx), toY(S.by), pxm, S.th, S.post ? 0 : S.delta, S.Tact / K2.Tmax); cgMark(ctx, toX(S.x), toY(S.y)); }
+    ctx.restore();
+    if (S.boom) drawBoom(ctx, toX(S.boom.x), toY(S.boom.y), pxm, S.t - S.boom.t0, GEO_GH.boomR);
+    massInset(ctx, w, h, S.MP, VEH_GH);
+    // 바람 화살표
+    const wv = S.w || S.p.wind; const ax = 160, ay = 44, L = clamp(wv * 5, -80, 80);
+    ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(ax + 40, ay); ctx.lineTo(ax + 40 + L, ay); ctx.stroke();
+    if (Math.abs(L) > 3) { const sg = Math.sign(L); ctx.beginPath(); ctx.moveTo(ax + 40 + L, ay); ctx.lineTo(ax + 40 + L - sg * 7, ay - 5); ctx.lineTo(ax + 40 + L - sg * 7, ay + 5); ctx.fill(); }
+    label(ctx, '바람 ' + fmt(wv, 1) + ' m/s', ax, ay - 14, '#fff');
+    label(ctx, '짐벌 각은 3배 과장', 160, 74, 'rgba(255,255,255,.75)', 'left', 11);
+  },
+  hud: S => `<div class="phase">${S.boom ? '폭발' : S.post ? '접지 — 자세 확인 중' : S.ref ? S.ref.phase : '대기'}</div>t = ${fmt(S.t, 1)} s`,
+  readout: S => [['수평 x (바닥)', fmt(S.bx, 1) + ' m'], ['고도 (바닥)', fmt(S.by, 1) + ' m'], ['무게중심 높이', fmt(S.MP.zcg, 2) + ' m'], ['관성모멘트', fmt(S.MP.I / 1e6, 2) + '×10⁶'], ['기울기 θ', fmt(S.th * R2D, 2) + '°'], ['짐벌 δ', fmt(S.delta * R2D, 2) + '°'],
+    ['스로틀', fmt(S.T / K2.Tmax * 100, 0) + ' %'], ['남은 연료', fmt((S.m - K2.mDry) / 1000, 2) + ' t'], ['최대 기울기', fmt(S.maxTh, 1) + '°'], ['최대 추종 오차', fmt(S.maxXerr, 1) + ' m'], ['지금 바람', fmt(S.w, 1) + ' m/s'], ['착지 충격', S.impactG ? fmt(S.impactG, 2) + ' g' : '—']],
+  plots: [
+    { title: '수평 위치 x [m]', series: [{ label: '기준', color: 'muted', style: 'dash', get: L => L.xRef }, { label: '실제', color: 'ink', get: L => L.x }, { label: '추정', color: 'lox', get: L => L.xEst, width: 1 }] },
+    { title: '각도 [°]', minSpan: 4, series: [{ label: '기울기 θ', color: 'ink', get: L => L.th }, { label: '짐벌 δ', color: 'kero', get: L => L.delta }] },
+    { title: '고도 [m]', series: [{ label: '기준', color: 'muted', style: 'dash', get: L => L.yRef }, { label: '실제', color: 'ink', get: L => L.y }] },
+    { title: '스로틀 [%] · 바람 [m/s]', series: [{ label: '스로틀', color: 'kero', get: L => L.thr }, { label: '바람', color: 'lox', get: L => L.wind }] },
+    { title: '무게중심 높이 [m]', minSpan: 0.5, series: [{ label: '바닥에서 무게중심까지', color: 'ink', get: L => L.zcg }] }
+  ]
+});
+
+// ====================================================================
+//  3단계
+// ====================================================================
+
+function bigCamera(R, S, w, h, Vfun) {
+  const V = Vfun(S.y);
+  const pxm = h / V;
+  return { V, pxm, cx: S.x, cy: S.y + V * 0.12 };
+}
+function minimap(ctx, w, h, pts, cur, extra) {
+  const narrow = w < 480; const bw = Math.min(250, w * (narrow ? 0.5 : 0.3)), bh = bw * 0.62, bx = w - bw - 10, by = 46;
+  ctx.fillStyle = 'rgba(8,14,20,.72)'; ctx.fillRect(bx, by, bw, bh);
+  ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.strokeRect(bx + .5, by + .5, bw - 1, bh - 1);
+  let xmin = extra.xmin, xmax = extra.xmax, ymax = extra.ymax;
+  for (const [x, y] of pts) { xmin = Math.min(xmin, x); xmax = Math.max(xmax, x); ymax = Math.max(ymax, y); }
+  const sc = Math.min((bw - 24) / Math.max(xmax - xmin, 1), (bh - 26) / Math.max(ymax, 1));
+  const X = x => bx + 12 + (x - xmin) * sc, Y = y => by + bh - 12 - y * sc;
+  ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.moveTo(bx + 6, Y(0)); ctx.lineTo(bx + bw - 6, Y(0)); ctx.stroke();
+  if (extra.band) { ctx.fillStyle = 'rgba(116,171,216,.18)'; ctx.fillRect(bx + 1, Y(extra.band[1]), bw - 2, Y(extra.band[0]) - Y(extra.band[1])); }
+  ctx.strokeStyle = COL.kero; ctx.lineWidth = 1.5; ctx.beginPath();
+  pts.forEach(([x, y], i) => i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))); ctx.stroke();
+  if (extra.marks) for (const m of extra.marks) { ctx.fillStyle = m.color; ctx.beginPath(); ctx.arc(X(m.x), Y(m.y), m.r || 3, 0, 7); ctx.fill(); if (m.label && !narrow) { const right = X(m.x) > bx + bw - 60; label(ctx, m.label, X(m.x) + (right ? -6 : 6), Y(m.y) - 8, '#fff', right ? 'right' : 'left', 10.5); } }
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(X(cur[0]), Y(cur[1]), 3.5, 0, 7); ctx.fill();
+  label(ctx, narrow ? extra.title.split(' · ')[0] : extra.title, bx + 8, by + 11, 'rgba(255,255,255,.85)', 'left', 10.5);
+}
+
+const s3Runner = new Runner({
+  id: 's3', alt: '팰컨 9 상승 시뮬레이션', dt: K3.dt, defaultSpeed: 5, speeds: [1, 5, 10, 30, Infinity],
+  codeKey: 's3', fnNames: ['guidance'],
+  tabs: [{ key: 's3', label: '상승 유도 guidance()' }],
+  params: { tKick: 15, kick: 4.5, qBucket: 28000, bucket: 0.7, loadRelief: true, windMode: 'steady', sfc: 5, wind: 30, reserve: 32, en: 1.5 },
+  sliders: [
+    { group: '피치 프로그램', items: [
+      { key: 'tKick', label: '수직 상승 시간', min: 5, max: 30, step: 0.5, d: 1, unit: 's' },
+      { key: 'kick', label: '피치 킥 각도', min: 0, max: 8, step: 0.1, d: 1, unit: '°' }] },
+    { group: 'Max-Q 스로틀 버킷', items: [
+      { key: 'qBucket', label: '버킷 시작 동압', min: 15000, max: 40000, step: 500, fmt: v => (v / 1000).toFixed(1), unit: 'kPa' },
+      { key: 'bucket', label: '버킷 스로틀', min: 0.4, max: 1, step: 0.05, fmt: v => (v * 100).toFixed(0), unit: '%' }] },
+    { group: '바람과 하중', items: [
+      { key: 'windMode', type: 'select', label: '바람 상태', options: [['calm', '잔잔'], ['steady', '일정'], ['gusty', '돌풍']] },
+      { key: 'sfc', label: '지상풍 (하류 방향)', min: 0, max: 15, step: 0.5, d: 1, unit: 'm/s' },
+      { key: 'wind', label: '제트기류 (고도 11 km, 역방향)', min: 0, max: 60, step: 1, d: 0, unit: 'm/s' },
+      { key: 'loadRelief', type: 'toggle', label: '하중 경감 (공기 기준 속도로 정렬)' }] },
+    { group: '재사용과 엔진', items: [{ key: 'reserve', label: '착륙용 예비 연료', min: 10, max: 80, step: 1, d: 0, unit: 't' },
+      { key: 'en', label: '엔진 추력 잡음', min: 0, max: 6, step: 0.5, d: 1, unit: '%' }] }
+  ],
+  tlmSides: ['left', 'right'],
+  tlm: S => { const f = S.MP.tanks; return { t: S.t, title: 'FALCON 9 · ASCENT',
+    left: { layout: 'f9', engines: engStates(S.eng), speed: Math.hypot(S.vx, S.vy), alt: S.by, lox: f[1].fill, fuel: f[0].fill, icon: S.mecoT ? 'f9' : 'stack', th: S.th },
+    right: { layout: 'mvac', engines: ['off'], speed: Math.hypot(S.vx, S.vy), alt: S.by + 54, lox: 1, fuel: 1, icon: 'up', th: S.th } }; },
+  onEngine: (S, side, i) => { if (side === 'left' && S.eng[i] && !S.eng[i].failed) { S.eng[i].failed = true; S.events.push([S.t, `엔진 ${i + 1}번 고장`]); } },
+  create: (p, seed, fns) => s3Create(p, seed, fns),
+  step: s3Step,
+  render(ctx, S, w, h) {
+    const { pxm, cx, cy } = bigCamera(null, S, w, h, y => clamp(110 + 1.0 * y, 110, 150000));
+    const toY = y => h / 2 - (y - cy) * pxm, toX = x => w / 2 + (x - cx) * pxm;
+    drawSkyGround(ctx, w, h, toY(0), S.y, false);
+    vRuler(ctx, w, h, toY, cy - h / 2 / pxm, cy + h / 2 / pxm, S.y > 2000 ? 'km' : 'm');
+    // 제트기류 띠
+    if (S.p.wind > 0) {
+      const y1 = toY(14000), y0 = toY(8000);
+      if (y1 < h && y0 > 0) { ctx.fillStyle = 'rgba(116,171,216,.16)'; ctx.fillRect(0, y1, w, y0 - y1); label(ctx, `제트기류 ← ${S.p.wind} m/s`, 12, (y0 + y1) / 2, 'rgba(255,255,255,.85)'); }
+    }
+    // 발사대
+    if (toY(0) < h) { ctx.fillStyle = '#5E666C'; ctx.fillRect(toX(-12), toY(80), 6 * pxm, 80 * pxm); }
+    // 궤적
+    const L = S.log; ctx.strokeStyle = 'rgba(255,210,150,.55)'; ctx.lineWidth = 1.5; ctx.beginPath();
+    for (let i = 0; i < L.t.length; i++) { const X = toX(L.x[i] * 1000), Y = toY(L.y[i] * 1000); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+    ctx.stroke();
+    const sMin = Math.max(pxm, 120 / 71);
+    const gap = S.mecoT ? Math.max(0, (S.t - S.mecoT - 1) * 8) : 0;
+    const zc = S.MP.zcg, bX = toX(S.x) - zc * sMin * Math.sin(S.th), bY = toY(S.y) + zc * sMin * Math.cos(S.th);
+    if (showBody(S)) { drawF9(ctx, bX, bY, sMin, S.th, { stack: true, eng: S.T > 0 ? 9 : 0, thr: S.thr, expand: 1 - Math.exp(-S.y / 8500), stage2Gap: gap }); cgMark(ctx, toX(S.x), toY(S.y), 5); }
+    if (S.boom) drawBoom(ctx, toX(S.boom.x), toY(S.boom.y), sMin, S.t - S.boom.t0, 40);
+    massInset(ctx, w, h, S.MP, VEH_F9, S.mecoT ? 47 : 70);
+    if (pxm < 120 / 71 / 2) label(ctx, '기체 크기 과장', toX(S.x) + 20, toY(S.y) + 10, 'rgba(255,255,255,.7)', 'left', 10.5);
+    if (gap > 0.5) label(ctx, '2단 MVac 점화 — 짐벌 + 냉가스 롤 제어', toX(S.x) + 30, toY(S.y) - 110, '#fff');
+    // 미니맵
+    const pts = L.t.map((_, i) => [L.x[i], L.y[i]]);
+    let mq = null; if (L.q.length) { let k = 0; for (let i = 1; i < L.q.length; i++) if (L.q[i] > L.q[k]) k = i; mq = { x: L.x[k], y: L.y[k], color: COL.fault, label: 'Max-Q' }; }
+    minimap(ctx, w, h, pts.length ? pts : [[0, 0]], [S.x / 1000, S.y / 1000], { xmin: 0, xmax: 60, ymax: 60, band: [8, 14], title: '전체 궤적 [km]', marks: mq ? [mq] : [] });
+  },
+  hud: S => `<div class="phase">${S.phase}</div>t = ${fmt(S.t, 1)} s · 고도 ${fmt(S.y / 1000, 2)} km · ${fmt(Math.hypot(S.vx, S.vy), 0)} m/s`,
+  readout: S => [['고도', fmt(S.y / 1000, 2) + ' km'], ['하류 거리', fmt(S.x / 1000, 2) + ' km'], ['속도', fmt(Math.hypot(S.vx, S.vy), 0) + ' m/s'], ['비행경로각', S.t > 1 ? fmt(S.gamma, 1) + '°' : '—'],
+    ['동압 q', S.st ? fmt(S.st.q / 1000, 1) + ' kPa' : '—'], ['받음각 α', fmt(S.aoa, 2) + '°'], ['q·α', fmt(S.qa, 1) + ' kPa·°'], ['최대 q·α', fmt(S.maxQa, 1)],
+    ['스로틀', S.T > 0 ? fmt(S.thr * 100, 0) + ' %' : '정지'], ['1단 연료', fmt(S.prop / 1000, 1) + ' t'], ['마하', S.st ? fmt(S.st.mach, 2) : '—'], ['바람', fmt(S.w, 1) + ' m/s'],
+    ['짐벌', fmt(S.delta * R2D, 2) + '°'], ['무게중심 높이', fmt(S.MP.zcg, 1) + ' m']],
+  plots: [
+    { title: '고도 [km]', series: [{ label: '고도', color: 'ink', get: L => L.y }] },
+    { title: '속도 [m/s]', series: [{ label: '지면 기준 속도', color: 'ink', get: L => L.speed }] },
+    { title: '동압 q [kPa]', hline: { y: K3.qLimit, label: '최대 동압 한계' }, series: [{ label: '동압', color: 'kero', get: L => L.q }] },
+    { title: '공력 하중 q·α [kPa·°]', hline: { y: K3.qaLimit, label: '구조 한계' }, series: [{ label: 'q·α', color: 'fault', get: L => L.qa }] },
+    { title: '피치각 [°] · 스로틀 [%]', series: [{ label: '피치(수직=0)', color: 'lox', get: L => L.pitch }, { label: '스로틀', color: 'kero', get: L => L.thr }] },
+    { title: '기체가 맞는 바람 [m/s]', minSpan: 4, series: [{ label: '바람 (+는 하류 방향)', color: 'lox', get: L => L.wind }] },
+    { title: '무게중심 높이 [m] · 짐벌 [°]', series: [{ label: '무게중심 (바닥 기준)', color: 'ink', get: L => L.zcg }, { label: '짐벌 δ', color: 'kero', get: L => L.delta }] }
+  ]
+});
+
+// ====================================================================
+//  4단계 — 전체 미션: 상승 → 분리 → 1단 귀환·착륙 ∥ 2단 궤도 투입·스타링크 배치
+// ====================================================================
+function renderBooster(ctx, S, w, h, R) {
+    const V = clamp(140 + 1.1 * S.by, 140, 170000), pxm = h / V;
+    const cx = S.bx, cy = S.by + V * 0.12;
+    const toY = y => h / 2 - (y - cy) * pxm, toX = x => w / 2 + (x - cx) * pxm;
+    drawSkyGround(ctx, w, h, toY(-4), S.by, true);
+    vRuler(ctx, w, h, toY, cy - h / 2 / pxm, cy + h / 2 / pxm, S.by > 2000 ? 'km' : 'm');
+    // 드론십 (갑판 = 0 m, 길이 90 m)
+    const dx = toX(S.xTarget), dy = toY(0);
+    if (dy < h + 40 && dx > -400 && dx < w + 400) {
+      ctx.fillStyle = '#3C4247'; ctx.fillRect(dx - 45 * pxm, dy, 90 * pxm, Math.max(4, 8 * pxm));
+      ctx.fillStyle = '#7C858C'; ctx.fillRect(dx - 45 * pxm, dy, 90 * pxm, Math.max(1.5, 0.8 * pxm));
+      ctx.fillStyle = 'rgba(232,237,240,.85)'; ctx.fillRect(dx - 20 * pxm, dy, 40 * pxm, Math.max(1.5, 0.8 * pxm));
+      label(ctx, '드론십', dx, dy + Math.max(4, 8 * pxm) + 12, '#fff', 'center');
+    } else if (S.by < 80000) {
+      const side = dx < 0 ? -1 : 1;
+      label(ctx, (side < 0 ? '◀ ' : '') + '드론십 ' + fmt(Math.abs(S.xTarget - S.bx) / 1000, 1) + ' km' + (side > 0 ? ' ▶' : ''), side < 0 ? 150 : w - 70, clamp(dy - 14, 40, h - 20), '#fff', side < 0 ? 'left' : 'right');
+    }
+    // 예측 착지점
+    if (S.phase === 'AERO' || S.phase === 'FLIP' || S.phase === 'ENTRY') {
+      R.pred = f9Predict(S.est || { x: S.bx, y: S.by, vx: S.vx, vy: S.vy }, S.m || F9R.dry, 0).x;
+      const px = toX(R.pred);
+      if (px > 0 && px < w && dy < h) { ctx.fillStyle = COL.kero; ctx.beginPath(); ctx.moveTo(px, dy - 2); ctx.lineTo(px - 6, dy - 12); ctx.lineTo(px + 6, dy - 12); ctx.fill(); }
+    } else R.pred = null;
+    // 궤적
+    const L = S.log; ctx.strokeStyle = 'rgba(255,210,150,.5)'; ctx.lineWidth = 1.5; ctx.beginPath();
+    for (let i = 0; i < L.t.length; i++) { const X = toX(L.x[i] * 1000), Y = toY(L.y[i] * 1000); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+    ctx.stroke();
+    // 기체: 바닥점에서 그리되 회전은 무게중심 둘레 (화면 확대 때도 무게중심 위치 유지)
+    const sMin = Math.max(pxm, 110 / 47), zc = S.MP.zcg;
+    const gX = toX(S.x), gY = toY(S.y);
+    const bX = gX - zc * sMin * Math.sin(S.th), bY = gY + zc * sMin * Math.cos(S.th);
+    const nOn = S.eng.filter(e => e.on).length;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, dy); ctx.clip();
+    if (showBody(S)) { drawF9(ctx, bX, bY, sMin, S.th, { stack: false, eng: nOn, thr: S.thr, expand: 1 - Math.exp(-S.y / 8500), fins: true, legs: S.legs }); cgMark(ctx, gX, gY, 5); }
+    ctx.restore();
+    if (S.boom) drawBoom(ctx, toX(S.boom.x), toY(S.boom.y), sMin, S.t - S.boom.t0, GEO_F9.boomR);
+    if (pxm < 110 / 47 / 2) label(ctx, '기체 크기 과장', gX + 24, gY + 30, 'rgba(255,255,255,.7)', 'left', 10.5);
+    // 미니맵 + 질량 분포
+    const pts = L.t.map((_, i) => [L.x[i], L.y[i]]);
+    const marks = [{ x: S.xTarget / 1000, y: 0, color: '#fff', r: 3, label: '드론십' }];
+    if (R.pred !== null && R.pred !== undefined) marks.push({ x: R.pred / 1000, y: 0, color: COL.kero, r: 3, label: '' });
+    minimap(ctx, w, h, pts.length ? pts : [[S.bx / 1000, S.by / 1000]], [S.bx / 1000, S.by / 1000],
+      { xmin: 0, xmax: S.xTarget / 1000 + 10, ymax: 60, title: '1단 궤적 [km] · ▲ 예측 착지점', marks });
+    massInset(ctx, w, h, S.MP, VEH_F9);
+  }
+
+// 2단 카메라: 우주 배경, 지구 가장자리, 2단·페어링·스타링크
+const STARS = Array.from({ length: 120 }, (_, i) => [((i * 7919) % 1000) / 1000, ((i * 104729) % 997) / 997, 0.3 + ((i * 31) % 7) / 10]);
+// 스타링크 위성 (옆에서 본 모습): 납작한 본체 + 양쪽 태양전지판 날개(아코디언 전개) + 홀 추진기
+function drawStarlink(ctx, s, d) {
+  const u = d.unfold || 0, nSeg = 5, segL = 2.4 * s;
+  // 날개: 처음 30% 동안 뿌리가 세워진 자세(접혀 본체에 붙음)에서 바깥으로 눕고,
+  //       나머지 동안 지그재그로 접힌 판들이 일자로 펴진다 (아코디언)
+  const root = (1 - Math.min(1, u / 0.3)) * Math.PI / 2;
+  const beta = (1 - clamp((u - 0.3) / 0.7, 0, 1)) * 80 * D2R;
+  for (const side of [-1, 1]) {
+    let x = side * 2.3 * s, y = -0.35 * s;
+    const base = side > 0 ? -root : Math.PI + root;          // 바깥 방향 (세워진 상태에서는 위쪽)
+    for (let k = 0; k < nSeg; k++) {
+      const a = base + (k % 2 ? 1 : -1) * beta;
+      const nx = x + Math.cos(a) * segL, ny = y + Math.sin(a) * segL;
+      ctx.lineWidth = Math.max(2.5, 0.32 * s); ctx.strokeStyle = '#22416c'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(nx, ny); ctx.stroke();
+      ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(170,200,240,.7)'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(nx, ny); ctx.stroke();
+      x = nx; y = ny;
+      if (u < 0.01) break;
+    }
+  }
+  ctx.fillStyle = '#9aa6b2'; ctx.fillRect(-2.3 * s, -0.7 * s, 4.6 * s, 0.7 * s);           // 본체
+  ctx.fillStyle = '#e8edf2'; ctx.fillRect(-2.0 * s, -0.08 * s, 4.0 * s, 0.08 * s);         // 아래: 안테나 면
+  ctx.fillStyle = '#2e4f78'; ctx.fillRect(-2.0 * s, -0.6 * s, 4.0 * s, 0.25 * s);
+  if (d.st === 'thrust') {                                                                  // 홀 추진기 (보라색 빛)
+    const g = ctx.createLinearGradient(0, 0, 0, 4 * s); g.addColorStop(0, 'rgba(190,150,255,.9)'); g.addColorStop(1, 'rgba(120,90,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-0.25 * s, 0); ctx.lineTo(0.25 * s, 0); ctx.lineTo(0.8 * s, 4 * s); ctx.lineTo(-0.8 * s, 4 * s); ctx.fill();
+  }
+}
+
+// 위성 카메라: 마지막으로 떠난(맨 위층) 위성을 가까이서
+function renderSat(ctx, M, w, h) {
+  const U = M.U, tgt = U.deployed.find(d => d.i === UP.nSat - 1);
+  const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#02040a'); g.addColorStop(1, '#0a1626');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  for (const [sx, sy, a] of STARS) { ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.fillRect(sx * w, sy * h * 0.75, 1.5, 1.5); }
+  // 태양 (판이 바라볼 방향)
+  const sunDir = UP.sunAngle, sx0 = w / 2 + Math.sin(sunDir) * h * 0.9, sy0 = h * 0.45 - Math.cos(sunDir) * h * 0.9;
+  const sg = ctx.createRadialGradient(sx0, sy0, 0, sx0, sy0, h * 0.5); sg.addColorStop(0, 'rgba(255,250,220,.95)'); sg.addColorStop(0.08, 'rgba(255,230,160,.55)'); sg.addColorStop(1, 'rgba(255,220,150,0)');
+  ctx.fillStyle = sg; ctx.fillRect(0, 0, w, h);
+  const horizonY = h * 0.9, Rpx = w * 3;
+  ctx.fillStyle = '#1d4466'; ctx.beginPath(); ctx.arc(w / 2, horizonY + Rpx, Rpx, 0, 7); ctx.fill();
+  if (!tgt) return label(ctx, '아직 분리 전입니다', w / 2, h / 2, '#fff', 'center', 15);
+  const s = h / 26, X = w / 2, Y = h * 0.45;
+  // 다른 위성과 2단: 같은 축척으로 상대 위치에 (흐리게)
+  ctx.save(); ctx.translate(X - tgt.x * s, Y + tgt.y * s);
+  for (const d of U.deployed) { if (d === tgt) continue; ctx.save(); ctx.translate(d.x * s, -d.y * s); ctx.rotate(d.a); ctx.globalAlpha = 0.22; drawStarlink(ctx, s, d); ctx.restore(); }
+  ctx.save(); ctx.globalAlpha = 0.35; ctx.rotate(U.th); ctx.translate(0, UP.zcg * s); ctx.fillStyle = '#EEF1F3'; ctx.fillRect(-1.83 * s, -13 * s, 3.66 * s, 13 * s); ctx.restore();
+  ctx.restore();
+  ctx.save(); ctx.translate(X, Y); ctx.rotate(tgt.a); drawStarlink(ctx, s, tgt); ctx.restore();
+  const names = { tumble: '분리 직후 — 2단에서 받은 회전으로 천천히 구르는 중', detumble: '반작용 휠로 회전을 멈추는 중', unfold: `태양전지판 전개 ${Math.round((tgt.unfold || 0) * 100)}%`, sun: '판이 태양을 향하도록 자세 전환', thrust: '홀 추진기로 궤도를 천천히 올리는 중 (약 500 km대 운용 궤도로)' };
+  label(ctx, `스타링크 6호 · ${names[tgt.st]}`, 16, 74, '#fff', 'left', 14);
+  label(ctx, '시간을 줄여 보여 줍니다 — 실제로는 몇 시간에서 몇 주', 16, 96, 'rgba(255,255,255,.75)', 'left', 12);
+}
+
+function renderUpper(ctx, M, w, h) {
+  const U = M.U;
+  const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#02040a'); g.addColorStop(1, '#0a1626');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  for (const [sx, sy, a] of STARS) { ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.fillRect(sx * w, sy * h * 0.75, 1.5, 1.5); }
+  // 지구 가장자리: 고도가 높을수록 아래로 내려간다
+  const horizonY = h * (0.78 + Math.min(0.2, U.y / 2.5e6));
+  const Rpx = w * 3;
+  const eg = ctx.createRadialGradient(w / 2, horizonY + Rpx, Rpx * 0.985, w / 2, horizonY + Rpx, Rpx * 1.02);
+  eg.addColorStop(0, '#2b5f8f'); eg.addColorStop(0.7, '#7fb6e0'); eg.addColorStop(1, 'rgba(127,182,224,0)');
+  ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(w / 2, horizonY + Rpx, Rpx * 1.02, 0, 7); ctx.fill();
+  ctx.fillStyle = '#1d4466'; ctx.beginPath(); ctx.arc(w / 2, horizonY + Rpx, Rpx, 0, 7); ctx.fill();
+  // 아래로 흘러가는 구름: 2단이 초속 7 km 넘게 지나가고 있다는 것을 보여 준다
+  ctx.save(); ctx.beginPath(); ctx.arc(w / 2, horizonY + Rpx, Rpx, 0, 7); ctx.clip();
+  const shift = U.x / 1000 * 9;
+  for (let i = 0; i < 46; i++) {
+    const row = i % 5, depth = 0.25 + row * 0.19, yy = horizonY + 6 + row * row * 9 + 4;
+    const span = w * 1.6, xx = (((i * 997) % 1000) / 1000 * span - shift * depth) % span;
+    const X = xx < 0 ? xx + span - w * 0.3 : xx - w * 0.3;
+    ctx.fillStyle = `rgba(235,242,248,${0.18 + 0.12 * row / 4})`;
+    ctx.beginPath(); ctx.ellipse(X, yy, (18 + (i * 37) % 40) * depth, (2.5 + (i % 3)) * depth, 0, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+  // 기체: 화면 가운데에 무게중심, 축척 고정. 회전은 무게중심 둘레
+  const s = h / 70, X = w / 2, Y = h * 0.42;
+  const sat = (c, i) => { c.fillStyle = '#9aa6b2'; c.fillRect(-2.3 * s, -0.7 * s, 4.6 * s, 0.7 * s); c.fillStyle = '#2e4f78'; c.fillRect(-2.0 * s, -0.6 * s, 4.0 * s, 0.25 * s); };
+  ctx.save(); ctx.translate(X, Y); ctx.rotate(U.th); ctx.translate(0, UP.zcg * s);
+  for (const f of U.fairings) { ctx.save(); ctx.translate(f.x * s, -f.y * s - 13 * s); ctx.rotate(f.a); ctx.fillStyle = '#E6EAEE'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.sign(f.vx) * 2.6 * s, 0); ctx.lineTo(Math.sign(f.vx) * 2.6 * s, -6 * s); ctx.quadraticCurveTo(Math.sign(f.vx) * 2.2 * s, -11 * s, 0, -13 * s); ctx.closePath(); ctx.fill(); ctx.restore(); }
+  if (U.on) { const L = 40 * s, W0 = 3.2 * s; const pg = ctx.createLinearGradient(0, 0, 0, L); pg.addColorStop(0, 'rgba(255,230,190,.9)'); pg.addColorStop(0.3, 'rgba(255,170,90,.45)'); pg.addColorStop(1, 'rgba(255,140,60,0)'); ctx.fillStyle = pg; ctx.beginPath(); ctx.moveTo(-W0 / 2, 3 * s); ctx.lineTo(-W0 * 4, L); ctx.lineTo(W0 * 4, L); ctx.lineTo(W0 / 2, 3 * s); ctx.fill(); }
+  ctx.fillStyle = '#3a3f44'; ctx.beginPath(); ctx.moveTo(-0.7 * s, 0); ctx.lineTo(0.7 * s, 0); ctx.lineTo(1.6 * s, 3 * s); ctx.lineTo(-1.6 * s, 3 * s); ctx.fill();
+  ctx.fillStyle = '#EEF1F3'; ctx.fillRect(-1.83 * s, -13 * s, 3.66 * s, 13 * s);
+  ctx.fillStyle = '#1E2328'; ctx.fillRect(-1.83 * s, -1.2 * s, 3.66 * s, 1.2 * s);
+  if (U.fairing) { ctx.fillStyle = '#E6EAEE'; ctx.beginPath(); ctx.moveTo(-2.6 * s, -13 * s); ctx.lineTo(2.6 * s, -13 * s); ctx.lineTo(2.6 * s, -19 * s); ctx.quadraticCurveTo(2.2 * s, -25.5 * s, 0, -26 * s); ctx.quadraticCurveTo(-2.2 * s, -25.5 * s, -2.6 * s, -19 * s); ctx.closePath(); ctx.fill(); }
+  else {
+    for (let i = 0; i < U.sats; i++) { ctx.save(); ctx.translate(0, -(UP.stackZ0 + (i + 1) * UP.layer) * s); sat(ctx, i); ctx.restore(); }
+    if (U.sats > 0) { ctx.strokeStyle = '#c9a43a'; ctx.lineWidth = 2; for (const sx of [-2.1, 2.1]) { ctx.beginPath(); ctx.moveTo(sx * s, -UP.stackZ0 * s); ctx.lineTo(sx * s, -(UP.stackZ0 + UP.nSat * UP.layer + 0.3) * s); ctx.stroke(); } }   // 텐션 로드
+  }
+  ctx.restore();
+  // 분리된 스타링크: 각자 받은 속도로 멀어지며 같이 돈다
+  for (const d of U.deployed) { ctx.save(); ctx.translate(X + d.x * s, Y - d.y * s); ctx.rotate(d.a); ctx.translate(0, 0.35 * s); drawStarlink(ctx, s, d); ctx.restore(); }
+  if (U.phase === 'SPINUP' || U.phase === 'DEPLOY') label(ctx, U.phase === 'SPINUP' ? '천천히 회전 중 — 곧 텐션 로드 해제' : `텐션 로드 해제 후 ${(U.tl - U.tDone).toFixed(0)} s — 바깥 층일수록 빨리 멀어진다 (v = ω·z)`, w / 2, h * 0.08 + 40, '#fff', 'center', 13);
+  const o = U.orbitNow;
+  label(ctx, `2단 · 고도 ${(U.y / 1000).toFixed(1)} km · 속도 ${(Math.hypot(U.vx, U.vy) / 1000).toFixed(2)} km/s`, 16, 74, '#fff', 'left', 13);
+  if (o) label(ctx, isFinite(o.peri) && o.peri > 0 ? `지금 엔진을 끄면: 궤도 ${(o.peri / 1000).toFixed(0)} × ${(o.apo / 1000).toFixed(0)} km` : '아직 궤도 속도에 못 미침 (끄면 다시 떨어진다)', 16, 94, 'rgba(255,255,255,.8)', 'left', 12);
+}
+
+// 지도 카메라: 둥근 지구 위의 두 궤적 (고도 3배 과장)
+function renderMap(ctx, M, w, h) {
+  ctx.fillStyle = '#05080c'; ctx.fillRect(0, 0, w, h);
+  const L = M.log, ex = 3;
+  let xmax = 800e3; for (const x of L.x2) if (isFinite(x)) xmax = Math.max(xmax, x * 1000); xmax *= 1.08;
+  const phiMax = xmax / RE, x0 = 70, yb = h - 150, sc = (w - 140) / (RE * Math.sin(phiMax));
+  const P = (x, y) => { const ph = x / RE, r = RE + y * ex; return [x0 + r * Math.sin(ph) * sc, yb - (r * Math.cos(ph) - RE) * sc]; };
+  ctx.fillStyle = '#1d4466'; ctx.beginPath(); ctx.moveTo(...P(-50e3, 0));
+  for (let i = 0; i <= 60; i++) ctx.lineTo(...P(-50e3 + (xmax + 100e3) * i / 60, 0));
+  ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath(); ctx.fill();
+  const path = (xs, ys, col) => { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); let pen = false; for (let i = 0; i < xs.length; i++) { if (!isFinite(xs[i])) { pen = false; continue; } const [X, Y] = P(xs[i] * 1000, Math.max(0, ys[i] * 1000)); pen ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); pen = true; } ctx.stroke(); };
+  path(L.x1, L.y1, '#E6A445'); path(L.x2, L.y2, '#74ABD8');
+  const dot = (x, y, c, t) => { const [X, Y] = P(x, Math.max(0, y)); ctx.fillStyle = c; ctx.beginPath(); ctx.arc(X, Y, 5, 0, 7); ctx.fill(); if (t) label(ctx, t, X + 8, Y - 10, '#fff', 'left', 12); };
+  dot(0, 0, '#fff', '발사장');
+  if (M.B) { dot(M.B.xTarget, 0, '#fff', '드론십'); dot(M.B.bx, M.B.by, '#E6A445', '1단'); }
+  else dot(M.A.bx, M.A.by, '#E6A445', '팰컨 9');
+  if (M.U) dot(M.U.x, M.U.y, '#74ABD8', '2단');
+  label(ctx, '지도 — 고도 3배 과장 · 주황: 1단 · 파랑: 2단', 16, 74, 'rgba(255,255,255,.8)', 'left', 12);
+}
+
+const FSM1 = [['ASCENT', '상승', '9기'], ['SEP', '단 분리', ''], ['FLIP', '뒤집기·유지', 'RCS'], ['ENTRY', '엔트리 번', '3기'], ['AERO', '공력 하강', '핀 + 받음각'], ['LANDING', '착륙 연소', '1기'], ['TOUCHDOWN', '접지', '']];
+const FSM2 = [['ASCENT', '상승', '1단이 밀어 줌'], ['SEP', '단 분리', ''], ['BURN', '2단 연소', 'MVac'], ['COAST', 'SECO · 관성', ''], ['SPINUP', '천천히 회전', 'RCS'], ['DEPLOY', '텐션 로드 해제', '6기 동시'], ['SATS', '위성 전개', '판 펼침 · 홀 추진'], ['DONE', '완료', '']];
+const F9_PHASE = { SEP: '단 분리', FLIP: '뒤집기 후 자세 유지 (RCS)', ENTRY: '엔트리 번 (엔진 3기)', AERO: '공력 하강 — 그리드 핀 + 받음각', LANDING: '착륙 연소 (엔진 1기)', TOUCHDOWN: '접지' };
+const U_PHASE = { SEP: '단 분리', BURN: '2단 연소', COAST: 'SECO · 관성 비행', SPINUP: '배치 자세로 회전', DEPLOY: '스타링크 분리 — 카드 펼치듯' };
+function camOf(M, R) {
+  if (M.phase === 'ASCENT' || M.phase === 'BOOM') return R.cam === 'map' ? 'map' : 'ascent';
+  if (R.cam !== 'auto') return R.cam === 'ascent' ? 'booster' : R.cam;
+  if (!M.B.done) return 'booster';
+  return M.U.phase === 'DEPLOY' && M.U.tl - M.U.tDone > 12 ? 'sat' : 'upper';
+}
+
+const s4Runner = new Runner({
+  id: 's4', alt: '팰컨 9 스타링크 미션 전체 시뮬레이션', dt: F9R.dt, defaultSpeed: 10, speeds: [1, 5, 10, 30, Infinity], goLabel: '발사',
+  codeKeys: ['kf', 's3', 's4', 'up'],
+  fnNames: ['kfPredict', 'kfUpdate', 'guidance', 'flipAttitude', 'attitude', 'aeroGuidance', 'ignite', 'landingBurn', 'upperGuidance'],
+  tabs: [{ key: 's4', label: '1단 귀환 비행 소프트웨어' }, { key: 'up', label: '2단 궤도 투입' }, { key: 's3', label: '상승 유도 (3단계와 공유)' }, { key: 'kf', label: '칼만 필터' }],
+  cams: [['auto', '자동'], ['booster', '1단'], ['upper', '2단'], ['sat', '위성'], ['map', '지도']],
+  params: { tKick: 15, kick: 6.5, qBucket: 28000, bucket: 0.7, reserve: 32,
+    hTarget: 280, Kh: 0.7, coast: 60, spin: 1.5, watch: 110,
+    entryAlt: 55, entryEnd: 800, offset: 2, Kpt: 1.5, Kdt: 3, wMax: 10, Kaero: 1.0, aoaMax: 8, margin: 0.75, Kx: 0.5, aLat: 3.5, tiltMax: 30,
+    sg: 3, sa: 0.2, gpsOut: false, windMode: 'steady', sfc: 6, jet: 30, en: 1.5, engFail: 'none' },
+  sliders: [
+    { group: '상승', items: [
+      { key: 'kick', label: '피치 킥 각도', min: 2, max: 9, step: 0.1, d: 1, unit: '°', reset: true },
+      { key: 'reserve', label: '1단 착륙용 예비 연료', min: 15, max: 60, step: 1, d: 0, unit: 't', reset: true },
+      { key: 'qBucket', label: 'Max-Q 버킷 시작 동압', min: 15000, max: 40000, step: 500, fmt: v => (v / 1000).toFixed(1), unit: 'kPa', reset: true }] },
+    { group: '2단 · 스타링크', items: [
+      { key: 'hTarget', label: '목표 궤도 고도', min: 200, max: 500, step: 5, d: 0, unit: 'km' },
+      { key: 'Kh', label: '고도 유도 게인', min: 0.2, max: 2, step: 0.05 },
+      { key: 'coast', label: 'SECO 뒤 배치까지', min: 10, max: 300, step: 5, d: 0, unit: 's' },
+      { key: 'spin', label: '배치 회전 속도', min: 0.2, max: 6, step: 0.1, d: 1, unit: '°/s' },
+      { key: 'watch', label: '분리 뒤 지켜보기', min: 30, max: 300, step: 10, d: 0, unit: 's' }] },
+    { group: '1단 엔트리 번 · 공력 하강', items: [
+      { key: 'entryAlt', label: '엔트리 번 점화 고도', min: 35, max: 75, step: 1, d: 0, unit: 'km', reset: true },
+      { key: 'entryEnd', label: '엔트리 번 종료 속도', min: 400, max: 2000, step: 50, d: 0, unit: 'm/s', reset: true },
+      { key: 'offset', label: '드론십 위치 (핀 없을 때 착지점 기준)', min: -6, max: 6, step: 0.5, d: 1, unit: 'km', reset: true },
+      { key: 'aoaMax', label: '최대 받음각', min: 0, max: 15, step: 0.5, d: 1, unit: '°' }] },
+    { group: '1단 자세 제어', items: [
+      { key: 'Kpt', label: '각도 게인 <span class="sym">K<sub>pθ</sub></span>', min: 0.2, max: 4, step: 0.05 },
+      { key: 'Kdt', label: '회전 속도 게인 <span class="sym">K<sub>dθ</sub></span>', min: 0.5, max: 6, step: 0.1, d: 1 },
+      { key: 'wMax', label: '최대 회전 속도', min: 2, max: 30, step: 1, d: 0, unit: '°/s' }] },
+    { group: '1단 착륙 연소', items: [
+      { key: 'margin', label: '점화 여유', min: 0.3, max: 0.98, step: 0.01 },
+      { key: 'Kx', label: '수평 속도 게인 <span class="sym">K<sub>x</sub></span>', min: 0, max: 2, step: 0.05 },
+      { key: 'aLat', label: '계획 수평 감속도', min: 0.5, max: 6, step: 0.1, d: 1, unit: 'm/s²' },
+      { key: 'tiltMax', label: '최대 기울기', min: 5, max: 40, step: 1, d: 0, unit: '°' }] },
+    { group: '환경 · 고장 · 항법', items: [
+      { key: 'windMode', type: 'select', label: '바람 상태', options: [['calm', '잔잔'], ['steady', '일정'], ['gusty', '돌풍']], reset: true },
+      { key: 'sfc', label: '지상·해상 바람', min: 0, max: 20, step: 0.5, d: 1, unit: 'm/s', reset: true },
+      { key: 'jet', label: '제트기류 (11 km)', min: 0, max: 60, step: 1, d: 0, unit: 'm/s', reset: true },
+      { key: 'en', label: '엔진 추력 잡음', min: 0, max: 6, step: 0.5, d: 1, unit: '%' },
+      { key: 'engFail', type: 'select', label: '예약 고장', options: [['none', '없음'], ['entry', '엔트리 번 중 1기']], reset: true },
+      { key: 'sg', label: 'GPS 잡음', min: 1, max: 15, step: 0.5, d: 1, unit: 'm', reset: true },
+      { key: 'gpsOut', type: 'toggle', label: 'GPS 음영 (고도 30 → 4 km)', reset: true }] }
+  ],
+  create: (p, seed, fns) => s4Create(p, seed, fns),
+  step: s4Step,
+  render(ctx, M, w, h, R) {
+    const cam = camOf(M, R);
+    if (cam === 'ascent') return s3Runner.cfg.render(ctx, M.A, w, h, R);
+    if (cam === 'map') return renderMap(ctx, M, w, h);
+    if (cam === 'upper' && M.U) return renderUpper(ctx, M, w, h);
+    if (cam === 'sat' && M.U) return renderSat(ctx, M, w, h);
+    return renderBooster(ctx, M.B, w, h, R);
+  },
+  hud: M => {
+    if (M.phase === 'ASCENT' || M.phase === 'BOOM') return `<div class="phase">${M.A.boom ? '폭발' : M.A.phase}</div>팰컨 9 · 상승`;
+    const B = M.B, U = M.U;
+    const b = B.boom ? '폭발' : B.post ? '접지 — 자세 확인 중' : F9_PHASE[B.phase];
+    return `<div class="phase">1단: ${b}</div>2단: ${U_PHASE[U.phase] || ''}`;
+  },
+  tlmSides: ['left', 'right'],
+  tlm: M => {
+    const A = M.A, B = M.B, U = M.U;
+    const one = B || A, f = one.MP.tanks;
+    const left = { layout: 'f9', engines: engStates(one.eng), speed: Math.hypot(one.vx, one.vy), alt: one.by, lox: f[1].fill, fuel: f[0].fill, icon: B ? 'f9' : 'stack', th: one.th };
+    const uFill = U ? U.prop / UP.prop : 1;
+    const right = { layout: 'mvac', engines: [U ? (U.failed ? 'failed' : U.on ? 'on' : 'off') : 'off'], speed: U ? Math.hypot(U.vx, U.vy) : Math.hypot(A.vx, A.vy), alt: U ? U.y : A.by + 54, lox: uFill, fuel: uFill,
+      icon: U && !U.fairing ? 'upOpen' : 'up', th: U ? U.th : A.th,
+      extra: U && U.orbitNow && isFinite(U.orbitNow.peri) && U.orbitNow.peri > 0 ? ['ORBIT', `${(U.orbitNow.peri / 1000).toFixed(0)}×${(U.orbitNow.apo / 1000).toFixed(0)}`, 'KM'] : null };
+    return { t: M.t, title: 'FALCON 9 · STARLINK MISSION', left, right };
+  },
+  onEngine: (M, side, i) => {
+    if (side === 'left') {
+      const eng = M.B ? M.B.eng : M.A.eng;
+      if (eng[i] && !eng[i].failed) { eng[i].failed = true; M.ev(1, `1단 엔진 ${i + 1}번 고장`); }
+    } else if (M.U && !M.U.failed) { M.U.failed = true; M.ev(2, '2단 MVac 고장'); }
+  },
+  readout: M => {
+    const A = M.A, B = M.B, U = M.U, one = B || A;
+    const r = [['T+', fmt(M.t, 1) + ' s'], ['1단 고도', one.by > 2000 ? fmt(one.by / 1000, 2) + ' km' : fmt(one.by, 1) + ' m'], ['1단 속도', fmt(Math.hypot(one.vx, one.vy), 0) + ' m/s'], ['1단 연료', fmt(one.prop / 1000, 2) + ' t'],
+      ['1단 기울기', fmt(one.th * R2D, 1) + '°'], ['1단 무게중심', fmt(one.MP.zcg, 1) + ' m']];
+    if (B) r.push(['드론십까지', fmt(B.xTarget - B.bx, 0) + ' m'], ['그리드 핀 / RCS', fmt(B.fin * 100, 0) + ' / ' + fmt(B.rcs * 100, 0) + ' %'], ['가열 지표', fmt(B.heat || 0, 2)], ['착지 충격', B.impactG ? fmt(B.impactG, 2) + ' g' : '—']);
+    if (U) { const o = U.orbitNow; r.push(['2단 고도', fmt(U.y / 1000, 1) + ' km'], ['2단 속도', fmt(Math.hypot(U.vx, U.vy), 0) + ' m/s'], ['2단 연료', fmt(U.prop / 1000, 1) + ' t'], ['궤도 (근×원)', o && isFinite(o.peri) && o.peri > 0 ? `${fmt(o.peri / 1000, 0)} × ${fmt(o.apo / 1000, 0)} km` : '—'], ['남은 스타링크', U.sats + '기']); }
+    return r;
+  },
+  plots: [
+    { title: '고도 [km]', series: [{ label: '1단', color: 'kero', get: L => L.y1 }, { label: '2단', color: 'lox', get: L => L.y2 }] },
+    { title: '속도 [m/s]', series: [{ label: '1단', color: 'kero', get: L => L.v1 }, { label: '2단', color: 'lox', get: L => L.v2 }] },
+    { title: '2단 궤도: 지금 끄면 그려질 근지점·원지점 [km]', yMin: 0, series: [{ label: '근지점', color: 'lox', get: L => L.peri }, { label: '원지점', color: 'ink', get: L => L.apo }] },
+    { title: '1단 자세 [°]', series: [{ label: '명령', color: 'muted', style: 'dash', get: L => L.thCmd }, { label: '기울기 θ', color: 'ink', get: L => L.th }, { label: '짐벌 δ', color: 'kero', get: L => L.delta }] },
+    { title: '1단 받음각 [°] · 그리드 핀 [%]', series: [{ label: '받음각', color: 'lox', get: L => L.aoa }, { label: '그리드 핀', color: 'ok', get: L => L.fin, width: 1 }] },
+    { title: '1단 켜진 엔진 ×10 · 스로틀 [%]', yMin: 0, yMax: 100, series: [{ label: '엔진 수 ×10', color: 'ink', get: L => L.nLit.map(v => v * 10) }, { label: '스로틀', color: 'kero', get: L => L.thr }] },
+    { title: '1단 재진입 가열 지표', hline: { y: F9R.heatLimit, label: '엔진부 한계' }, series: [{ label: '√ρ · v³', color: 'fault', get: L => L.heat }] },
+    { title: '1단: 드론십까지 수평 거리 [km]', series: [{ label: 'x − x_target', color: 'lox', get: L => L.errX }] },
+    { title: '1단 무게중심 높이 [m]', minSpan: 0.5, series: [{ label: '바닥에서 무게중심까지', color: 'ink', get: L => L.zcg }] }
+  ],
+  extra(M) {
+    const p1 = M.phase === 'ASCENT' || M.phase === 'BOOM' ? 'ASCENT' : M.B.phase;
+    const p2 = M.phase === 'ASCENT' || M.phase === 'BOOM' ? 'ASCENT' : M.done ? 'DONE' : M.U.phase === 'DEPLOY' && M.U.deployed.some(d => d.st !== 'tumble') ? 'SATS' : M.U.phase;
+    const row = (F, ph) => { const idx = F.findIndex(f => f[0] === ph); return F.map((f, i) => (i ? '<div class="arr"></div>' : '') + `<div class="st ${i === idx ? 'on' : i < idx ? 'done' : ''}"><b>${f[1]}</b>${f[2]}</div>`).join(''); };
+    $('#s4-fsm').innerHTML = `<div class="fsm-label">1단</div>${row(FSM1, p1)}`;
+    $('#s4-fsm2').innerHTML = `<div class="fsm-label">2단</div>${row(FSM2, p2)}`;
+    const all = M.events1.map(e => [e[0], '1단', e[1]]).concat(M.events2.map(e => [e[0], '2단', e[1]])).sort((a, b) => a[0] - b[0]);
+    $('#s4-events').innerHTML = all.map(([t, who, m]) => `<li>T+${t.toFixed(1)} s · <b>${who}</b> — ${m}</li>`).join('');
+  }
+});
+
+// ====================================================================
+//  탭 전환, 테마
+// ====================================================================
+const RUNNERS = { s1: s1Runner, s2: s2Runner, s3: s3Runner, s4: s4Runner };
+function goStage(id) {
+  document.querySelectorAll('section.stage').forEach(s => s.classList.toggle('active', s.id === id));
+  document.querySelectorAll('nav.stages button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.go === id)));
+  for (const k in RUNNERS) if (k !== id && RUNNERS[k].running) RUNNERS[k].toggle();
+  if (RUNNERS[id]) requestAnimationFrame(() => RUNNERS[id].draw());
+  const nav = $('nav.stages'), top = $('header.top').offsetHeight; if (window.scrollY > top) window.scrollTo(0, top);
+  if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([document.getElementById(id)]).catch(() => {});
+}
+document.querySelectorAll('nav.stages button').forEach(b => b.onclick = () => goStage(b.dataset.go));
+
+const themes = ['auto', 'light', 'dark'];
+let themeIdx = 0;
+try { const t = localStorage.getItem('rk-theme'); if (t && themes.includes(t)) themeIdx = themes.indexOf(t); } catch (e) {}
+function applyTheme() {
+  const t = themes[themeIdx];
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+  $('#themeBtn').textContent = '화면 테마: ' + ({ auto: '시스템', light: '밝게', dark: '어둡게' })[t];
+  readColors();
+  for (const k in RUNNERS) RUNNERS[k].draw();
+}
+$('#themeBtn').onclick = () => { themeIdx = (themeIdx + 1) % 3; try { localStorage.setItem('rk-theme', themes[themeIdx]); } catch (e) {} applyTheme(); };
+applyTheme();
+if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readColors(); for (const k in RUNNERS) RUNNERS[k].draw(); });
+window.addEventListener('load', () => { for (const k in RUNNERS) RUNNERS[k].editor.refresh(); });
+
+</script>
+</body>
+</html>

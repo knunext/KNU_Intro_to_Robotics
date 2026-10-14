@@ -1,0 +1,1696 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>4족 보행 로봇 1부: 로봇 개를 걷게 하기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script>
+window.MathJax = {
+  loader: { load: ['[tex]/html'] },
+  tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']], packages: { '[+]': ['html'] } },
+  svg: { fontCache: 'global' },
+  options: { enableMenu: false }
+};
+</script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root{
+  --paper:#ECEFEA; --panel:#F8F9F6; --ink:#1C2126; --ink-2:#56606A; --rule:#CDD2CA;
+  --yellow:#F0B800; --blue:#2860C4; --orange:#C25416; --good:#1F8A5B; --bad:#C2372B;
+  --stage:#D9DED6; --grid:#BCC3B9; --code-bg:#1F252B; --code-ink:#E6E9E3;
+  color-scheme: light dark;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#161A1E; --panel:#1E2328; --ink:#E5E8E2; --ink-2:#A3ABA6; --rule:#353C43;
+    --yellow:#F2C230; --blue:#7CA6F0; --orange:#F29757; --good:#4CC38A; --bad:#F2725F;
+    --stage:#232A30; --grid:#3B444B; --code-bg:#0F1316;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#161A1E; --panel:#1E2328; --ink:#E5E8E2; --ink-2:#A3ABA6; --rule:#353C43;
+  --yellow:#F2C230; --blue:#7CA6F0; --orange:#F29757; --good:#4CC38A; --bad:#F2725F;
+  --stage:#232A30; --grid:#3B444B; --code-bg:#0F1316;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px); -webkit-text-size-adjust:100%}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
+  font-size:17px;line-height:1.75;word-break:keep-all;overflow-wrap:anywhere}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+.prose{max-width:46rem}
+a{color:var(--blue)}
+:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+h1,h2,h3{line-height:1.25;letter-spacing:-0.015em}
+h1{font-size:clamp(2.2rem,6.4vw,4rem);font-weight:700;margin:0 0 .35em}
+h2{font-size:clamp(1.5rem,3.4vw,2rem);font-weight:700;margin:0 0 .6em}
+h3{font-size:1.15rem;font-weight:700;margin:1.6em 0 .4em}
+p{margin:0 0 1em}
+.num{font-variant-numeric:tabular-nums}
+
+/* hero */
+.hero{padding:44px 20px 22px}
+.hero .series{font-size:1rem;color:var(--ink-2);margin:0 0 .6em}
+.hero .lede{font-size:1.12rem;color:var(--ink-2);max-width:40rem;margin:0}
+.hero h1{position:relative;padding-left:22px}
+.hero h1::before{content:"";position:absolute;left:0;top:.12em;bottom:.12em;width:9px;background:var(--yellow);border-radius:2px}
+
+/* simulator */
+.sim{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:10px}
+@media (min-width:1040px){.sim{grid-template-columns:minmax(0,1fr) 330px}}
+.stage{position:relative;height:min(64vh,620px);min-height:360px;border-radius:10px;overflow:hidden;background:var(--stage);border:1px solid var(--rule);touch-action:none;user-select:none;-webkit-user-select:none}
+.stage canvas#gl{width:100%;height:100%;display:block}
+.pip-lbl{position:absolute;font-size:12px;line-height:1.3;padding:2px 6px;border-radius:4px;background:rgba(20,24,28,.72);color:#F2F3EF;pointer-events:none;white-space:nowrap}
+#depthCv{position:absolute;image-rendering:pixelated;border-radius:4px;border:1px solid rgba(255,255,255,.35);pointer-events:none;background:#000}
+#pipRgbFrame{position:absolute;border-radius:4px;border:1px solid rgba(255,255,255,.35);pointer-events:none}
+.joy{position:absolute;left:14px;bottom:14px;width:108px;height:108px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.18),rgba(255,255,255,.06));border:2px solid rgba(255,255,255,.55);
+  box-shadow:0 0 0 1px rgba(0,0,0,.18) inset;touch-action:none}
+.joy .knob{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:var(--yellow);border:2px solid #1C2126;pointer-events:none}
+.hud{position:absolute;right:12px;bottom:12px;max-width:62%;text-align:right;font-size:13px;line-height:1.45;color:#F2F3EF;pointer-events:none}
+.hud span{display:inline-block;background:rgba(20,24,28,.72);border-radius:4px;padding:2px 7px;margin-top:4px}
+#hudMsg:empty{display:none}
+.sim-err{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:24px;text-align:center;color:var(--ink)}
+.help{font-size:.92rem;color:var(--ink-2);margin:8px 2px 0}
+kbd{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.85em;border:1px solid var(--rule);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel)}
+
+.rail{display:grid;gap:12px;align-content:start}
+@media (min-width:640px) and (max-width:1039px){.rail{grid-template-columns:1fr 1fr}}
+.box{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:12px 14px}
+.box h4{margin:0 0 8px;font-size:.95rem;font-weight:700}
+.row{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:.92rem}
+.row label{flex:0 0 auto;min-width:4.5em}
+.row input[type=range]{flex:1;min-width:0;accent-color:var(--blue)}
+.row output{flex:0 0 5.6em;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button,.btn{font:inherit;font-size:.9rem;border:1px solid var(--rule);background:transparent;color:var(--ink);border-radius:999px;padding:5px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--yellow);border-color:var(--yellow);color:#1C2126;font-weight:500}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:500}
+.btn:disabled{opacity:.45;cursor:default}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:.9rem}
+.checks label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.checks input{accent-color:var(--blue);width:16px;height:16px}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.data{font-size:.88rem;font-variant-numeric:tabular-nums}
+.data table{width:100%;border-collapse:collapse}
+.data th,.data td{padding:2px 4px;text-align:right}
+.data th:first-child,.data td:first-child{text-align:left}
+.data thead th{color:var(--ink-2);font-weight:500;border-bottom:1px solid var(--rule)}
+.imu{display:grid;grid-template-columns:repeat(3,1fr);gap:2px 8px;margin-bottom:8px}
+.imu div{display:flex;justify-content:space-between}
+.imu b{font-weight:500;color:var(--ink-2)}
+#contactCv{width:100%;height:78px;display:block;margin-top:4px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:baseline}
+
+/* sections */
+section.lesson{padding:56px 0 8px;border-top:1px solid var(--rule);margin-top:44px}
+.sec-no{display:inline-block;min-width:1.9em;height:1.9em;line-height:1.9em;text-align:center;border-radius:50%;background:var(--ink);color:var(--paper);font-size:.8em;margin-right:.45em;vertical-align:.12em}
+.note{border-left:4px solid var(--yellow);padding:4px 0 4px 14px;color:var(--ink-2);margin:1.2em 0}
+table.t{border-collapse:collapse;width:100%;font-size:.95rem;margin:1em 0}
+table.t th,table.t td{border-bottom:1px solid var(--rule);padding:8px 10px;text-align:left;vertical-align:top}
+table.t thead th{font-weight:700;border-bottom:2px solid var(--ink)}
+.tscroll{overflow-x:auto}
+
+/* layer stack */
+.stack{display:grid;grid-template-columns:1fr;gap:16px;margin:1.4em 0}
+@media (min-width:860px){.stack{grid-template-columns:minmax(0,1fr) 260px}}
+.layers{list-style:none;margin:0;padding:0;position:relative}
+.layers li{position:relative;display:grid;grid-template-columns:minmax(0,1fr);padding:10px 14px 10px 18px;margin:0 0 10px;background:var(--panel);border:1px solid var(--rule);border-radius:8px}
+.layers li::after{content:"";position:absolute;left:30px;bottom:-11px;width:2px;height:10px;background:var(--ink-2)}
+.layers li:last-child::after{display:none}
+.layers li.here{border-left:6px solid var(--yellow);padding-left:14px}
+.layers .nm{font-weight:700}
+.layers .out{color:var(--ink-2);font-size:.93rem}
+.layers .ch{font-size:.85rem;color:var(--blue)}
+.layers .hz{position:absolute;right:12px;top:10px;font-size:.82rem;color:var(--ink-2)}
+.side-est{background:var(--panel);border:1px dashed var(--ink-2);border-radius:8px;padding:12px 14px;font-size:.93rem;align-self:start}
+
+/* figures */
+.fig{background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:14px;margin:1.4em 0}
+.fig-grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:820px){.fig-grid.two{grid-template-columns:3fr 2fr}.fig-grid.half{grid-template-columns:1fr 1fr}}
+.fig canvas{width:100%;display:block;border-radius:6px;background:var(--paper);touch-action:none}
+.cap{font-size:.86rem;color:var(--ink-2);margin:4px 2px 0}
+.ctrls{display:grid;grid-template-columns:1fr;gap:2px 18px;margin-top:10px}
+@media (min-width:640px){.ctrls{grid-template-columns:1fr 1fr}}
+.stat{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.93rem;margin-top:8px;font-variant-numeric:tabular-nums}
+.stat .warn{color:var(--bad);font-weight:500}
+.stat .ok{color:var(--good);font-weight:500}
+
+/* live matrices */
+.mxline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:10px 0;font-size:15px}
+.mxline .eq{font-size:1.2rem;padding:0 2px}
+.mxname{font-style:italic;font-family:"Times New Roman",serif;font-size:1.25rem}
+.mx{display:inline-flex;align-items:stretch}
+.mx::before,.mx::after{content:"";width:7px;border:2px solid var(--ink)}
+.mx::before{border-right:none;border-radius:4px 0 0 4px}
+.mx::after{border-left:none;border-radius:0 4px 4px 0}
+.mx table{border-collapse:separate;border-spacing:3px 2px;font-variant-numeric:tabular-nums}
+.mx td{padding:3px 7px;text-align:right;border-radius:4px;min-width:4.1em;transition:background-color .15s}
+.mx td.cos{background:color-mix(in srgb,var(--blue) 20%,transparent)}
+.mx td.sin{background:color-mix(in srgb,var(--orange) 22%,transparent)}
+.mx td.res{font-weight:500}
+.mx tr.hl td{box-shadow:inset 0 0 0 2px var(--yellow)}
+.mx tr[data-r]{cursor:pointer}
+.expand{font-size:.95rem;background:var(--paper);border-radius:6px;padding:8px 10px;font-variant-numeric:tabular-nums;overflow-x:auto;white-space:nowrap}
+.expand .c{color:var(--blue);font-weight:500}.expand .s{color:var(--orange);font-weight:500}
+.cosv{color:var(--blue)} .sinv{color:var(--orange)}
+
+/* math & code */
+mjx-container[display="true"]{font-size:122% !important;margin:1.1em 0 !important;overflow-x:auto;overflow-y:hidden;padding:4px 0}
+mjx-container:not([display]){font-size:106% !important}
+pre.code{background:var(--code-bg);color:var(--code-ink);border-radius:10px;padding:16px 18px;overflow-x:auto;
+  font:14px/1.62 "IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;margin:1.2em 0;word-break:normal;overflow-wrap:normal}
+pre.code code{font:inherit;background:none;white-space:pre}
+.hljs-keyword,.hljs-built_in{color:#F2C230}.hljs-string{color:#A6D98A}.hljs-number,.hljs-literal{color:#F29757}
+.hljs-comment{color:#8D99A3;font-style:italic}.hljs-title,.hljs-title.function_{color:#82B4F7}.hljs-params{color:#E6E9E3}
+.hljs-meta{color:#C9A4F0}.hljs-operator{color:#E6E9E3}
+
+ol.road{list-style:none;padding:0;margin:1.2em 0;counter-reset:r 1}
+ol.road li{counter-increment:r;display:grid;grid-template-columns:3.2em minmax(0,1fr);gap:0 12px;padding:12px 0;border-bottom:1px solid var(--rule)}
+ol.road li::before{content:counter(r) "부";font-weight:700;color:var(--ink);background:var(--yellow);border-radius:6px;text-align:center;height:2em;line-height:2em;color:#1C2126}
+ol.road b{display:block}
+ol.tasks{padding-left:1.3em}
+ol.tasks li{margin:.4em 0}
+footer{padding:40px 20px 60px;color:var(--ink-2);font-size:.9rem}
+@media (max-width:520px){
+  body{font-size:16px}
+  .wrap{padding:0 14px}
+  .hero{padding:30px 14px 16px}
+  .stage{height:56vh;min-height:330px}
+  .joy{width:96px;height:96px}
+  .mx td{min-width:3.5em;padding:2px 4px}
+  .mxline{font-size:13px}
+  #legSide,#legFront{height:270px !important}
+  #swCv{height:240px !important}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none !important}}
+</style>
+</head>
+<body>
+
+<header class="hero wrap">
+  <p class="series">4족 보행 로봇 시리즈, 1부</p>
+  <h1>로봇 개를 걷게 하기</h1>
+  <p class="lede">다리 하나의 기구학에서 출발해 걸음새, 발 디딤, 몸통 운동 모델까지 다룹니다. 아래 로봇은 이 페이지에서 배우는 계산만으로 움직이고, 실제 로봇 개에 달리는 센서를 그대로 달았습니다.</p>
+</header>
+
+<div class="wrap">
+  <div class="sim">
+    <div>
+      <div class="stage" id="stage" tabindex="0" aria-label="로봇 개 3D 시뮬레이터. W A S D Q E 키로 조종">
+        <canvas id="gl"></canvas>
+        <div id="pipRgbFrame"></div>
+        <canvas id="depthCv" width="80" height="60"></canvas>
+        <div class="pip-lbl" id="pipRgbLbl">머리 RGB 카메라</div>
+        <div class="pip-lbl" id="pipDepthLbl">깊이 카메라, 0.2–6 m</div>
+        <div class="joy" id="joy" aria-label="조이스틱"><div class="knob" id="joyKnob"></div></div>
+        <div class="hud"><span id="hudGait">서기</span><br><span id="hudMsg"></span></div>
+        <div class="sim-err" id="simErr">3D 화면을 켜지 못했습니다. 브라우저의 WebGL(하드웨어 가속)이 꺼져 있는지 확인하세요. 아래 실습은 그대로 쓸 수 있습니다.</div>
+      </div>
+      <p class="help">화면을 끌면 시점이 돌고, 두 손가락이나 휠로 확대합니다. 바닥을 탭하면 그 지점까지 경로를 계획해 걸어갑니다. 조이스틱이나 <kbd>W</kbd><kbd>S</kbd> 앞뒤, <kbd>A</kbd><kbd>D</kbd> 옆걸음, <kbd>Q</kbd><kbd>E</kbd> 회전으로 직접 몰 수도 있습니다.</p>
+    </div>
+
+    <div class="rail">
+      <div class="box">
+        <h4>걸음새</h4>
+        <div class="seg" data-group="gait">
+          <button data-v="stand" aria-pressed="false">서기</button>
+          <button data-v="walk" aria-pressed="false">걷기</button>
+          <button data-v="trot" aria-pressed="true">트롯</button>
+          <button data-v="pace" aria-pressed="false">페이스</button>
+          <button data-v="bound" aria-pressed="false">바운드</button>
+        </div>
+        <div class="row"><label for="vmax">최대 속도</label><input id="vmax" type="range" min="0.2" max="1.6" step="0.1" value="0.8"><output id="vmaxOut">0.8 m/s</output></div>
+      </div>
+      <div class="box">
+        <h4>몸통 자세 <span style="font-weight:400;color:var(--ink-2);font-size:.85rem">발은 그대로, 다리 IK만 바뀜</span></h4>
+        <div class="row"><label for="bh">높이</label><input id="bh" type="range" min="0.30" max="0.56" step="0.01" value="0.46"><output id="bhOut">0.46 m</output></div>
+        <div class="row"><label for="broll">롤</label><input id="broll" type="range" min="-15" max="15" step="1" value="0"><output id="brollOut">0°</output></div>
+        <div class="row"><label for="bpitch">피치</label><input id="bpitch" type="range" min="-15" max="15" step="1" value="0"><output id="bpitchOut">0°</output></div>
+      </div>
+      <div class="box">
+        <h4>센서와 팔</h4>
+        <div class="checks">
+          <label><input type="checkbox" id="tgLidar" checked> 라이다 점</label>
+          <label><input type="checkbox" id="tgCams" checked> 카메라 화면</label>
+          <label><input type="checkbox" id="tgCloud"> 깊이 점구름</label>
+          <label><input type="checkbox" id="tgStrafe"> 조이스틱 옆걸음</label>
+          <label><input type="checkbox" id="tgArm" checked> 7자유도 팔</label>
+        </div>
+        <div class="btns">
+          <button class="btn primary" id="btnPick">상자 집으러 가기</button>
+          <button class="btn" id="btnReset">처음 위치로</button>
+        </div>
+      </div>
+      <div class="box data">
+        <h4>센서 읽기</h4>
+        <div class="imu" id="imuOut"></div>
+        <table>
+          <thead><tr><th>관절 엔코더</th><th>hx</th><th>hy</th><th>kn</th></tr></thead>
+          <tbody id="jointTbl"></tbody>
+        </table>
+        <div style="margin-top:8px;color:var(--ink-2)">발 접촉, 최근 3초 (칠한 곳이 디딤)</div>
+        <canvas id="contactCv"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="prose">
+    <h3>이 로봇에 달린 센서</h3>
+    <p>실제 로봇 개에 쓰이는 센서를 그대로 흉내 냈습니다. 지금은 읽어서 보여 주기만 하고, 이 값을 해석해 위치와 지도를 만드는 일은 2부에서 합니다.</p>
+  </div>
+  <div class="tscroll">
+    <table class="t">
+      <thead><tr><th>센서</th><th>실제 예</th><th>무엇을 주나</th><th>시뮬레이터에서</th></tr></thead>
+      <tbody>
+        <tr><td>스테레오 깊이 카메라</td><td>Spot 몸통의 스테레오 카메라 5쌍, Intel RealSense D435</td><td>픽셀마다 거리 \(d(u,v)\)</td><td>오른쪽 위 깊이 영상(80×60, 시야 86°), 점구름 켜기</td></tr>
+        <tr><td>RGB 카메라</td><td>머리 카메라, Spot CAM</td><td>색 영상, 물체 인식의 입력</td><td>왼쪽 위 화면</td></tr>
+        <tr><td>3D 라이다</td><td>16채널 회전형(VLP-16 계열), Unitree L1(Go2 머리)</td><td>360° 거리 점들</td><td>등 위의 원통, 16채널 ±15°, 3° 간격</td></tr>
+        <tr><td>IMU</td><td>몸통 내장 자이로 + 가속도계</td><td>각속도, 가속도 → 기울기</td><td>잡음 섞인 수치</td></tr>
+        <tr><td>관절 엔코더</td><td>12개 관절 모터마다</td><td>관절 각 \(q\), 각속도</td><td>표의 hx, hy, kn</td></tr>
+        <tr><td>발 접촉</td><td>발끝 힘 센서, 또는 관절 토크로 추정</td><td>디딤인지 스윙인지</td><td>접촉 기록 그래프</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 1 -->
+  <section class="lesson" id="s1">
+    <div class="prose">
+      <h2><span class="sec-no">1</span>큰 그림: 층으로 나눈 제어</h2>
+      <p>로봇 개의 소프트웨어는 층층이 쌓여 있습니다. 위층일수록 느리고 큰 결정(어디로 갈까)을, 아래층일수록 빠르고 구체적인 결정(모터를 몇 도로)을 내립니다. 실제 Spot이나 Go2는 아래쪽 몇 층을 모델 예측 제어(MPC)나 강화학습 정책으로 바꾸기도 하지만, 층의 역할 분담은 같습니다.</p>
+      <p>이 페이지는 노란 띠가 붙은 세 층을 다룹니다. 위의 시뮬레이터에서 바닥을 탭하면 맨 위층부터 맨 아래층까지 전부 한 번씩 돕니다.</p>
+    </div>
+    <div class="stack">
+      <ol class="layers">
+        <li><span class="hz">~1 Hz</span><span class="nm">경로 계획</span><span class="out">목표까지 지나갈 점들</span><span class="ch">1–2장 A*, RRT</span></li>
+        <li><span class="hz">~20 Hz</span><span class="nm">경로 추종</span><span class="out">몸통 속도 명령 \((v_x, v_y, \omega)\)</span><span class="ch">순수 추종(pure pursuit). 이때 쓰는 몸통 운동 모델은 이 페이지 6절</span></li>
+        <li class="here"><span class="hz">~50 Hz</span><span class="nm">보행 스케줄러</span><span class="out">다리마다 언제 들고 언제 딛는지</span><span class="ch">이 페이지 4절</span></li>
+        <li class="here"><span class="hz">~200 Hz</span><span class="nm">발 궤적과 착지점</span><span class="out">발끝 목표 위치 \(\mathbf p\)</span><span class="ch">이 페이지 5절</span></li>
+        <li class="here"><span class="hz">~500 Hz</span><span class="nm">다리 역기구학</span><span class="out">관절 목표 각 \(q^*\)</span><span class="ch">이 페이지 2–3절, 4–5장 로봇팔과 같은 원리</span></li>
+        <li><span class="hz">~1 kHz</span><span class="nm">관절 제어</span><span class="out">모터 토크 \(\tau = k_p(q^*-q) - k_d\dot q\)</span><span class="ch">10장 PID</span></li>
+      </ol>
+      <div class="side-est">
+        <b>옆에서 받쳐 주는 층: 상태 추정</b>
+        <p style="margin:.4em 0 0">IMU, 관절 엔코더, 카메라, 라이다를 합쳐 몸의 기울기·속도·위치와 주변 지도를 만듭니다. 모든 층이 이 값을 읽습니다. 7장 베이즈 필터가 여기서 쓰이고, 2부에서 다룹니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="lesson" id="s2">
+    <div class="prose">
+      <h2><span class="sec-no">2</span>다리 하나: 순기구학</h2>
+      <p>다리 하나는 관절 3개짜리 작은 로봇팔입니다. Spot의 관절 이름을 빌리면 <b>hx</b>(엉덩이를 옆으로 벌리기), <b>hy</b>(엉덩이 앞뒤), <b>kn</b>(무릎)이고, 다리 4개를 합쳐 관절이 12개입니다. 관절 각 \(q=(q_1,q_2,q_3)\)를 알 때 발끝 위치를 구하는 일이 순기구학(FK)입니다.</p>
+      <p>먼저 다리가 놓인 평면 안에서 생각합니다. 허벅지 길이 \(L_2\), 종아리 길이 \(L_3\)이고, \(q_2=0\)이면 허벅지가 수직 아래를 향하며, \(q_2\)가 커질수록 뒤로 젖혀집니다. 무릎 \(q_3\)는 허벅지에 대한 상대 각입니다.</p>
+      \[ x_A = -L_2\sin q_2 - L_3\sin(q_2+q_3), \qquad z_A = -L_2\cos q_2 - L_3\cos(q_2+q_3) \]
+      <p>그다음 엉덩이 옆 관절이 이 평면 전체를 몸통의 앞뒤 축(\(x\)축) 둘레로 \(q_1\)만큼 돌립니다. 다리 평면은 몸통에서 옆으로 \(L_1\)만큼 떨어져 있는데, 왼쪽 다리는 \(s=+1\), 오른쪽 다리는 \(s=-1\)입니다.</p>
+      \[ \mathbf p = R_x(q_1)\begin{bmatrix} x_A \\ sL_1 \\ z_A \end{bmatrix}, \qquad
+         R_x(q_1) = \begin{bmatrix} 1 & 0 & 0 \\ 0 & \class{cosv}{\cos q_1} & -\class{sinv}{\sin q_1} \\ 0 & \class{sinv}{\sin q_1} & \class{cosv}{\cos q_1} \end{bmatrix} \]
+      <p>이 페이지 로봇은 \(L_1=0.10\), \(L_2=0.32\), \(L_3=0.33\) m이고, 기본 서기 자세가 대략 \(q=(0,\,0.8,\,-1.6)\) rad입니다. 실제 Spot의 서기 자세도 이와 비슷합니다.</p>
+    </div>
+
+    <div class="fig" id="legFig">
+      <div class="seg" data-group="legmode" style="margin-bottom:10px">
+        <button data-v="fk" aria-pressed="true">순기구학: 각을 바꾸면 발이 움직임</button>
+        <button data-v="ik" aria-pressed="false">역기구학: 발을 끌면 각이 정해짐</button>
+      </div>
+      <div class="fig-grid two">
+        <div><canvas id="legSide" style="height:360px"></canvas><p class="cap">옆에서 본 왼앞다리. 앞쪽이 오른쪽입니다.</p></div>
+        <div><canvas id="legFront" style="height:360px"></canvas><p class="cap">앞에서 본 모습. 로봇의 왼쪽이 화면 오른쪽입니다.</p></div>
+      </div>
+      <div class="ctrls">
+        <div class="row"><label for="q1">\(q_1\) hx</label><input id="q1" type="range" min="-40" max="40" step="0.5" value="0"><output id="q1o">0°</output></div>
+        <div class="row"><label for="q2">\(q_2\) hy</label><input id="q2" type="range" min="-50" max="150" step="0.5" value="45.8"><output id="q2o">45.8°</output></div>
+        <div class="row"><label for="q3">\(q_3\) kn</label><input id="q3" type="range" min="-165" max="-15" step="0.5" value="-91.7"><output id="q3o">-91.7°</output></div>
+      </div>
+      <div class="stat" id="legInfo"></div>
+      <div class="mxline" id="legMx"></div>
+      <div class="expand" id="legExp"></div>
+      <p class="cap">파란 칸은 cos, 주황 칸은 sin이 들어간 칸입니다. 결과 벡터의 행을 누르면 그 성분이 어떻게 곱해지는지 아래에 펼쳐집니다.</p>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="lesson" id="s3">
+    <div class="prose">
+      <h2><span class="sec-no">3</span>다리 하나: 역기구학</h2>
+      <p>걷기에서는 거꾸로 묻습니다. 발을 어디에 둘지 먼저 정하고, 그러려면 관절을 몇 도로 돌려야 하는지 구합니다. 4–5장 로봇팔에서는 반복 계산으로 풀었지만, 관절이 3개뿐인 다리는 삼각형 하나로 바로 풀립니다. 위 실습을 역기구학 모드로 바꾸고 발을 끌어 보세요.</p>
+      <h3>① 옆 관절 \(q_1\): 앞에서 본 그림</h3>
+      <p>발 위치 \((x,y,z)\) 중 \(y\), \(z\)만 보면 옆 관절이 길이 \(L_1\)의 막대를 돌리는 문제입니다. 다리 평면 안에서의 높이 \(z_A\)를 피타고라스로 구하고, 두 각의 차이로 \(q_1\)을 얻습니다.</p>
+      \[ z_A = -\sqrt{\,y^2+z^2-L_1^2\,}, \qquad q_1 = \operatorname{atan2}(z,\,y) - \operatorname{atan2}(z_A,\,sL_1) \]
+      <h3>② 무릎 \(q_3\): 코사인 법칙</h3>
+      <p>엉덩이에서 발까지 거리 \(r\)은 허벅지와 종아리가 만드는 삼각형의 세 번째 변입니다. 무릎이 뒤로 꺾이도록 음수 해를 고릅니다.</p>
+      \[ r^2 = x^2 + z_A^2 = L_2^2 + L_3^2 + 2L_2L_3\cos q_3
+         \quad\Longrightarrow\quad
+         q_3 = -\arccos\frac{r^2 - L_2^2 - L_3^2}{2L_2L_3} \]
+      <h3>③ 엉덩이 \(q_2\): 두 각의 차이</h3>
+      \[ q_2 = \operatorname{atan2}(-x,\,-z_A) - \operatorname{atan2}\!\big(L_3\sin q_3,\; L_2 + L_3\cos q_3\big) \]
+      <div class="note">\(r > L_2+L_3\)이면 arccos 안의 값이 1을 넘어 해가 없습니다. 발이 닿지 않는 곳이라는 뜻이고, 위 그림의 점선 원 밖입니다. 코드에서는 값을 \([-1,1]\)로 잘라 가장 가까운 자세로 멈춥니다. 무릎을 앞으로 꺾는 해(\(+\arccos\))도 있는데, 로봇마다 무릎 방향을 하나로 정해 둡니다.</div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="lesson" id="s4">
+    <div class="prose">
+      <h2><span class="sec-no">4</span>걸음새: 다리 네 개의 시간표</h2>
+      <p>걸음새(gait)는 네 다리를 언제 들고 언제 딛는지 적은 시간표입니다. 모든 다리가 같은 주기 \(T\)로 움직인다고 보고, 0에서 1까지 도는 위상 \(\phi\)로 시간을 잽니다. 다리 \(i\)는 위상이 \(o_i\)에 이르면 발을 들어 스윙을 시작합니다.</p>
+      \[ \phi(t) = \frac{t}{T} \bmod 1, \qquad u_i = (\phi - o_i) \bmod 1, \qquad
+         \text{다리 } i = \begin{cases} \text{스윙(공중)}, & u_i < 1-\beta \\ \text{디딤(지면)}, & \text{그 밖} \end{cases} \]
+      <p>\(\beta\)는 듀티비, 즉 한 주기 중 발이 땅에 붙어 있는 비율입니다. 표의 숫자만 바꾸면 전혀 다른 걸음이 됩니다.</p>
+    </div>
+    <div class="tscroll prose">
+      <table class="t">
+        <thead><tr><th>걸음새</th><th>\(o\) (왼앞, 오른앞, 왼뒤, 오른뒤)</th><th>\(\beta\)</th><th>특징</th></tr></thead>
+        <tbody>
+          <tr><td>걷기 walk</td><td class="num">0.25, 0.75, 0, 0.5</td><td>0.75</td><td>늘 발 3개 이상이 땅에. 느리지만 멈춰도 서 있을 수 있음</td></tr>
+          <tr><td>트롯 trot</td><td class="num">0, 0.5, 0.5, 0</td><td>0.55</td><td>대각선 두 다리가 짝. Spot과 Go2의 기본 걸음</td></tr>
+          <tr><td>페이스 pace</td><td class="num">0, 0.5, 0, 0.5</td><td>0.55</td><td>같은 쪽 두 다리가 짝. 좌우로 크게 흔들림</td></tr>
+          <tr><td>바운드 bound</td><td class="num">0, 0, 0.5, 0.5</td><td>0.5</td><td>앞다리 둘, 뒷다리 둘이 짝. 앞뒤로 흔들림</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="prose">
+      <h3>넘어지지 않으려면: 지지 다각형</h3>
+      <p>땅에 닿은 발들을 이은 볼록 다각형을 지지 다각형이라 합니다. 무게중심(CoM)을 바닥에 내린 점 \(\mathbf c\)가 이 안에 있으면, 그 자리에서 얼어붙어도 넘어지지 않습니다(정적 안정). 얼마나 여유가 있는지는 가장 가까운 변까지의 거리로 잽니다.</p>
+      \[ m = \min_k \; d\big(\mathbf c,\ \text{변}_k\big) \qquad (\mathbf c\text{가 밖에 있으면 음수}) \]
+      <p>트롯은 땅에 발이 둘뿐이라 다각형이 선분이 되고, 정적으로는 늘 넘어지는 중입니다. 넘어지기 전에 다음 발을 디뎌 받치는 동적 균형으로 걷습니다. 걷기도 몸을 가만히 두면 여유가 음수가 되는 순간이 있는데, 다리를 들기 전에 몸통을 나머지 세 발 쪽으로 옮겨 해결합니다. 아래에서 <b>무게중심 옮기기</b>를 켜고 끄며 비교해 보세요.</p>
+    </div>
+    <div class="fig">
+      <div class="seg" data-group="g2" style="margin-bottom:10px">
+        <button data-v="walk" aria-pressed="true">걷기</button>
+        <button data-v="trot" aria-pressed="false">트롯</button>
+        <button data-v="pace" aria-pressed="false">페이스</button>
+        <button data-v="bound" aria-pressed="false">바운드</button>
+      </div>
+      <div class="fig-grid half">
+        <div><canvas id="g2chart" style="height:250px"></canvas><p class="cap">두 주기 분량의 시간표. 칠한 막대가 디딤, 세로선이 지금 위상입니다.</p></div>
+        <div><canvas id="g2top" style="height:250px"></canvas><p class="cap">위에서 본 모습. 노란 면이 지지 다각형, 과녁 표시가 무게중심입니다.</p></div>
+      </div>
+      <div class="ctrls">
+        <div class="row"><label for="g2v">속도</label><input id="g2v" type="range" min="0" max="1.0" step="0.05" value="0.25"><output id="g2vo">0.25 m/s</output></div>
+        <div class="row" style="gap:16px"><label style="display:flex;gap:6px;align-items:center;min-width:0"><input type="checkbox" id="g2shift" style="accent-color:var(--blue)"> 무게중심 옮기기</label><button class="btn" id="g2play">일시정지</button></div>
+      </div>
+      <div class="stat" id="g2stat"></div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="lesson" id="s5">
+    <div class="prose">
+      <h2><span class="sec-no">5</span>발 궤적과 착지점</h2>
+      <p>디딤 중인 발은 땅에 붙어 있으니, 몸이 속도 \(v\)로 나아가면 엉덩이에서 보기에 발은 \(-v\)로 뒤로 밀려납니다. 디딤 시간 \(T_{\text{st}} = \beta T\) 동안 밀려나는 거리가 보폭입니다. 스윙 중인 발은 같은 거리를 더 짧은 시간 \((1-\beta)T\) 안에 되돌아와야 하므로 몸보다 빨라야 합니다.</p>
+      \[ L_{\text{step}} = v\,T_{\text{st}} = v\,\beta\,T, \qquad \bar v_{\text{swing}} = \frac{v}{1-\beta}\ \ (\text{지면 기준 평균}) \]
+      <p>스윙 궤적은 수평으로는 부드럽게 출발해 부드럽게 멈추고, 수직으로는 높이 \(H\)까지 올랐다 내려오게 만듭니다. \(s\)는 스윙 진행률입니다.</p>
+      \[ \mathbf p_{xy}(s) = \mathbf p_0 + (\mathbf p_1-\mathbf p_0)\,(3s^2-2s^3), \qquad z(s) = H\sin(\pi s), \qquad s\in[0,1] \]
+    </div>
+    <div class="fig">
+      <div class="fig-grid">
+        <div><canvas id="swCv" style="height:330px"></canvas><p class="cap">엉덩이에 붙어서 본 발끝의 한 주기. 아래 직선이 디딤, 위 곡선이 스윙입니다. 다리 모양은 매 순간 3절의 역기구학으로 계산합니다.</p></div>
+      </div>
+      <div class="ctrls">
+        <div class="row"><label for="swV">속도 \(v\)</label><input id="swV" type="range" min="0" max="1.6" step="0.05" value="0.6"><output id="swVo"></output></div>
+        <div class="row"><label for="swT">주기 \(T\)</label><input id="swT" type="range" min="0.3" max="1.2" step="0.05" value="0.5"><output id="swTo"></output></div>
+        <div class="row"><label for="swB">듀티비 \(\beta\)</label><input id="swB" type="range" min="0.4" max="0.85" step="0.05" value="0.55"><output id="swBo"></output></div>
+        <div class="row"><label for="swH">스윙 높이 \(H\)</label><input id="swH" type="range" min="0.03" max="0.16" step="0.01" value="0.09"><output id="swHo"></output></div>
+      </div>
+      <div class="stat" id="swStat"></div>
+      <div class="btns"><button class="btn" id="swPlay">일시정지</button></div>
+    </div>
+    <div class="prose">
+      <h3>어디에 디딜까: 레이버트의 발 디딤 규칙</h3>
+      <p>스윙이 끝나는 순간 발을 어디에 내릴지가 균형을 좌우합니다. 1980년대 마크 레이버트(훗날 보스턴 다이내믹스 창업자)가 깡충 뛰는 외다리 로봇으로 찾은 규칙이 지금도 쓰입니다.</p>
+      \[ \mathbf p_{\text{td}} = \underbrace{\mathbf p_{\text{hip}}}_{\text{착지 순간의 엉덩이}} + \underbrace{\frac{T_{\text{st}}}{2}\,\mathbf v}_{\text{대칭 보폭}} + \underbrace{k\,(\mathbf v - \mathbf v_{\text{cmd}})}_{\text{속도 보정}} \]
+      <p>가운데 항은 디딤 구간의 한가운데에 엉덩이가 발 바로 위를 지나게 합니다. 마지막 항은 명령보다 빠르면 발을 더 앞에 디뎌 브레이크를 겁니다. 회전할 때는 다리마다 엉덩이 속도가 달라서, 몸통 중심에서 엉덩이까지의 벡터 \(\mathbf r_i\)를 써서 다리별 속도를 씁니다.</p>
+      \[ \mathbf v_{\text{hip},i} = \mathbf v + \boldsymbol\omega \times \mathbf r_i \]
+      <p>위 시뮬레이터는 마지막 항 없이 앞의 두 항과 이 회전 보정만 씁니다. 물리 엔진이 없어 속도가 명령과 늘 같기 때문입니다. MuJoCo에서 해 볼 과제로 남겨 두었습니다.</p>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="lesson" id="s6">
+    <div class="prose">
+      <h2><span class="sec-no">6</span>몸통 운동 모델</h2>
+      <p>계획 층에서 보면 12개 관절은 잊고 몸통 하나만 남깁니다. 3장의 2륜 로봇과 달리 로봇 개는 옆으로도 걸을 수 있어서(전방향, holonomic) 명령이 세 개입니다. 몸통 좌표계의 속도 \((v_x, v_y)\)를 방향각 \(\psi\)만큼 돌리면 세계 좌표계의 속도가 됩니다.</p>
+      \[ \begin{bmatrix} \dot x \\ \dot y \end{bmatrix} =
+         \begin{bmatrix} \class{cosv}{\cos\psi} & -\class{sinv}{\sin\psi} \\ \class{sinv}{\sin\psi} & \class{cosv}{\cos\psi} \end{bmatrix}
+         \begin{bmatrix} v_x \\ v_y \end{bmatrix}, \qquad \dot\psi = \omega \]
+      <p>\(v_y = 0\)으로 두면 3장의 유니사이클 모델과 똑같습니다. 실제 로봇은 속도 한계(Spot은 약 1.6 m/s)와 가속 한계가 있어서, 명령을 곧바로 따르지 않고 1차 필터로 부드럽게 따라갑니다. 위 시뮬레이터는 \(\tau = 0.3\) s를 씁니다.</p>
+      \[ \mathbf v_{k+1} = \mathbf v_k + \alpha\,(\mathbf v_{\text{cmd}} - \mathbf v_k), \qquad \alpha = 1 - e^{-\Delta t/\tau} \]
+    </div>
+    <div class="fig">
+      <div class="fig-grid">
+        <canvas id="bmCv" style="height:330px"></canvas>
+      </div>
+      <p class="cap">4초 동안의 궤적. 실선이 로봇 개, 파란 점선은 같은 명령에서 \(v_y\)를 뺀 2륜 로봇입니다. 시간 슬라이더로 한 순간을 고르면 그때의 회전 행렬이 아래에 나옵니다.</p>
+      <div class="ctrls">
+        <div class="row"><label for="bmVx">\(v_x\)</label><input id="bmVx" type="range" min="-0.6" max="1.2" step="0.05" value="0.6"><output id="bmVxo"></output></div>
+        <div class="row"><label for="bmVy">\(v_y\)</label><input id="bmVy" type="range" min="-0.6" max="0.6" step="0.05" value="0.3"><output id="bmVyo"></output></div>
+        <div class="row"><label for="bmW">\(\omega\)</label><input id="bmW" type="range" min="-1.2" max="1.2" step="0.05" value="0.5"><output id="bmWo"></output></div>
+        <div class="row"><label for="bmT">시간 \(t\)</label><input id="bmT" type="range" min="0" max="4" step="0.05" value="1.5"><output id="bmTo"></output></div>
+      </div>
+      <div class="mxline" id="bmMx"></div>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="lesson" id="s7">
+    <div class="prose">
+      <h2><span class="sec-no">7</span>파이썬 실습: 걷는 함수 만들기</h2>
+      <p>2–6절의 식을 그대로 옮긴 코드입니다. 위쪽 함수들은 완성본이고, 맨 아래 <code>move()</code>의 TODO를 학생이 채웁니다. MuJoCo Menagerie에 Unitree Go2와 Boston Dynamics Spot 모델이 있으니 둘 중 하나로 시작하면 됩니다.</p>
+    </div>
+<pre class="code"><code class="language-python">import numpy as np
+
+L1, L2, L3 = 0.10, 0.32, 0.33      # 옆 오프셋, 허벅지, 종아리 [m] (모델에 맞게 바꾸기)
+
+def leg_fk(q, s):
+    """관절각 q=(q1,q2,q3) → 엉덩이 좌표계의 발 위치. s=+1 왼쪽, -1 오른쪽 다리"""
+    q1, q2, q3 = q
+    xa = -L2*np.sin(q2) - L3*np.sin(q2 + q3)
+    za = -L2*np.cos(q2) - L3*np.cos(q2 + q3)
+    ya = s*L1
+    c, sn = np.cos(q1), np.sin(q1)
+    return np.array([xa, c*ya - sn*za, sn*ya + c*za])      # R_x(q1) @ [xa, ya, za]
+
+def leg_ik(p, s):
+    """발 위치 p → 관절각. 닿지 않으면 가장 가까운 자세"""
+    x, y, z = p
+    za = -np.sqrt(max(y*y + z*z - L1*L1, 1e-9))            # ① 다리 평면 안의 높이
+    q1 = np.arctan2(z, y) - np.arctan2(za, s*L1)
+    c3 = (x*x + za*za - L2*L2 - L3*L3) / (2*L2*L3)          # ② 코사인 법칙
+    q3 = -np.arccos(np.clip(c3, -1.0, 1.0))                # 무릎은 뒤로
+    q2 = np.arctan2(-x, -za) - np.arctan2(L3*np.sin(q3), L2 + L3*np.cos(q3))  # ③
+    return np.array([q1, q2, q3])
+
+# 다리 순서 (FL, FR, RL, RR) = (왼앞, 오른앞, 왼뒤, 오른뒤)
+GAITS = {
+    "walk":  dict(start=[0.25, 0.75, 0.00, 0.50], beta=0.75, T=1.00),
+    "trot":  dict(start=[0.00, 0.50, 0.50, 0.00], beta=0.55, T=0.50),
+    "pace":  dict(start=[0.00, 0.50, 0.00, 0.50], beta=0.55, T=0.50),
+    "bound": dict(start=[0.00, 0.00, 0.50, 0.50], beta=0.50, T=0.42),
+}
+
+def leg_phase(phi, i, g):
+    """전체 위상 phi에서 다리 i가 스윙인지, 그 구간의 진행률 s ∈ [0,1)"""
+    sw = 1.0 - g["beta"]
+    u = (phi - g["start"][i]) % 1.0
+    return (True, u / sw) if u &lt; sw else (False, (u - sw) / g["beta"])
+
+def swing_point(p0, p1, s, H=0.09):
+    b = 3*s**2 - 2*s**3                                     # 0에서 1로 부드럽게
+    p = p0 + (p1 - p0) * b
+    p[2] = p0[2] + H*np.sin(np.pi*s)
+    return p
+
+def raibert(p_hip, v_hip, T_st, t_left, k=0.0, v_cmd=None):
+    """착지점 = 착지 순간 엉덩이 + 디딤 절반만큼 앞 (+ 속도 보정)"""
+    p = p_hip + v_hip*(t_left + 0.5*T_st)
+    if v_cmd is not None:
+        p = p + k*(v_hip - v_cmd)
+    return p
+
+
+# ---------- MuJoCo에서 걷기 ----------
+import mujoco
+
+model = mujoco.MjModel.from_xml_path("mujoco_menagerie/unitree_go2/scene.xml")
+data  = mujoco.MjData(model)
+for i in range(model.nu):                    # 액추에이터 순서·이름부터 확인 (모델마다 다름)
+    print(i, model.actuator(i).name)
+
+LEGS = ["FL", "FR", "RL", "RR"]
+SIDE = {"FL": +1, "FR": -1, "RL": +1, "RR": -1}
+HIP  = {"FL": (+0.30, +0.07), "FR": (+0.30, -0.07),     # 몸통 중심 → 엉덩이 [m]
+        "RL": (-0.30, +0.07), "RR": (-0.30, -0.07)}
+
+def move(vx, vy, wz, gait="trot", seconds=5.0, h=0.30):
+    g, dt, phi = GAITS[gait], model.opt.timestep, 0.0
+    T_st = g["beta"] * g["T"]
+    for _ in range(int(seconds / dt)):
+        phi += dt / g["T"]
+        for i, leg in enumerate(LEGS):
+            swing, s = leg_phase(phi, i, g)
+            # TODO 1  몸통 좌표계의 발 목표 p_body 만들기
+            #         디딤: 기본 위치에서 시작해 -v 방향으로 L_step만큼 뒤로 밀림
+            #         스윙: swing_point()로 뒤 끝에서 raibert() 착지점까지
+            #         회전 wz가 있으면 다리마다 v_hip = v + wz × r_i
+            # TODO 2  엉덩이 좌표계로: p_hip = p_body - (HIP[leg][0], HIP[leg][1], 0)
+            # TODO 3  q = leg_ik(p_hip, SIDE[leg])
+            # TODO 4  액추에이터가 위치형이면 data.ctrl[...] = q
+            #         토크형이면 τ = kp*(q - qpos) - kd*qvel  (10장 PID)
+        mujoco.mj_step(model, data)
+</code></pre>
+    <div class="prose">
+      <h3>과제</h3>
+      <ol class="tasks">
+        <li><b>역기구학 검증.</b> 관절 범위 안에서 무작위 \(q\)를 1000개 뽑아 <code>leg_ik(leg_fk(q))</code>가 \(q\)로 돌아오는지 확인합니다. 오차가 큰 경우가 있다면 왜인지 설명합니다.</li>
+        <li><b><code>move()</code> 완성.</b> 트롯으로 0.3 m/s 직진, 제자리에서 \(\omega=0.5\) rad/s 회전, 옆걸음 0.2 m/s를 각각 성공시킵니다.</li>
+        <li><b>걷기의 무게중심 옮기기.</b> 다리를 들기 전에 몸통을 나머지 세 발의 무게중심 쪽으로 옮겨, 한 주기 내내 안정 여유 \(m>0\)인지 그래프로 보입니다.</li>
+        <li><b>도전: 레이버트 보정항.</b> \(k(\mathbf v-\mathbf v_{\text{cmd}})\)를 넣고 <code>data.xfrc_applied</code>로 몸통을 옆으로 밀었을 때 버티는 \(k\)의 범위를 찾습니다.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section class="lesson" id="s8">
+    <div class="prose">
+      <h2><span class="sec-no">8</span>다음 이야기</h2>
+      <p>위 시뮬레이터에는 이미 다음 편의 재료가 다 들어 있습니다. 라이다와 깊이 카메라는 값을 읽기만 하고, 팔은 정해진 순서대로만 움직입니다. 다음 편에서 하나씩 학생이 직접 만드는 부분으로 바꿉니다.</p>
+      <ol class="road">
+        <li><div><b>보고, 집기: 센서와 7자유도 팔 (<a href="https://claude.ai/artifact/9VCX4ttEaoPgCkfQK1V3kk" target="_blank" rel="noopener">열기</a>)</b>깊이·컬러 카메라로 물체를 찾아 3D 위치를 재고, IMU 상보 필터와 라이다 점구름을 다루며, 7자유도 팔의 야코비안·DLS·영공간으로 집습니다. 둘을 잇는 끈은 좌표계입니다.</div></li>
+        <li><div><b>지도와 경로 계획</b>점구름을 높이 지도로 바꾸고 기울기·턱 높이로 주행 비용을 매긴 뒤, 1–2장 A*와 RRT로 계단과 경사를 피해 가기. 발 디딤 위치까지 계획하기.</div></li>
+        <li><div><b>통합 미션</b>지도 만들기, 물체 찾기, 다가가기, 집기, 옮기기를 한 작업으로 묶고, 위 시뮬레이터의 ‘상자 집으러 가기’를 학생이 처음부터 구현해 가사 로봇 최종 프로젝트로 이어 갑니다.</div></li>
+        
+      </ol>
+    </div>
+  </section>
+</div>
+<footer class="wrap">로보틱스 수업 자료, 4족 보행 로봇 시리즈 1부. 시뮬레이터의 로봇 치수는 Spot과 비슷한 비율로 정한 교육용 값입니다.</footer>
+<script>
+'use strict';
+/* ================= 0. 공통 수학 ================= */
+const TAU = Math.PI * 2, D2R = Math.PI / 180, R2D = 180 / Math.PI;
+const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = t => t * t * (3 - 2 * t);
+const wrapPi = a => Math.atan2(Math.sin(a), Math.cos(a));
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const scl = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const lerpV = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+const mv = (R, v) => [R[0][0] * v[0] + R[0][1] * v[1] + R[0][2] * v[2], R[1][0] * v[0] + R[1][1] * v[1] + R[1][2] * v[2], R[2][0] * v[0] + R[2][1] * v[1] + R[2][2] * v[2]];
+const mtv = (R, v) => [R[0][0] * v[0] + R[1][0] * v[1] + R[2][0] * v[2], R[0][1] * v[0] + R[1][1] * v[1] + R[2][1] * v[2], R[0][2] * v[0] + R[1][2] * v[1] + R[2][2] * v[2]];
+const mm = (A, B) => A.map(r => [0, 1, 2].map(j => r[0] * B[0][j] + r[1] * B[1][j] + r[2] * B[2][j]));
+const rotX = a => { const c = Math.cos(a), s = Math.sin(a); return [[1, 0, 0], [0, c, -s], [0, s, c]]; };
+const rotY = a => { const c = Math.cos(a), s = Math.sin(a); return [[c, 0, s], [0, 1, 0], [-s, 0, c]]; };
+const rotZ = a => { const c = Math.cos(a), s = Math.sin(a); return [[c, -s, 0], [s, c, 0], [0, 0, 1]]; };
+const rotZYX = (r, p, y) => mm(rotZ(y), mm(rotY(p), rotX(r)));
+function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); }
+function solveLin(A, b) {           // 가우스 소거 (부분 피벗)
+  const n = b.length, M = A.map((r, i) => r.concat([b[i]]));
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    const t = M[c]; M[c] = M[p]; M[p] = t;
+    const d = M[c][c] || 1e-12;
+    for (let r = c + 1; r < n; r++) { const f = M[r][c] / d; for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
+  }
+  const x = new Array(n).fill(0);
+  for (let r = n - 1; r >= 0; r--) { let s = M[r][n]; for (let k = r + 1; k < n; k++) s -= M[r][k] * x[k]; x[r] = s / (M[r][r] || 1e-12); }
+  return x;
+}
+
+/* ================= 1. 로봇 치수와 다리 기구학 ================= */
+const DOG = { hipX: 0.30, hipY: 0.07, L1: 0.10, L2: 0.32, L3: 0.33, bodyL: 0.84, bodyW: 0.27, bodyH: 0.15, footR: 0.03 };
+const LEGS = [
+  { id: 'FL', ko: '왼앞', sx: 1, sy: 1, c: '#2E6FD6' },
+  { id: 'FR', ko: '오른앞', sx: 1, sy: -1, c: '#0E9384' },
+  { id: 'RL', ko: '왼뒤', sx: -1, sy: 1, c: '#8250DF' },
+  { id: 'RR', ko: '오른뒤', sx: -1, sy: -1, c: '#D2452F' }
+];
+
+function legFK(q, s) {
+  const { L1, L2, L3 } = DOG;
+  const xa = -L2 * Math.sin(q[1]) - L3 * Math.sin(q[1] + q[2]);
+  const za = -L2 * Math.cos(q[1]) - L3 * Math.cos(q[1] + q[2]);
+  const ya = s * L1, c = Math.cos(q[0]), sn = Math.sin(q[0]);
+  return [xa, c * ya - sn * za, sn * ya + c * za];
+}
+
+function legIK(p, s) {
+  const { L1, L2, L3 } = DOG;
+  let x = p[0];
+  const y = p[1], z = p[2];
+  let ok = true;
+  let d2 = y * y + z * z - L1 * L1;
+  if (d2 < 1e-6) { d2 = 1e-6; ok = false; }
+  let za = -Math.sqrt(d2);
+  const q1 = wrapPi(Math.atan2(z, y) - Math.atan2(za, s * L1));
+  const r = Math.hypot(x, za), rmax = L2 + L3 - 1e-4, rmin = Math.abs(L2 - L3) + 1e-3;
+  if (r > rmax) { const k = rmax / r; x *= k; za *= k; ok = false; }
+  else if (r < rmin) { const k = rmin / Math.max(r, 1e-6); x *= k; za *= k; ok = false; }
+  const c3 = clamp((x * x + za * za - L2 * L2 - L3 * L3) / (2 * L2 * L3), -1, 1);
+  const q3 = -Math.acos(c3);
+  const q2 = Math.atan2(-x, -za) - Math.atan2(L3 * Math.sin(q3), L2 + L3 * Math.cos(q3));
+  return { q: [q1, q2, q3], ok };
+}
+
+/* ================= 2. 걸음새 엔진 (3D 시뮬레이터와 2D 실습이 같이 씀) ================= */
+const GAITS = {
+  stand: { ko: '서기', T: 0.6, beta: 1, start: [0, 0, 0, 0] },
+  walk: { ko: '걷기', T: 1.0, beta: 0.75, start: [0.25, 0.75, 0, 0.5] },
+  trot: { ko: '트롯', T: 0.5, beta: 0.55, start: [0, 0.5, 0.5, 0] },
+  pace: { ko: '페이스', T: 0.5, beta: 0.55, start: [0, 0.5, 0, 0.5] },
+  bound: { ko: '바운드', T: 0.42, beta: 0.5, start: [0, 0, 0.5, 0.5] }
+};
+
+class Loco {
+  constructor() { this.gait = 'trot'; this.stepH = 0.09; this.cmd = [0, 0, 0]; this.tau = 0.3; this.reset(0, 0, 0); }
+  reset(x, y, yaw) {
+    this.x = x; this.y = y; this.yaw = yaw; this.phi = 0; this.vel = [0, 0, 0]; this.vw = [0, 0];
+    this.feet = LEGS.map((L, i) => { const n = this.neutralW(i); return { p: [n[0], n[1], 0], swing: false, s: 0, lift: null, dur: 0.25, cyc: -99, tgt: null }; });
+  }
+  neutralW(i) {
+    const L = LEGS[i], bx = L.sx * DOG.hipX, by = L.sy * (DOG.hipY + DOG.L1), c = Math.cos(this.yaw), s = Math.sin(this.yaw);
+    return [this.x + c * bx - s * by, this.y + s * bx + c * by];
+  }
+  /** 다음에 스윙을 시작할 다리와 남은 위상 */
+  nextSwing() {
+    const g = GAITS[this.gait]; let best = -1, bd = 2;
+    if (this.gait === 'stand') return { i: -1, du: 1 };
+    this.feet.forEach((f, i) => { if (f.swing) { best = i; bd = -1; return; } if (bd < 0) return; const du = ((g.start[i] - this.phi) % 1 + 1) % 1; if (du < bd) { bd = du; best = i; } });
+    return { i: best, du: bd };
+  }
+  step(dt, blocked) {
+    const g = GAITS[this.gait], stand = this.gait === 'stand';
+    const cmd = stand ? [0, 0, 0] : this.cmd, a = 1 - Math.exp(-dt / this.tau);
+    for (let k = 0; k < 3; k++) this.vel[k] += (cmd[k] - this.vel[k]) * a;
+    const c = Math.cos(this.yaw), s = Math.sin(this.yaw);
+    const vxw = c * this.vel[0] - s * this.vel[1], vyw = s * this.vel[0] + c * this.vel[1];
+    let nx = this.x + vxw * dt, ny = this.y + vyw * dt;
+    if (blocked && blocked(nx, ny)) {
+      if (!blocked(nx, this.y)) ny = this.y; else if (!blocked(this.x, ny)) nx = this.x; else { nx = this.x; ny = this.y; }
+    }
+    this.vw = [(nx - this.x) / dt, (ny - this.y) / dt];
+    this.x = nx; this.y = ny; this.yaw = wrapPi(this.yaw + this.vel[2] * dt);
+    const sw = 1 - g.beta, Tst = g.beta * g.T;
+    if (!stand) {
+      this.phi += dt / g.T;
+      this.feet.forEach((f, i) => {
+        if (f.swing) return;
+        const u = this.phi - g.start[i], cyc = Math.floor(u), loc = u - cyc;
+        if (loc < sw && f.cyc !== cyc) {
+          f.cyc = cyc;
+          if (loc < 0.35 * sw) this._lift(f, (sw - loc) * g.T);
+        }
+      });
+    } else if (!this.feet.some(f => f.swing)) {
+      let best = -1, bd = 0.025;          // 서기: 기본 위치에서 먼 발부터 하나씩 정리
+      this.feet.forEach((f, i) => { const n = this.neutralW(i), d = Math.hypot(f.p[0] - n[0], f.p[1] - n[1]); if (d > bd) { bd = d; best = i; } });
+      if (best >= 0) this._lift(this.feet[best], 0.26);
+    }
+    this.feet.forEach((f, i) => {
+      if (!f.swing) return;
+      f.s += dt / f.dur;
+      const sc = Math.min(f.s, 1);
+      const n = this.neutralW(i), rx = n[0] - this.x, ry = n[1] - this.y, w = this.vel[2];
+      const vhx = this.vw[0] - w * ry, vhy = this.vw[1] + w * rx;     // v + ω × r
+      const tl = (1 - sc) * f.dur + (stand ? 0 : 0.5 * Tst);          // 레이버트: 남은 스윙 + 디딤 절반
+      const tx = n[0] + vhx * tl, ty = n[1] + vhy * tl;
+      f.tgt = [tx, ty];
+      const b = smooth(sc);
+      f.p[0] = lerp(f.lift[0], tx, b); f.p[1] = lerp(f.lift[1], ty, b);
+      f.p[2] = this.stepH * Math.sin(Math.PI * sc);
+      if (f.s >= 1) { f.swing = false; f.p[2] = 0; }
+    });
+  }
+  _lift(f, dur) { f.swing = true; f.s = 0; f.dur = dur; f.lift = f.p.slice(); }
+}
+
+/* 볼록 다각형과 안정 여유 */
+function convexHull(pts) {
+  if (pts.length < 3) return pts.slice();
+  const P = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const p of P) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+  up.pop(); lo.pop(); return lo.concat(up);
+}
+function stabilityMargin(hull, c) {           // 반시계 볼록 다각형. 안이면 +, 밖이면 -
+  if (hull.length < 3) return null;
+  let m = Infinity;
+  for (let k = 0; k < hull.length; k++) {
+    const a = hull[k], b = hull[(k + 1) % hull.length];
+    const ex = b[0] - a[0], ey = b[1] - a[1], L = Math.hypot(ex, ey) || 1e-9;
+    const d = (ex * (c[1] - a[1]) - ey * (c[0] - a[0])) / L;   // 왼쪽(안쪽)이 +
+    if (d < m) m = d;
+  }
+  return m;
+}
+/* ================= 3. 3D 시뮬레이터 ================= */
+const $ = s => document.querySelector(s);
+const COL = {};
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  ['paper', 'panel', 'ink', 'ink-2', 'rule', 'yellow', 'blue', 'orange', 'good', 'bad', 'stage', 'grid'].forEach(k => COL[k] = cs.getPropertyValue('--' + k).trim());
+}
+readTheme();
+const themeHooks = [];
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readTheme(); themeHooks.forEach(f => f()); }); } catch (e) { }
+const reduceMotion = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
+
+/* ---- 방 안 장애물 (축 정렬 상자) ---- */
+const ROOM = { x0: -6, x1: 6, y0: -4, y1: 4 };
+const OBST = [
+  { x: 0, y: 4, w: 12.4, d: 0.2, h: 0.9, col: 0xCBD0C8 }, { x: 0, y: -4, w: 12.4, d: 0.2, h: 0.9, col: 0xCBD0C8 },
+  { x: 6, y: 0, w: 0.2, d: 8, h: 0.9, col: 0xCBD0C8 }, { x: -6, y: 0, w: 0.2, d: 8, h: 0.9, col: 0xCBD0C8 },
+  { x: 1.5, y: 1.8, w: 1.2, d: 0.8, h: 0.75, col: 0xC9B48F },
+  { x: -2.5, y: -2.0, w: 0.6, d: 0.6, h: 1.0, col: 0x8E9C7A },
+  { x: -1.5, y: 2.2, w: 0.5, d: 0.5, h: 2.2, col: 0xB4B9B3 },
+  { x: 3.8, y: 2.6, w: 1.6, d: 0.6, h: 0.9, col: 0x7D8B99 },
+  { x: -4.2, y: 0.5, w: 0.8, d: 1.6, h: 0.5, col: 0x9C8570 },
+  { x: 0.5, y: -2.8, w: 2.0, d: 0.5, h: 0.45, col: 0xA7AFA2 },
+  { x: -0.8, y: -0.9, w: 0.45, d: 0.45, h: 0.6, col: 0xB07A4F },
+  { x: 4.6, y: -1.8, w: 0.7, d: 0.7, h: 0.35, col: 0x6F8FA8 }
+];
+OBST.forEach(o => { o.min = [o.x - o.w / 2, o.y - o.d / 2, 0]; o.max = [o.x + o.w / 2, o.y + o.d / 2, o.h]; });
+const PKG = { home: [2.6, -1.0], size: 0.24, x: 2.6, y: -1.0, z: 0.12, held: false, yaw: 0.3, min: [0, 0, 0], max: [0, 0, 0] };
+function pkgBox() { const h = PKG.size / 2; PKG.min = [PKG.x - h, PKG.y - h, PKG.z - h]; PKG.max = [PKG.x + h, PKG.y + h, PKG.z + h]; }
+pkgBox();
+
+/* ---- 레이 캐스팅 (센서용) ---- */
+function rayAABB(o, d, mn, mx, tmax) {
+  let t0 = 0, t1 = tmax;
+  for (let k = 0; k < 3; k++) {
+    if (Math.abs(d[k]) < 1e-12) { if (o[k] < mn[k] || o[k] > mx[k]) return Infinity; continue; }
+    let a = (mn[k] - o[k]) / d[k], b = (mx[k] - o[k]) / d[k];
+    if (a > b) { const t = a; a = b; b = t; }
+    if (a > t0) t0 = a; if (b < t1) t1 = b;
+    if (t0 > t1) return Infinity;
+  }
+  return t0 > 1e-6 ? t0 : Infinity;
+}
+function castRay(o, d, tmax) {
+  let t = tmax;
+  if (d[2] < -1e-9) { const tf = -o[2] / d[2]; if (tf < t) t = tf; }
+  for (let i = 0; i < OBST.length; i++) { const b = OBST[i]; const tb = rayAABB(o, d, b.min, b.max, t); if (tb < t) t = tb; }
+  const tp = rayAABB(o, d, PKG.min, PKG.max, t); if (tp < t) t = tp;
+  return t;
+}
+
+/* ---- 경로 계획: 점유 격자 + A* ---- */
+const GRID = { res: 0.1, nx: 120, ny: 80 };
+function inflatedHit(x, y, r, withPkg) {
+  if (x < ROOM.x0 + 0.1 + r || x > ROOM.x1 - 0.1 - r || y < ROOM.y0 + 0.1 + r || y > ROOM.y1 - 0.1 - r) return true;
+  for (let i = 4; i < OBST.length; i++) { const o = OBST[i]; if (x > o.min[0] - r && x < o.max[0] + r && y > o.min[1] - r && y < o.max[1] + r) return true; }
+  if (withPkg && !PKG.held) { const h = PKG.size / 2; if (x > PKG.x - h - r && x < PKG.x + h + r && y > PKG.y - h - r && y < PKG.y + h + r) return true; }
+  return false;
+}
+function buildOcc(r) {
+  const occ = new Uint8Array(GRID.nx * GRID.ny);
+  for (let j = 0; j < GRID.ny; j++) for (let i = 0; i < GRID.nx; i++) {
+    const x = ROOM.x0 + (i + 0.5) * GRID.res, y = ROOM.y0 + (j + 0.5) * GRID.res;
+    occ[j * GRID.nx + i] = inflatedHit(x, y, r, true) ? 1 : 0;
+  }
+  return occ;
+}
+const cellOf = (x, y) => [clamp(Math.floor((x - ROOM.x0) / GRID.res), 0, GRID.nx - 1), clamp(Math.floor((y - ROOM.y0) / GRID.res), 0, GRID.ny - 1)];
+const cellXY = (i, j) => [ROOM.x0 + (i + 0.5) * GRID.res, ROOM.y0 + (j + 0.5) * GRID.res];
+function nearestFree(occ, i, j, maxR) {
+  if (!occ[j * GRID.nx + i]) return [i, j];
+  for (let r = 1; r <= maxR; r++) {
+    let best = null, bd = 1e9;
+    for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) {
+      if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
+      const a = i + di, b = j + dj;
+      if (a < 0 || b < 0 || a >= GRID.nx || b >= GRID.ny || occ[b * GRID.nx + a]) continue;
+      const d = di * di + dj * dj; if (d < bd) { bd = d; best = [a, b]; }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+function astar(occ, s, g) {
+  const N = GRID.nx * GRID.ny, nx = GRID.nx;
+  const gS = new Float32Array(N).fill(Infinity), came = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
+  const heap = []; // [f, idx]
+  const push = (f, v) => { heap.push([f, v]); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (; ;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+  const h = (i, j) => { const dx = Math.abs(i - g[0]), dy = Math.abs(j - g[1]); return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy); };
+  const si = s[1] * nx + s[0], gi = g[1] * nx + g[0];
+  gS[si] = 0; push(h(s[0], s[1]), si);
+  const nb = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2]];
+  let expanded = 0;
+  while (heap.length) {
+    const [, v] = pop();
+    if (closed[v]) continue; closed[v] = 1; expanded++;
+    if (v === gi) break;
+    const i = v % nx, j = (v / nx) | 0;
+    for (const [di, dj, c] of nb) {
+      const a = i + di, b = j + dj;
+      if (a < 0 || b < 0 || a >= nx || b >= GRID.ny) continue;
+      const w = b * nx + a;
+      if (occ[w] || closed[w]) continue;
+      if (di && dj && (occ[j * nx + a] || occ[b * nx + i])) continue;   // 모서리 자르기 금지
+      const ng = gS[v] + c;
+      if (ng < gS[w]) { gS[w] = ng; came[w] = v; push(ng + h(a, b), w); }
+    }
+  }
+  if (!closed[gi]) return null;
+  const path = []; for (let v = gi; v !== -1; v = came[v]) path.push([v % nx, (v / nx) | 0]);
+  path.reverse(); path.expanded = expanded; return path;
+}
+function lineFree(occ, a, b) {
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.ceil(L / 0.04);
+  for (let k = 1; k < n; k++) { const t = k / n, c = cellOf(lerp(a[0], b[0], t), lerp(a[1], b[1], t)); if (occ[c[1] * GRID.nx + c[0]]) return false; }
+  return true;
+}
+function planPath(from, to) {
+  const occ = buildOcc(0.46);
+  let s = cellOf(from[0], from[1]), g = cellOf(to[0], to[1]);
+  s = nearestFree(occ, s[0], s[1], 8); g = nearestFree(occ, g[0], g[1], 10);
+  if (!s || !g) return null;
+  const cells = astar(occ, s, g); if (!cells) return null;
+  let pts = cells.map(c => cellXY(c[0], c[1]));
+  pts[0] = [from[0], from[1]];
+  const sm = [pts[0]]; let i = 0;                         // 줄 당기기(string pulling)
+  while (i < pts.length - 1) { let j = pts.length - 1; while (j > i + 1 && !lineFree(occ, pts[i], pts[j])) j--; sm.push(pts[j]); i = j; }
+  const out = [sm[0]];                                   // 0.1 m 간격으로 다시 찍기
+  for (let k = 1; k < sm.length; k++) { const a = sm[k - 1], b = sm[k], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.1)); for (let m = 1; m <= n; m++) out.push([lerp(a[0], b[0], m / n), lerp(a[1], b[1], m / n)]); }
+  out.expanded = cells.expanded; out.len = cells.length; return out;
+}
+
+/* ---- 7자유도 팔 ---- */
+const ARM = {
+  mount: [0.22, 0, DOG.bodyH / 2], ax: [2, 1, 2, 1, 2, 1, 2], len: [0.10, 0.18, 0.17, 0.16, 0.15, 0.07, 0.13], lim: 2.9,
+  stow: [0, -1.5, 0, 2.75, 0, 0.6, 0], rest: [0, 0.2, 0, 1.3, 0, 1.1, 0]
+};
+function armFK(q, Rb, pb) {
+  let R = Rb, p = add(pb, mv(Rb, ARM.mount));
+  const o = [], a = [];
+  for (let k = 0; k < 7; k++) {
+    const col = ARM.ax[k];
+    o.push(p); a.push([R[0][col], R[1][col], R[2][col]]);
+    R = mm(R, col === 2 ? rotZ(q[k]) : rotY(q[k]));
+    p = add(p, [R[0][2] * ARM.len[k], R[1][2] * ARM.len[k], R[2][2] * ARM.len[k]]);
+  }
+  return { o, a, p, R, z: [R[0][2], R[1][2], R[2][2]] };
+}
+function armIK(q, tgt, zdes, Rb, pb, iters) {
+  const wo = 0.35, lam = 0.06, kN = 0.04;
+  for (let it = 0; it < iters; it++) {
+    const f = armFK(q, Rb, pb);
+    const e = sub(tgt, f.p).concat(scl(cross(f.z, zdes), wo));
+    const J = [[], [], [], [], [], []];
+    for (let k = 0; k < 7; k++) { const v = cross(f.a[k], sub(f.p, f.o[k])); for (let r = 0; r < 3; r++) { J[r][k] = v[r]; J[r + 3][k] = f.a[k][r] * wo; } }
+    const A = [0, 1, 2, 3, 4, 5].map(i => [0, 1, 2, 3, 4, 5].map(j => { let s = 0; for (let k = 0; k < 7; k++) s += J[i][k] * J[j][k]; return s + (i === j ? lam * lam : 0); }));
+    const y = solveLin(A, e);                                     // DLS: Δq = Jᵀ(JJᵀ+λ²I)⁻¹e
+    const z = q.map((v, k) => kN * (ARM.rest[k] - v));            // 영공간: 쉬는 자세 쪽으로
+    const Jz = J.map(r => r.reduce((s, v, k) => s + v * z[k], 0));
+    const y2 = solveLin(A, Jz);
+    for (let k = 0; k < 7; k++) {
+      let dq = 0, zk = z[k];
+      for (let r = 0; r < 6; r++) { dq += J[r][k] * y[r]; zk -= J[r][k] * y2[r]; }
+      q[k] = clamp(q[k] + clamp(dq, -0.12, 0.12) + zk, -ARM.lim, ARM.lim);
+    }
+  }
+  return q;
+}
+
+/* ---- 상태 ---- */
+const SIM = {
+  loco: new Loco(), h: 0.46, roll: 0, pitch: 0, pitchM: 0, userGait: 'trot', vmax: 0.8, idleT: 0,
+  showLidar: true, showCams: true, showCloud: false, strafeJoy: false,
+  arm: { on: true, q: ARM.stow.slice(), open: 0.15, tgt: null },
+  path: null, pi: 0, goal: null, msg: '', msgT: 0,
+  joints: LEGS.map(() => [0, 0.8, -1.6]), ok: [true, true, true, true],
+  contactHist: [], imu: { g: [0, 0, 0], a: [0, 0, 9.81], rp: [0, 0] }
+};
+const START = [-2.8, -0.9, 0.0];
+SIM.loco.reset(START[0], START[1], START[2]);
+const MIS = { state: 'idle', t: 0 };
+function setMsg(t, dur) { SIM.msg = t; SIM.msgT = dur || 3.5; }
+function bodyR() { return rotZYX(SIM.roll, SIM.pitch + SIM.pitchM, SIM.loco.yaw); }
+function bodyP() { return [SIM.loco.x, SIM.loco.y, SIM.h]; }
+function blockedBody(x, y) { return inflatedHit(x, y, 0.40, true); }
+
+let simReady = false;
+function initSim() {
+  if (typeof THREE === 'undefined') throw new Error('three.js 없음');
+  const stage = $('#stage'), cv = $('#gl');
+  const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const scene = new THREE.Scene();
+  const world = new THREE.Group(); world.rotation.x = -Math.PI / 2; scene.add(world);   // 안쪽은 z가 위인 로봇 좌표계
+  const T3 = v => new THREE.Vector3(v[0], v[2], -v[1]);
+  const cam = new THREE.PerspectiveCamera(50, 1, 0.05, 80);
+  const headCam = new THREE.PerspectiveCamera(70, 4 / 3, 0.05, 30);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f86, 0.75));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.75);
+  sun.position.set(3, 9, 4); sun.castShadow = true;
+  Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: 1, far: 30 });
+  sun.shadow.mapSize.set(1024, 1024); scene.add(sun);
+
+  const floorMat = new THREE.MeshLambertMaterial({ color: 0xd6dbd2 });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 8), floorMat); floor.receiveShadow = true; world.add(floor);
+  const gl = []; for (let x = -6; x <= 6.001; x += 0.5) gl.push(x, -4, 0.003, x, 4, 0.003); for (let y = -4; y <= 4.001; y += 0.5) gl.push(-6, y, 0.003, 6, y, 0.003);
+  const gridGeo = new THREE.BufferGeometry(); gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(gl, 3));
+  const gridMat = new THREE.LineBasicMaterial({ color: 0xaab2a6, transparent: true, opacity: 0.7 });
+  world.add(new THREE.LineSegments(gridGeo, gridMat));
+  function applyTheme() {
+    scene.background = new THREE.Color(COL.stage || '#D9DED6');
+    const dark = (COL.paper || '').toLowerCase() === '#161a1e';
+    floorMat.color.set(dark ? 0x30373d : 0xd6dbd2); gridMat.color.set(dark ? 0x4a535a : 0xaab2a6);
+  }
+  applyTheme(); themeHooks.push(applyTheme);
+
+  const M = {
+    yellow: new THREE.MeshLambertMaterial({ color: 0xF0B800 }), dark: new THREE.MeshLambertMaterial({ color: 0x2C3238 }),
+    rubber: new THREE.MeshLambertMaterial({ color: 0x15181B }), lens: new THREE.MeshPhongMaterial({ color: 0x0A0C0E, shininess: 90, specular: 0x667788 }),
+    lidar: new THREE.MeshPhongMaterial({ color: 0x3A4148, shininess: 40 }), kraft: new THREE.MeshLambertMaterial({ color: 0xB88A55 }),
+    tape: new THREE.MeshLambertMaterial({ color: 0xE9DCC3 })
+  };
+  const mesh = (geo, mat) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; return m; };
+  const box = (x, y, z, mat) => mesh(new THREE.BoxGeometry(x, y, z), mat);
+  const cylZ = (r, h, mat) => { const m = mesh(new THREE.CylinderGeometry(r, r, h, 20), mat); m.rotation.x = Math.PI / 2; return m; };
+  const cylY = (r, h, mat) => mesh(new THREE.CylinderGeometry(r, r, h, 18), mat);
+  const cylX = (r, h, mat) => { const m = mesh(new THREE.CylinderGeometry(r, r, h, 18), mat); m.rotation.z = Math.PI / 2; return m; };
+
+  OBST.forEach(o => { const m = box(o.w, o.d, o.h, new THREE.MeshLambertMaterial({ color: o.col })); m.position.set(o.x, o.y, o.h / 2); world.add(m); });
+  const pkgG = new THREE.Group(); world.add(pkgG);
+  pkgG.add(box(PKG.size, PKG.size, PKG.size, M.kraft));
+  const tp = box(PKG.size * 1.01, 0.05, PKG.size * 1.01, M.tape); pkgG.add(tp);
+
+  /* 로봇 개 몸통 */
+  const body = new THREE.Group(); world.add(body);
+  body.add(box(DOG.bodyL, DOG.bodyW, DOG.bodyH, M.yellow));
+  const belly = box(DOG.bodyL * 0.9, DOG.bodyW * 0.78, 0.05, M.dark); belly.position.z = -DOG.bodyH / 2 - 0.02; body.add(belly);
+  const front = box(0.07, DOG.bodyW * 0.92, DOG.bodyH * 0.9, M.dark); front.position.x = DOG.bodyL / 2 + 0.03; body.add(front);
+  const rear = box(0.05, DOG.bodyW * 0.92, DOG.bodyH * 0.9, M.dark); rear.position.x = -DOG.bodyL / 2 - 0.02; body.add(rear);
+  for (const yy of [0.055, -0.055]) { const l = cylX(0.02, 0.02, M.lens); l.position.set(DOG.bodyL / 2 + 0.07, yy, -0.01); body.add(l); }
+  for (const sy of [1, -1]) for (const xx of [0.08, -0.04]) { const l = cylY(0.016, 0.02, M.lens); l.position.set(xx, sy * (DOG.bodyW / 2 + 0.005), 0); body.add(l); }
+  const lStand = box(0.13, 0.13, 0.05, M.dark); lStand.position.set(-0.2, 0, DOG.bodyH / 2 + 0.025); body.add(lStand);
+  const lid = cylZ(0.055, 0.075, M.lidar); lid.position.set(-0.2, 0, DOG.bodyH / 2 + 0.09); body.add(lid);
+  const lidBand = cylZ(0.057, 0.02, M.lens); lidBand.position.set(-0.2, 0, DOG.bodyH / 2 + 0.09); body.add(lidBand);
+
+  /* 다리 */
+  const legM = LEGS.map(L => {
+    const hip = new THREE.Group(); hip.position.set(L.sx * DOG.hipX, L.sy * DOG.hipY, 0); body.add(hip);
+    hip.add(cylX(0.055, 0.1, M.dark));
+    const th = new THREE.Group(); th.position.set(0, L.sy * DOG.L1, 0); hip.add(th);
+    th.add(cylY(0.052, 0.08, M.dark));
+    const thigh = box(0.075, 0.06, DOG.L2, M.yellow); thigh.position.z = -DOG.L2 / 2; th.add(thigh);
+    const kn = new THREE.Group(); kn.position.z = -DOG.L2; th.add(kn);
+    kn.add(cylY(0.038, 0.07, M.dark));
+    const calf = box(0.038, 0.034, DOG.L3, M.dark); calf.position.z = -DOG.L3 / 2; kn.add(calf);
+    const foot = mesh(new THREE.SphereGeometry(DOG.footR, 14, 10), M.rubber); foot.position.z = -DOG.L3; kn.add(foot);
+    return { hip, th, kn };
+  });
+
+  /* 팔 */
+  const armRoot = new THREE.Group(); armRoot.position.set(ARM.mount[0], ARM.mount[1], ARM.mount[2]); body.add(armRoot);
+  const aBase = cylZ(0.065, 0.03, M.dark); aBase.position.z = 0.015; armRoot.add(aBase);
+  const J = []; let par = armRoot; const rad = [0.05, 0.045, 0.042, 0.04, 0.035, 0.032, 0.03];
+  let fingers = [];
+  for (let k = 0; k < 7; k++) {
+    const j = new THREE.Group(); par.add(j); J.push(j);
+    if (ARM.ax[k] === 1) j.add(cylY(rad[k] * 1.05, rad[k] * 2.1, M.dark)); else { const mtr = cylZ(rad[k] * 1.08, 0.05, M.dark); mtr.position.z = 0.025; j.add(mtr); }
+    if (k < 6) { const link = cylZ(rad[k] * 0.78, ARM.len[k], k % 2 ? M.dark : M.yellow); link.position.z = ARM.len[k] / 2; j.add(link); }
+    else {
+      const palm = box(0.06, 0.2, 0.04, M.dark); palm.position.z = 0.03; j.add(palm);
+      fingers = [1, -1].map(sg => { const f = box(0.03, 0.014, 0.1, M.rubber); f.position.set(0, sg * 0.15, 0.09); j.add(f); return f; });
+    }
+    const nxt = new THREE.Group(); nxt.position.z = ARM.len[k]; j.add(nxt); par = nxt;
+  }
+
+  /* 센서 그리기 */
+  const NL = 16 * 120;
+  const lidGeo = new THREE.BufferGeometry();
+  const lidPos = new Float32Array(NL * 3), lidCol = new Float32Array(NL * 3);
+  lidGeo.setAttribute('position', new THREE.BufferAttribute(lidPos, 3)); lidGeo.setAttribute('color', new THREE.BufferAttribute(lidCol, 3));
+  const lidPts = new THREE.Points(lidGeo, new THREE.PointsMaterial({ size: 0.035, vertexColors: true })); lidPts.frustumCulled = false; world.add(lidPts);
+  const DW = 80, DH = 60, NDp = DW * DH;
+  const cloudGeo = new THREE.BufferGeometry();
+  const cloudPos = new Float32Array(NDp * 3), cloudCol = new Float32Array(NDp * 3);
+  cloudGeo.setAttribute('position', new THREE.BufferAttribute(cloudPos, 3)); cloudGeo.setAttribute('color', new THREE.BufferAttribute(cloudCol, 3));
+  const cloudPts = new THREE.Points(cloudGeo, new THREE.PointsMaterial({ size: 0.03, vertexColors: true })); cloudPts.frustumCulled = false; world.add(cloudPts);
+  const pathGeo = new THREE.BufferGeometry(); pathGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3 * 600), 3));
+  const pathLine = new THREE.Line(pathGeo, new THREE.LineBasicMaterial({ color: 0x2860C4 })); pathLine.frustumCulled = false; world.add(pathLine);
+  const goalRing = new THREE.Mesh(new THREE.RingGeometry(0.16, 0.22, 36), new THREE.MeshBasicMaterial({ color: 0x2860C4, side: THREE.DoubleSide })); goalRing.position.z = 0.006; world.add(goalRing);
+  const sensorLayers = [lidPts, cloudPts, pathLine, goalRing];
+
+  /* 깊이 카메라 내부 파라미터 (핀홀) */
+  const HFOV = 86 * D2R, FX = (DW / 2) / Math.tan(HFOV / 2), FY = FX, CX = (DW - 1) / 2, CY = (DH - 1) / 2;
+  const TILT = 12 * D2R, CAM_B = [DOG.bodyL / 2 + 0.075, 0, 0.0];
+  const R_BC = mm(rotY(TILT), [[0, 0, 1], [-1, 0, 0], [0, -1, 0]]);   // 카메라축(x 오른쪽, y 아래, z 앞) → 몸통
+  headCam.fov = 2 * Math.atan((DH / 2) / FY) * R2D; headCam.updateProjectionMatrix();
+  const dctx = $('#depthCv').getContext('2d'); const dimg = dctx.createImageData(DW, DH);
+  function turbo(t) {
+    t = clamp(t, 0, 1);
+    const r = 0.13572138 + t * (4.61539260 + t * (-42.66032258 + t * (132.13108234 + t * (-152.94239396 + t * 59.28637943))));
+    const g = 0.09140261 + t * (2.19418839 + t * (4.84296658 + t * (-14.18503333 + t * (4.27729857 + t * 2.82956604))));
+    const b = 0.10667330 + t * (12.64194608 + t * (-60.58204836 + t * (110.36276771 + t * (-89.90310912 + t * 27.34824973))));
+    return [clamp(r, 0, 1), clamp(g, 0, 1), clamp(b, 0, 1)];
+  }
+  function scanLidar() {
+    const R = bodyR(), o = add(bodyP(), mv(R, [-0.2, 0, DOG.bodyH / 2 + 0.09]));
+    let n = 0;
+    for (let ch = 0; ch < 16; ch++) {
+      const el = (-15 + ch * 2) * D2R, ce = Math.cos(el), se = Math.sin(el);
+      for (let a = 0; a < 120; a++) {
+        const az = a * 3 * D2R, d = mv(R, [ce * Math.cos(az), ce * Math.sin(az), se]);
+        const t = castRay(o, d, 12);
+        if (t >= 12) continue;
+        const p = add(o, scl(d, t + gauss() * 0.01));
+        lidPos[3 * n] = p[0]; lidPos[3 * n + 1] = p[1]; lidPos[3 * n + 2] = p[2];
+        const c = turbo(0.15 + p[2] / 1.6); lidCol[3 * n] = c[0]; lidCol[3 * n + 1] = c[1]; lidCol[3 * n + 2] = c[2]; n++;
+      }
+    }
+    lidGeo.setDrawRange(0, n); lidGeo.attributes.position.needsUpdate = true; lidGeo.attributes.color.needsUpdate = true;
+  }
+  function camPose() {
+    const R = bodyR(); const Rc = mm(R, R_BC);
+    return { R: Rc, o: add(bodyP(), mv(R, CAM_B)) };
+  }
+  function scanDepth() {
+    const { R, o } = camPose(); let n = 0; const data = dimg.data;
+    for (let v = 0; v < DH; v++) for (let u = 0; u < DW; u++) {
+      const dc = [(u - CX) / FX, (v - CY) / FY, 1];            // K⁻¹[u v 1]ᵀ
+      const d = mv(R, dc);
+      const t = castRay(o, d, 6);                               // dc의 z=1이므로 t가 곧 깊이
+      const k = 4 * (v * DW + u);
+      if (t >= 6 || t < 0.2) { data[k] = 12; data[k + 1] = 14; data[k + 2] = 18; data[k + 3] = 255; continue; }
+      const c = turbo(1 - (t - 0.2) / 5.8);
+      data[k] = c[0] * 255; data[k + 1] = c[1] * 255; data[k + 2] = c[2] * 255; data[k + 3] = 255;
+      if (SIM.showCloud) { const p = add(o, scl(d, t)); cloudPos[3 * n] = p[0]; cloudPos[3 * n + 1] = p[1]; cloudPos[3 * n + 2] = p[2]; cloudCol[3 * n] = c[0]; cloudCol[3 * n + 1] = c[1]; cloudCol[3 * n + 2] = c[2]; n++; }
+    }
+    dctx.putImageData(dimg, 0, 0);
+    cloudGeo.setDrawRange(0, n); cloudGeo.attributes.position.needsUpdate = true; cloudGeo.attributes.color.needsUpdate = true;
+  }
+  function drawPath() {
+    const a = pathGeo.attributes.position.array;
+    if (!SIM.path) { pathGeo.setDrawRange(0, 0); goalRing.visible = false; return; }
+    const P = SIM.path, n = Math.min(P.length, 600);
+    for (let k = 0; k < n; k++) { a[3 * k] = P[k][0]; a[3 * k + 1] = P[k][1]; a[3 * k + 2] = 0.012; }
+    pathGeo.setDrawRange(0, n); pathGeo.attributes.position.needsUpdate = true;
+    goalRing.visible = true; goalRing.position.x = P[P.length - 1][0]; goalRing.position.y = P[P.length - 1][1];
+  }
+
+  /* 카메라 궤도 조작 */
+  const orbit = { az: Math.PI + 0.25, el: 0.6, dist: 3.8, tgt: [START[0], START[1], 0.35] };
+  const ptrs = new Map(); let down = null, pinch0 = 0, dist0 = 0;
+  cv.addEventListener('pointerdown', e => { try { stage.focus({ preventScroll: true }); } catch (_) { } cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); if (ptrs.size === 1) down = { x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 }; if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); dist0 = orbit.dist; down = null; } });
+  cv.addEventListener('pointermove', e => {
+    if (!ptrs.has(e.pointerId)) return;
+    const prev = ptrs.get(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+    if (ptrs.size === 1) { const dx = e.clientX - prev[0], dy = e.clientY - prev[1]; orbit.az -= dx * 0.008; orbit.el = clamp(orbit.el + dy * 0.006, 0.06, 1.45); if (down) down.moved += Math.abs(dx) + Math.abs(dy); }
+    else if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch0 > 0) orbit.dist = clamp(dist0 * pinch0 / d, 1.2, 14); }
+  });
+  const endPtr = e => {
+    if (ptrs.size === 1 && down && down.moved < 8 && performance.now() - down.t < 450) tapGoal(e);
+    ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = 0; if (!ptrs.size) down = null;
+  };
+  cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); down = null; });
+  cv.addEventListener('wheel', e => { if (document.activeElement !== stage) return; e.preventDefault(); orbit.dist = clamp(orbit.dist * Math.exp(e.deltaY * 0.0012), 1.2, 14); }, { passive: false });
+  const ray = new THREE.Raycaster();
+  function tapGoal(e) {
+    const r = cv.getBoundingClientRect();
+    ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), cam);
+    const hit = ray.intersectObject(floor)[0]; if (!hit) return;
+    const p = world.worldToLocal(hit.point.clone());
+    if (MIS.state === 'goto') { setMis('idle'); SIM.path = null; }
+    goTo([p.x, p.y]);
+  }
+
+  /* 조이스틱과 키보드 */
+  const joy = { x: 0, y: 0, id: null }; const jEl = $('#joy'), knob = $('#joyKnob');
+  function joyMove(e) { const r = jEl.getBoundingClientRect(); let x = (e.clientX - r.left) / r.width * 2 - 1, y = (e.clientY - r.top) / r.height * 2 - 1; const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; } joy.x = x; joy.y = y; knob.style.transform = `translate(${x * r.width * 0.32}px,${y * r.height * 0.32}px)`; }
+  jEl.addEventListener('pointerdown', e => { e.stopPropagation(); jEl.setPointerCapture(e.pointerId); joy.id = e.pointerId; joyMove(e); });
+  jEl.addEventListener('pointermove', e => { if (e.pointerId === joy.id) joyMove(e); });
+  const joyEnd = e => { if (e.pointerId !== joy.id) return; joy.id = null; joy.x = joy.y = 0; knob.style.transform = ''; };
+  jEl.addEventListener('pointerup', joyEnd); jEl.addEventListener('pointercancel', joyEnd);
+  const keys = new Set();
+  const KEYMAP = { KeyW: 1, KeyS: 1, KeyA: 1, KeyD: 1, KeyQ: 1, KeyE: 1, ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1 };
+  window.addEventListener('keydown', e => {
+    const tg = e.target; if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA' || tg.isContentEditable)) return;
+    if (!KEYMAP[e.code]) return;
+    if (e.code.startsWith('Arrow') && document.activeElement !== stage) return;
+    if (e.code.startsWith('Arrow')) e.preventDefault();
+    keys.add(e.code);
+  });
+  window.addEventListener('keyup', e => keys.delete(e.code));
+  window.addEventListener('blur', () => keys.clear());
+  function manualCmd() {
+    const k = c => keys.has(c) ? 1 : 0;
+    const f = k('KeyW') + k('ArrowUp') - k('KeyS') - k('ArrowDown');
+    const st = k('KeyA') - k('KeyD'), tr = k('KeyQ') + k('ArrowLeft') - k('KeyE') - k('ArrowRight');
+    const jx = Math.abs(joy.x) < 0.08 ? 0 : joy.x, jy = Math.abs(joy.y) < 0.08 ? 0 : joy.y;
+    return [SIM.vmax * clamp(f - jy, -1, 1), 0.6 * SIM.vmax * clamp(st + (SIM.strafeJoy ? -jx : 0), -1, 1), 1.2 * clamp(tr + (SIM.strafeJoy ? 0 : -jx), -1, 1)];
+  }
+
+  /* 경로 추종 (순수 추종) */
+  function goTo(p, quiet) {
+    if (MIS.state !== 'idle' && MIS.state !== 'carry' && MIS.state !== 'goto') { setMsg('팔 작업 중에는 이동하지 않습니다'); return false; }
+    const lo = SIM.loco, t0 = performance.now();
+    const path = planPath([lo.x, lo.y], p);
+    if (!path) { setMsg('그곳까지 가는 길을 찾지 못했습니다'); return false; }
+    SIM.path = path; SIM.pi = 0; drawPath();
+    if (!quiet) setMsg(`A* 경로: 격자 ${path.len}칸, 탐색 ${path.expanded}칸, ${(performance.now() - t0).toFixed(1)} ms`);
+    return true;
+  }
+  function follow() {
+    const P = SIM.path, lo = SIM.loco;
+    let best = SIM.pi, bd = 1e9;
+    for (let i = SIM.pi; i < Math.min(P.length, SIM.pi + 40); i++) { const d = Math.hypot(P[i][0] - lo.x, P[i][1] - lo.y); if (d < bd) { bd = d; best = i; } }
+    SIM.pi = best;
+    const Ld = 0.6; let L = P[P.length - 1];
+    for (let i = best; i < P.length; i++) if (Math.hypot(P[i][0] - lo.x, P[i][1] - lo.y) >= Ld) { L = P[i]; break; }
+    const G = P[P.length - 1], dg = Math.hypot(G[0] - lo.x, G[1] - lo.y);
+    if (dg < 0.07) { SIM.path = null; drawPath(); lo.cmd = [0, 0, 0]; return true; }
+    const c = Math.cos(lo.yaw), s = Math.sin(lo.yaw), dx = L[0] - lo.x, dy = L[1] - lo.y;
+    const xb = c * dx + s * dy, yb = -s * dx + c * dy, alpha = Math.atan2(yb, xb);
+    if (Math.abs(alpha) > 0.9 && dg > 0.3) { lo.cmd = [0, 0, Math.sign(alpha) * 0.9]; return false; }
+    let v = Math.min(Math.min(SIM.vmax, 0.9), 1.2 * dg + 0.05) * Math.max(0.25, Math.cos(alpha));
+    const kappa = 2 * yb / Math.max(xb * xb + yb * yb, 0.01);
+    lo.cmd = [v, 0, clamp(v * kappa, -1.2, 1.2)];
+    return false;
+  }
+
+  /* 상자 집기 미션 */
+  const btnPick = $('#btnPick');
+  function setMis(s) { MIS.state = s; MIS.t = 0; }
+  function pickTop() { return PKG.size; }
+  function startPick() {
+    const lo = SIM.loco; if (!SIM.arm.on) { SIM.arm.on = true; $('#tgArm').checked = true; }
+    const base = Math.atan2(PKG.y - lo.y, PKG.x - lo.x); let ok = false;
+    for (const da of [0, 0.5, -0.5, 1, -1, 1.6, -1.6, Math.PI]) {
+      const ang = base + da, ax = PKG.x - 0.72 * Math.cos(ang), ay = PKG.y - 0.72 * Math.sin(ang);
+      if (inflatedHit(ax, ay, 0.42, false)) continue;
+      if (goTo([ax, ay], true)) { ok = true; break; }
+    }
+    if (!ok) { setMsg('상자에 다가갈 자리가 없습니다'); return; }
+    setMis('goto'); setMsg('1/6 경로 계획 후 상자 앞으로 이동', 99);
+  }
+  function startPlace() {
+    const lo = SIM.loco, px = lo.x + 0.78 * Math.cos(lo.yaw), py = lo.y + 0.78 * Math.sin(lo.yaw);
+    if (inflatedHit(px, py, PKG.size / 2 + 0.05, false)) { setMsg('앞이 막혀 내려놓을 수 없습니다. 넓은 곳으로 옮겨 주세요'); return; }
+    SIM.path = null; drawPath(); MIS.place = [px, py]; MIS.p0 = SIM.arm.tgt.slice(); setMis('placeGo'); setMsg('상자를 앞에 내려놓는 중', 99);
+  }
+  btnPick.addEventListener('click', () => { if (MIS.state === 'idle') startPick(); else if (MIS.state === 'carry') startPlace(); });
+  function updateMission(dt) {
+    const lo = SIM.loco, A = SIM.arm; MIS.t += dt;
+    const Rb = bodyR(), pb = bodyP(), down = [0, 0, -1];
+    const ik = () => armIK(A.q, A.tgt, down, Rb, pb, 3);
+    switch (MIS.state) {
+      case 'goto':
+        if (!SIM.path) {
+          const err = wrapPi(Math.atan2(PKG.y - lo.y, PKG.x - lo.x) - lo.yaw);
+          lo.cmd = [0, 0, clamp(2.4 * err, -0.9, 0.9)];
+          if (Math.abs(err) < 0.03) { lo.cmd = [0, 0, 0]; setMis('settle'); setMsg('2/6 멈추고 네 발 정리', 99); }
+        }
+        break;
+      case 'settle':
+        if (MIS.t > 0.5 && !lo.feet.some(f => f.swing) && Math.hypot(lo.vel[0], lo.vel[1], lo.vel[2]) < 0.02) { MIS.q0 = A.q.slice(); setMis('unstow'); setMsg('3/6 팔 펴기 (관절 공간 보간)', 99); }
+        break;
+      case 'unstow': { const b = smooth(clamp(MIS.t / 0.9, 0, 1)); A.q = MIS.q0.map((v, k) => lerp(v, ARM.rest[k], b)); if (MIS.t >= 0.9) { A.tgt = armFK(A.q, Rb, pb).p; MIS.p0 = A.tgt.slice(); setMis('reach'); setMsg('4/6 상자 위로 (DLS 역기구학)', 99); } break; }
+      case 'reach': { const b = smooth(clamp(MIS.t / 1.3, 0, 1)); A.tgt = lerpV(MIS.p0, [PKG.x, PKG.y, pickTop() + 0.12], b); SIM.pitchM = lerp(0, 0.12, b); ik(); if (MIS.t > 1.5) { MIS.p0 = A.tgt.slice(); setMis('descend'); } break; }
+      case 'descend': { const b = smooth(clamp(MIS.t / 0.9, 0, 1)); A.tgt = lerpV(MIS.p0, [PKG.x, PKG.y, pickTop() - 0.07], b); ik(); if (MIS.t > 1.0) { setMis('grip'); setMsg('5/6 집게 닫기', 99); } break; }
+      case 'grip': { A.open = lerp(0.15, PKG.size / 2 + 0.008, smooth(clamp(MIS.t / 0.5, 0, 1))); ik(); if (MIS.t > 0.55) { PKG.held = true; MIS.p0 = A.tgt.slice(); setMis('lift'); setMsg('6/6 들어 올리기', 99); } break; }
+      case 'lift': {
+        const b = smooth(clamp(MIS.t / 1.2, 0, 1));
+        const carry = add(pb, mv(rotZ(lo.yaw), [0.5, 0, 0.42]));
+        A.tgt = lerpV(MIS.p0, carry, b); SIM.pitchM = lerp(0.12, 0, b); ik();
+        if (MIS.t > 1.3) { setMis('carry'); setMsg('상자를 들었습니다. 몰고 다니다가 내려놓아 보세요', 5); }
+        break;
+      }
+      case 'carry': A.tgt = add(pb, mv(rotZ(lo.yaw), [0.5, 0, 0.42])); ik(); break;
+      case 'placeGo': { const b = smooth(clamp(MIS.t / 1.2, 0, 1)); A.tgt = lerpV(MIS.p0, [MIS.place[0], MIS.place[1], PKG.size + 0.14], b); SIM.pitchM = lerp(0, 0.12, b); ik(); if (MIS.t > 1.3) { MIS.p0 = A.tgt.slice(); setMis('placeDown'); } break; }
+      case 'placeDown': { const b = smooth(clamp(MIS.t / 0.9, 0, 1)); A.tgt = lerpV(MIS.p0, [MIS.place[0], MIS.place[1], PKG.size - 0.07 + 0.004], b); ik(); if (MIS.t > 1.0) setMis('release'); break; }
+      case 'release': { A.open = lerp(PKG.size / 2 + 0.008, 0.15, smooth(clamp(MIS.t / 0.4, 0, 1))); ik(); if (MIS.t > 0.15 && PKG.held) { PKG.held = false; PKG.z = PKG.size / 2; pkgBox(); } if (MIS.t > 0.45) { MIS.p0 = A.tgt.slice(); setMis('retreat'); } break; }
+      case 'retreat': { const b = smooth(clamp(MIS.t / 0.7, 0, 1)); A.tgt = lerpV(MIS.p0, add(MIS.p0, [0, 0, 0.22]), b); SIM.pitchM = lerp(0.12, 0, b); ik(); if (MIS.t > 0.75) { MIS.q0 = A.q.slice(); setMis('stow'); } break; }
+      case 'stow': { const b = smooth(clamp(MIS.t / 1.0, 0, 1)); A.q = MIS.q0.map((v, k) => lerp(v, ARM.stow[k], b)); if (MIS.t > 1.0) { setMis('idle'); setMsg('내려놓기 끝', 3); } break; }
+    }
+    if (PKG.held) {
+      const f = armFK(A.q, Rb, pb), c = add(f.p, scl(f.z, 0.05));
+      PKG.x = c[0]; PKG.y = c[1]; PKG.z = c[2]; PKG.yaw = lo.yaw; pkgBox();
+    }
+    const busy = MIS.state !== 'idle' && MIS.state !== 'carry';
+    btnPick.disabled = busy;
+    btnPick.textContent = MIS.state === 'carry' ? '상자 내려놓기' : busy ? '작업 중…' : '상자 집으러 가기';
+    $('#tgArm').disabled = MIS.state !== 'idle';
+  }
+
+  /* UI 연결 */
+  document.querySelectorAll('.seg[data-group="gait"] button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.seg[data-group="gait"] button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    SIM.userGait = b.dataset.v; if (SIM.userGait === 'stand') setMsg('서기에서는 걷지 않습니다. 몸통 자세 슬라이더를 움직여 보세요');
+  }));
+  const bindR = (id, out, fn, fmt) => { const el = $(id), o = $(out); const up = () => { const v = parseFloat(el.value); fn(v); o.textContent = fmt(v); }; el.addEventListener('input', up); up(); };
+  bindR('#vmax', '#vmaxOut', v => SIM.vmax = v, v => v.toFixed(1) + ' m/s');
+  bindR('#bh', '#bhOut', v => SIM.h = v, v => v.toFixed(2) + ' m');
+  bindR('#broll', '#brollOut', v => SIM.roll = v * D2R, v => v + '°');
+  bindR('#bpitch', '#bpitchOut', v => SIM.pitch = v * D2R, v => v + '°');
+  const bindC = (id, fn) => { const el = $(id); el.addEventListener('change', () => fn(el.checked)); fn(el.checked); };
+  bindC('#tgLidar', v => { SIM.showLidar = v; lidPts.visible = v; });
+  bindC('#tgCloud', v => { SIM.showCloud = v; cloudPts.visible = v; });
+  bindC('#tgCams', v => { SIM.showCams = v; ['#depthCv', '#pipRgbLbl', '#pipDepthLbl', '#pipRgbFrame'].forEach(s => $(s).style.display = v ? '' : 'none'); });
+  bindC('#tgStrafe', v => SIM.strafeJoy = v);
+  bindC('#tgArm', v => { SIM.arm.on = v; armRoot.visible = v; btnPick.disabled = !v; });
+  $('#btnReset').addEventListener('click', () => {
+    SIM.loco.reset(START[0], START[1], START[2]); SIM.path = null; drawPath(); setMis('idle');
+    SIM.arm.q = ARM.stow.slice(); SIM.arm.open = 0.15; SIM.pitchM = 0;
+    PKG.held = false; PKG.x = PKG.home[0]; PKG.y = PKG.home[1]; PKG.z = PKG.size / 2; PKG.yaw = 0.3; pkgBox();
+    orbit.tgt = [START[0], START[1], 0.35]; setMsg('처음 위치로 돌아왔습니다', 2);
+  });
+
+  /* 데이터 패널 */
+  const jt = $('#jointTbl');
+  jt.innerHTML = LEGS.map((L, i) => `<tr><td><span class="dot" style="background:${L.c}"></span>${L.ko}</td><td id="j${i}0"></td><td id="j${i}1"></td><td id="j${i}2"></td></tr>`).join('');
+  const jCells = LEGS.map((L, i) => [0, 1, 2].map(k => $('#j' + i + k)));
+  const imuEl = $('#imuOut');
+  const imuLbl = ['자이로 x', '자이로 y', '자이로 z', '가속 x', '가속 y', '가속 z', '롤', '피치', '요'];
+  imuEl.innerHTML = imuLbl.map((l, i) => `<div><b>${l}</b><span id="imu${i}"></span></div>`).join('');
+  const imuCells = imuLbl.map((l, i) => $('#imu' + i));
+  const ccv = $('#contactCv');
+  function drawContacts() {
+    const { ctx, w, h } = fitCanvas(ccv); ctx.clearRect(0, 0, w, h);
+    const H = SIM.contactHist, n = H.length, rowH = h / 4;
+    LEGS.forEach((L, i) => {
+      ctx.fillStyle = COL.rule; ctx.fillRect(0, i * rowH + rowH * 0.15, w, rowH * 0.7);
+      ctx.fillStyle = L.c;
+      for (let k = 0; k < n; k++) if (H[k][i]) ctx.fillRect(w - (n - k) * (w / 90), i * rowH + rowH * 0.15, w / 90 + 0.6, rowH * 0.7);
+    });
+  }
+  let lastYaw = SIM.loco.yaw, lastRP = [0, 0], lastVW = [0, 0], accS = [0, 0, 0];
+  function updatePanel(dt) {
+    const lo = SIM.loco, Rb = bodyR();
+    const gz = wrapPi(lo.yaw - lastYaw) / dt, gx = (SIM.roll - lastRP[0]) / dt, gy = (SIM.pitch + SIM.pitchM - lastRP[1]) / dt;
+    const aw = [(lo.vw[0] - lastVW[0]) / dt, (lo.vw[1] - lastVW[1]) / dt, 9.81];
+    lastYaw = lo.yaw; lastRP = [SIM.roll, SIM.pitch + SIM.pitchM]; lastVW = lo.vw.slice();
+    const ab = mtv(Rb, aw); for (let k = 0; k < 3; k++) accS[k] = lerp(accS[k], ab[k], 0.5);
+    const vals = [gx * R2D + gauss() * 0.4, gy * R2D + gauss() * 0.4, gz * R2D + gauss() * 0.4, accS[0] + gauss() * 0.05, accS[1] + gauss() * 0.05, accS[2] + gauss() * 0.05, SIM.roll * R2D, (SIM.pitch + SIM.pitchM) * R2D, lo.yaw * R2D];
+    vals.forEach((v, i) => imuCells[i].textContent = v.toFixed(i < 3 ? 1 : i < 6 ? 2 : 1) + (i < 3 ? '°/s' : i < 6 ? '' : '°'));
+    SIM.joints.forEach((q, i) => q.forEach((v, k) => { jCells[i][k].textContent = (v * R2D).toFixed(1); jCells[i][k].style.color = SIM.ok[i] ? '' : COL.bad; }));
+    drawContacts();
+  }
+
+  /* 화면 크기 */
+  const pip = { w: 200, h: 150 };
+  function layout() {
+    const W = stage.clientWidth, H = stage.clientHeight;
+    renderer.setSize(W, H, false); cam.aspect = W / H; cam.updateProjectionMatrix();
+    pip.w = Math.round(Math.min(240, W * (W < 560 ? 0.36 : 0.28))); pip.h = Math.round(pip.w * 0.75);
+    const d = $('#depthCv').style; d.width = pip.w + 'px'; d.height = pip.h + 'px'; d.top = '10px'; d.right = '10px';
+    const f = $('#pipRgbFrame').style; f.width = pip.w + 'px'; f.height = pip.h + 'px'; f.top = '10px'; f.left = '10px';
+    const a = $('#pipRgbLbl').style; a.left = '14px'; a.top = (pip.h + 14) + 'px';
+    const b = $('#pipDepthLbl').style; b.right = '14px'; b.top = (pip.h + 14) + 'px';
+  }
+  new ResizeObserver(layout).observe(stage); layout();
+
+  /* 메인 루프 */
+  let visible = true;
+  new IntersectionObserver(es => { visible = es[0].isIntersecting; }).observe(stage);
+  let last = performance.now(), tL = 0, tD = 0, tP = 0, tC = 0;
+  const hudG = $('#hudGait'), hudM = $('#hudMsg');
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.04, (now - last) / 1000); last = now;
+    if (!visible || dt <= 0) return;
+    const lo = SIM.loco;
+
+    // 1) 명령 고르기: 손 조종 > 경로 추종 > 미션
+    const man = manualCmd(), manual = Math.hypot(man[0], man[1], man[2]) > 0.01;
+    const armBusy = !['idle', 'carry', 'goto'].includes(MIS.state);
+    if (manual && !armBusy) {
+      if (SIM.path) { SIM.path = null; drawPath(); if (MIS.state === 'goto') { setMis('idle'); setMsg('직접 조종해서 미션을 멈췄습니다'); } }
+      lo.cmd = man;
+    } else if (SIM.path) follow();
+    else if (MIS.state !== 'goto') lo.cmd = [0, 0, 0];
+    updateMission(dt);
+
+    // 2) 걸음새: 멈춰 있으면 자동으로 서기
+    let g = SIM.userGait;
+    const wantsMove = Math.hypot(lo.cmd[0], lo.cmd[1], lo.cmd[2]) > 0.01;
+    if ((SIM.path || MIS.state === 'goto') && g === 'stand') g = 'trot';
+    if (armBusy) g = 'stand';
+    const moving = wantsMove || Math.hypot(lo.vel[0], lo.vel[1], lo.vel[2]) > 0.03;
+    SIM.idleT = moving ? 0 : SIM.idleT + dt;
+    if (g !== 'stand' && !wantsMove && SIM.idleT > 0.8) g = 'stand';
+    if (manual && SIM.userGait === 'stand' && SIM.msgT <= 0) setMsg('걸음새를 고르면 움직입니다');
+    lo.gait = g;
+    lo.step(dt, blockedBody);
+
+    // 3) 다리 역기구학
+    const Rb = bodyR(), pb = bodyP();
+    lo.feet.forEach((f, i) => {
+      const L = LEGS[i];
+      const pbody = mtv(Rb, sub([f.p[0], f.p[1], f.p[2] + DOG.footR], pb));
+      const r = legIK(sub(pbody, [L.sx * DOG.hipX, L.sy * DOG.hipY, 0]), L.sy);
+      SIM.joints[i] = r.q; SIM.ok[i] = r.ok;
+      legM[i].hip.rotation.x = r.q[0]; legM[i].th.rotation.y = r.q[1]; legM[i].kn.rotation.y = r.q[2];
+    });
+    body.position.set(pb[0], pb[1], pb[2]); body.rotation.set(SIM.roll, SIM.pitch + SIM.pitchM, lo.yaw, 'ZYX');
+    for (let k = 0; k < 7; k++) { if (ARM.ax[k] === 2) J[k].rotation.z = SIM.arm.q[k]; else J[k].rotation.y = SIM.arm.q[k]; }
+    fingers[0].position.y = SIM.arm.open; fingers[1].position.y = -SIM.arm.open;
+    pkgG.position.set(PKG.x, PKG.y, PKG.z); pkgG.rotation.z = PKG.yaw;
+
+    // 4) 센서
+    tL += dt; tD += dt; tP += dt; tC += dt;
+    if (SIM.showLidar && tL > 0.1) { tL = 0; scanLidar(); }
+    if ((SIM.showCams || SIM.showCloud) && tD > 0.12) { tD = 0; scanDepth(); }
+    if (tC > 1 / 30) { tC = 0; SIM.contactHist.push(lo.feet.map(f => !f.swing)); if (SIM.contactHist.length > 90) SIM.contactHist.shift(); }
+    if (tP > 0.1) { updatePanel(tP); tP = 0; }
+
+    // 5) 카메라
+    orbit.tgt = lerpV(orbit.tgt, [lo.x, lo.y, 0.35], 1 - Math.exp(-dt / 0.25));
+    const ce = Math.cos(orbit.el);
+    cam.position.copy(T3(add(orbit.tgt, [orbit.dist * ce * Math.cos(orbit.az), orbit.dist * ce * Math.sin(orbit.az), orbit.dist * Math.sin(orbit.el)])));
+    cam.lookAt(T3(orbit.tgt));
+    const W = stage.clientWidth, H = stage.clientHeight;
+    renderer.setScissorTest(false); renderer.setViewport(0, 0, W, H); renderer.render(scene, cam);
+    if (SIM.showCams) {
+      const cp = camPose();
+      headCam.position.copy(T3(cp.o));
+      headCam.up.copy(T3(mv(cp.R, [0, -1, 0])));
+      headCam.lookAt(T3(add(cp.o, mv(cp.R, [0, 0, 1]))));
+      const vis = sensorLayers.map(o => o.visible); sensorLayers.forEach(o => o.visible = false);
+      renderer.setScissorTest(true); renderer.setScissor(10, H - pip.h - 10, pip.w, pip.h); renderer.setViewport(10, H - pip.h - 10, pip.w, pip.h);
+      renderer.render(scene, headCam);
+      renderer.setScissorTest(false);
+      sensorLayers.forEach((o, i) => o.visible = vis[i]);
+    }
+
+    // 6) 상태 글
+    const spd = Math.hypot(lo.vel[0], lo.vel[1]);
+    hudG.textContent = `${GAITS[lo.gait].ko}, ${spd.toFixed(2)} m/s, 회전 ${(lo.vel[2] * R2D).toFixed(0)}°/s`;
+    if (SIM.msgT > 0) { SIM.msgT -= dt; hudM.textContent = SIM.msg; } else hudM.textContent = '';
+  }
+  drawPath();
+  requestAnimationFrame(frame);
+  simReady = true;
+}
+/* ================= 4. 2D 실습 위젯 ================= */
+function fitCanvas(cv) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth, h = cv.clientHeight;
+  const W = Math.max(1, Math.round(w * dpr)), H = Math.max(1, Math.round(h * dpr));
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+const fmtN = (v, d = 3) => (v < -0.5 * Math.pow(10, -d) ? '−' : '') + Math.abs(v).toFixed(d);
+const FONT = '13px "IBM Plex Sans KR", system-ui, sans-serif';
+function segGroup(name, fn) {
+  const bs = document.querySelectorAll(`.seg[data-group="${name}"] button`);
+  bs.forEach(b => b.addEventListener('click', () => { bs.forEach(x => x.setAttribute('aria-pressed', x === b)); fn(b.dataset.v); }));
+}
+function line(ctx, pts, col, wdt, dash) {
+  ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = wdt; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; if (dash) ctx.setLineDash(dash);
+  ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke(); ctx.restore();
+}
+function circ(ctx, x, y, r, fill, stroke, lw) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 1.5; ctx.stroke(); } }
+function label(ctx, t, x, y, col, align, font) { ctx.font = font || FONT; ctx.fillStyle = col; ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y); }
+function mxHTML(rows, hl) {
+  return '<span class="mx"><table>' + rows.map((r, i) => `<tr${hl !== undefined ? ` data-r="${i}"` : ''} class="${hl === i ? 'hl' : ''}">` + r.map(c => `<td class="${c.c || ''}">${typeof c.v === 'number' ? fmtN(c.v, c.d ?? 3) : c.v}</td>`).join('') + '</tr>').join('') + '</table></span>';
+}
+const visibleSet = new Set();
+const visObs = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) visibleSet.add(e.target); else visibleSet.delete(e.target); }));
+
+/* ---- 위젯 A: 다리 하나 FK/IK ---- */
+function setupLeg() {
+  const side = $('#legSide'), front = $('#legFront'), s = 1;
+  const sl = ['#q1', '#q2', '#q3'].map(id => $(id)), outs = ['#q1o', '#q2o', '#q3o'].map(id => $(id));
+  let mode = 'fk', q = [0, 0.8, -1.6], tgt = legFK(q, s), ok = true, hlRow = 1;
+  sl[1].value = (0.8 * R2D).toFixed(1); sl[2].value = (-1.6 * R2D).toFixed(1);
+  const view = { side: null, front: null };
+  function pts(q) {
+    const R = rotX(q[0]);
+    return { O: [0, 0, 0], A: mv(R, [0, s * DOG.L1, 0]), K: mv(R, [-DOG.L2 * Math.sin(q[1]), s * DOG.L1, -DOG.L2 * Math.cos(q[1])]), F: legFK(q, s) };
+  }
+  function drawSide() {
+    const { ctx, w, h } = fitCanvas(side); ctx.clearRect(0, 0, w, h);
+    const k = Math.min(w / 1.15, h / 0.86), ox = w / 2, oy = 0.11 * k + 6; view.side = { k, ox, oy };
+    const X = p => [ox + p[0] * k, oy - p[2] * k];
+    ctx.strokeStyle = COL.rule; ctx.lineWidth = 1;
+    for (let gx = -0.5; gx <= 0.501; gx += 0.1) line(ctx, [X([gx, 0, 0.1]), X([gx, 0, -0.7])], COL.rule, 0.6);
+    for (let gz = 0.1; gz >= -0.701; gz -= 0.1) line(ctx, [X([-0.55, 0, gz]), X([0.55, 0, gz])], COL.rule, 0.6);
+    ctx.globalAlpha = 0.28; ctx.fillStyle = COL.yellow; const b0 = X([-0.62, 0, 0.075]), b1 = X([0.14, 0, -0.075]); ctx.fillRect(b0[0], b0[1], b1[0] - b0[0], b1[1] - b0[1]); ctx.globalAlpha = 1;
+    line(ctx, [X([-0.55, 0, -0.43]), X([0.55, 0, -0.43])], COL['ink-2'], 1.2, [6, 5]);
+    label(ctx, '서기 높이 (발 중심)', X([0.54, 0, -0.43])[0], X([0, 0, -0.43])[1] - 10, COL['ink-2'], 'right');
+    const P = pts(q), A = X(P.A), K = X(P.K), F = X(P.F);
+    if (mode === 'ik') {
+      ctx.save(); ctx.setLineDash([4, 5]); circ(ctx, A[0], A[1], (DOG.L2 + DOG.L3) * k, null, COL['ink-2'], 1); ctx.restore();
+      ctx.save(); ctx.setLineDash([3, 4]); line(ctx, [A, F], COL.blue, 1.5); ctx.restore();
+      const mid = [(A[0] + F[0]) / 2, (A[1] + F[1]) / 2]; label(ctx, 'r = ' + Math.hypot(P.F[0] - P.A[0], P.F[2] - P.A[2]).toFixed(3), mid[0] + 8, mid[1], COL.blue);
+    }
+    // q2 각 표시
+    const down = Math.PI / 2, a2 = Math.atan2(K[1] - A[1], K[0] - A[0]);
+    ctx.beginPath(); ctx.arc(A[0], A[1], 34, Math.min(down, a2), Math.max(down, a2)); ctx.strokeStyle = COL.orange; ctx.lineWidth = 2; ctx.stroke();
+    line(ctx, [A, [A[0], A[1] + 46]], COL.orange, 1, [3, 3]);
+    label(ctx, 'q₂ ' + (q[1] * R2D).toFixed(1) + '°', A[0] + 40, A[1] + 30, COL.orange);
+    const ext = [K[0] + (K[0] - A[0]) * 0.35, K[1] + (K[1] - A[1]) * 0.35], a3 = Math.atan2(F[1] - K[1], F[0] - K[0]);
+    line(ctx, [K, ext], COL.blue, 1, [3, 3]);
+    ctx.beginPath(); const e0 = Math.atan2(ext[1] - K[1], ext[0] - K[0]); ctx.arc(K[0], K[1], 26, Math.min(e0, a3), Math.max(e0, a3)); ctx.strokeStyle = COL.blue; ctx.lineWidth = 2; ctx.stroke();
+    label(ctx, 'q₃ ' + (q[2] * R2D).toFixed(1) + '°', K[0] - 34, K[1] + 4, COL.blue, 'right');
+    line(ctx, [A, K], '#1C2126', 15); line(ctx, [A, K], '#F0B800', 11);
+    line(ctx, [K, F], COL.ink, 7);
+    circ(ctx, A[0], A[1], 9, COL.ink); circ(ctx, K[0], K[1], 7, COL.ink); circ(ctx, F[0], F[1], 7, ok ? COL.ink : COL.bad, COL.paper, 2);
+    if (mode === 'ik') { const T = X(tgt); line(ctx, [[T[0] - 10, T[1]], [T[0] + 10, T[1]]], ok ? COL.good : COL.bad, 2); line(ctx, [[T[0], T[1] - 10], [T[0], T[1] + 10]], ok ? COL.good : COL.bad, 2); }
+    label(ctx, 'L₂', (A[0] + K[0]) / 2 - 16, (A[1] + K[1]) / 2, COL.ink); label(ctx, 'L₃', (K[0] + F[0]) / 2 + 10, (K[1] + F[1]) / 2, COL.ink);
+    label(ctx, '앞 →', w - 10, 14, COL['ink-2'], 'right');
+  }
+  function drawFront() {
+    const { ctx, w, h } = fitCanvas(front); ctx.clearRect(0, 0, w, h);
+    const k = Math.min(w / 1.0, h / 0.86), ox = w * 0.42, oy = 0.11 * k + 6; view.front = { k, ox, oy };
+    const X = p => [ox + p[1] * k, oy - p[2] * k];
+    for (let gy = -0.4; gy <= 0.601; gy += 0.1) line(ctx, [X([0, gy, 0.1]), X([0, gy, -0.7])], COL.rule, 0.6);
+    for (let gz = 0.1; gz >= -0.701; gz -= 0.1) line(ctx, [X([0, -0.45, gz]), X([0, 0.6, gz])], COL.rule, 0.6);
+    ctx.globalAlpha = 0.28; ctx.fillStyle = COL.yellow; const b0 = X([0, -0.205, 0.075]), b1 = X([0, 0.065, -0.075]); ctx.fillRect(b0[0], b0[1], b1[0] - b0[0], b1[1] - b0[1]); ctx.globalAlpha = 1;
+    line(ctx, [X([0, -0.45, -0.43]), X([0, 0.6, -0.43])], COL['ink-2'], 1.2, [6, 5]);
+    const P = pts(q), O = X(P.O), A = X(P.A), K = X(P.K), F = X(P.F);
+    const a1 = Math.atan2(A[1] - O[1], A[0] - O[0]);
+    ctx.beginPath(); ctx.arc(O[0], O[1], 30, Math.min(0, a1), Math.max(0, a1)); ctx.strokeStyle = COL.orange; ctx.lineWidth = 2; ctx.stroke();
+    line(ctx, [O, [O[0] + 40, O[1]]], COL.orange, 1, [3, 3]);
+    label(ctx, 'q₁ ' + (q[0] * R2D).toFixed(1) + '°', O[0] - 12, O[1] + 22, COL.orange, 'right');
+    line(ctx, [O, A], COL.ink, 8); line(ctx, [A, K], '#1C2126', 13); line(ctx, [A, K], '#F0B800', 9); line(ctx, [K, F], COL.ink, 6);
+    circ(ctx, O[0], O[1], 8, COL.ink); circ(ctx, A[0], A[1], 6, COL.ink); circ(ctx, K[0], K[1], 5, COL.ink); circ(ctx, F[0], F[1], 7, ok ? COL.ink : COL.bad, COL.paper, 2);
+    label(ctx, 'L₁', (O[0] + A[0]) / 2, (O[1] + A[1]) / 2 - 12, COL.ink, 'center');
+    label(ctx, '로봇 왼쪽 →', w - 10, 14, COL['ink-2'], 'right');
+    if (mode === 'ik') { const T = X(tgt); line(ctx, [[T[0] - 10, T[1]], [T[0] + 10, T[1]]], ok ? COL.good : COL.bad, 2); line(ctx, [[T[0], T[1] - 10], [T[0], T[1] + 10]], ok ? COL.good : COL.bad, 2); }
+  }
+  function renderMx() {
+    const R = rotX(q[0]), xa = -DOG.L2 * Math.sin(q[1]) - DOG.L3 * Math.sin(q[1] + q[2]), za = -DOG.L2 * Math.cos(q[1]) - DOG.L3 * Math.cos(q[1] + q[2]);
+    const pA = [xa, s * DOG.L1, za], p = mv(R, pA);
+    const cls = [['', '', ''], ['', 'cos', 'sin'], ['', 'sin', 'cos']];
+    $('#legMx').innerHTML = `<span class="mxname">p</span>` + mxHTML(p.map(v => [{ v, c: 'res' }]), hlRow) + `<span class="eq">=</span><span class="mxname">R<sub>x</sub>(q₁)</span>` +
+      mxHTML(R.map((r, i) => r.map((v, j) => ({ v, c: cls[i][j] }))), hlRow) + `<span class="mxname">p<sub>A</sub></span>` + mxHTML(pA.map(v => [{ v }]));
+    $('#legMx').querySelectorAll('tr[data-r]').forEach(tr => tr.addEventListener('click', () => { hlRow = +tr.dataset.r; renderMx(); }));
+    const nm = ['x', 'y', 'z'][hlRow], terms = R[hlRow].map((v, j) => { const c = cls[hlRow][j] === 'cos' ? 'c' : cls[hlRow][j] === 'sin' ? 's' : ''; return `<span class="${c}">${fmtN(v)}</span> × ${fmtN(pA[j])}`; });
+    $('#legExp').innerHTML = `p<sub>${nm}</sub> = ${terms.join(' + ')} = <b>${fmtN(p[hlRow])}</b> m`;
+    const r = Math.hypot(xa, za);
+    $('#legInfo').innerHTML = `<span>발 위치 (${fmtN(p[0])}, ${fmtN(p[1])}, ${fmtN(p[2])}) m</span><span>엉덩이–발 거리 r = ${r.toFixed(3)} m (최대 ${(DOG.L2 + DOG.L3).toFixed(2)})</span>` + (ok ? '' : '<span class="warn">닿지 않는 곳: 가장 가까운 자세로 멈춤</span>');
+  }
+  function update() {
+    if (mode === 'ik') { const res = legIK(tgt, s); q = res.q; ok = res.ok; sl.forEach((e, i) => e.value = (q[i] * R2D).toFixed(1)); }
+    else { q = sl.map(e => parseFloat(e.value) * D2R); tgt = legFK(q, s); ok = true; }
+    outs.forEach((o, i) => o.textContent = (q[i] * R2D).toFixed(1) + '°');
+    drawSide(); drawFront(); renderMx();
+  }
+  sl.forEach(e => e.addEventListener('input', () => { if (mode === 'fk') update(); }));
+  segGroup('legmode', v => { mode = v; sl.forEach(e => e.disabled = v === 'ik'); update(); });
+  function drag(cv, which) {
+    let active = false;
+    const set = e => {
+      const r = cv.getBoundingClientRect(), v = view[which], px = e.clientX - r.left, py = e.clientY - r.top;
+      if (which === 'side') tgt = [(px - v.ox) / v.k, tgt[1], -(py - v.oy) / v.k]; else tgt = [tgt[0], (px - v.ox) / v.k, -(py - v.oy) / v.k];
+      update();
+    };
+    cv.addEventListener('pointerdown', e => { if (mode !== 'ik') return; active = true; cv.setPointerCapture(e.pointerId); set(e); });
+    cv.addEventListener('pointermove', e => { if (active) set(e); });
+    cv.addEventListener('pointerup', () => active = false); cv.addEventListener('pointercancel', () => active = false);
+  }
+  drag(side, 'side'); drag(front, 'front');
+  new ResizeObserver(() => { drawSide(); drawFront(); }).observe(side);
+  themeHooks.push(update);
+  update();
+}
+
+/* ---- 위젯 B: 걸음새 시간표 + 지지 다각형 ---- */
+function setupGait() {
+  const chart = $('#g2chart'), top = $('#g2top'), stat = $('#g2stat'), fig = chart.closest('.fig');
+  visObs.observe(fig);
+  const lo = new Loco(); lo.gait = 'walk'; lo.stepH = 0.08;
+  let v = 0.25, shiftOn = false, playing = !reduceMotion, com = [0, 0], hist = [], t = 0;
+  lo.cmd = [v, 0, 0]; lo.tau = 0.05; lo.vel = [v, 0, 0];
+  const playBtn = $('#g2play'); playBtn.textContent = playing ? '일시정지' : '재생';
+  playBtn.addEventListener('click', () => { playing = !playing; playBtn.textContent = playing ? '일시정지' : '재생'; });
+  segGroup('g2', g => { lo.gait = g; hist = []; draw(); });
+  $('#g2v').addEventListener('input', e => { v = parseFloat(e.target.value); lo.cmd = [v, 0, 0]; $('#g2vo').textContent = v.toFixed(2) + ' m/s'; });
+  $('#g2vo').textContent = v.toFixed(2) + ' m/s';
+  $('#g2shift').addEventListener('change', e => { shiftOn = e.target.checked; hist = []; });
+  function step(dt) {
+    lo.step(dt); t += dt;
+    if (lo.x > 50) { const dx = lo.x; lo.x -= dx; lo.feet.forEach(f => { f.p[0] -= dx; if (f.lift) f.lift[0] -= dx; if (f.tgt) f.tgt[0] -= dx; }); }
+    let want = [0, 0];
+    if (shiftOn && lo.gait === 'walk') {
+      const ns = lo.nextSwing();
+      if (ns.i >= 0 && ns.du < 0.3) {
+        const others = lo.feet.filter((f, i) => i !== ns.i);
+        const cx = others.reduce((a, f) => a + f.p[0], 0) / 3, cy = others.reduce((a, f) => a + f.p[1], 0) / 3;
+        want = [cx - lo.x, cy - lo.y]; const m = Math.hypot(want[0], want[1]); if (m > 0.09) want = [want[0] * 0.09 / m, want[1] * 0.09 / m];
+      }
+    }
+    const a = 1 - Math.exp(-dt / 0.1); com = [lerp(com[0], want[0], a), lerp(com[1], want[1], a)];
+    const st = lo.feet.filter(f => !f.swing).map(f => [f.p[0], f.p[1]]);
+    const m = st.length >= 3 ? stabilityMargin(convexHull(st), [lo.x + com[0], lo.y + com[1]]) : null;
+    hist.push([t, m]); const T = GAITS[lo.gait].T; while (hist.length && hist[0][0] < t - T) hist.shift();
+  }
+  function drawChart() {
+    const { ctx, w, h } = fitCanvas(chart); ctx.clearRect(0, 0, w, h);
+    const g = GAITS[lo.gait], x0 = 58, x1 = w - 10, y0 = 14, rh = (h - y0 - 30) / 4, sw = 1 - g.beta;
+    const X = u => x0 + (x1 - x0) * u / 2;
+    LEGS.forEach((L, i) => {
+      const y = y0 + i * rh;
+      label(ctx, L.ko, 6, y + rh / 2, COL.ink);
+      ctx.fillStyle = COL.rule; ctx.fillRect(x0, y + rh * 0.22, x1 - x0, rh * 0.56);
+      ctx.fillStyle = L.c;
+      for (let c = -1; c < 3; c++) {        // 디딤 구간: [start + sw, start + 1)
+        const a = g.start[i] + sw + c, b = g.start[i] + 1 + c;
+        const aa = Math.max(0, a), bb = Math.min(2, b); if (bb > aa) ctx.fillRect(X(aa), y + rh * 0.22, X(bb) - X(aa), rh * 0.56);
+      }
+    });
+    for (let u = 0; u <= 2.001; u += 0.25) { line(ctx, [[X(u), y0], [X(u), y0 + 4 * rh]], COL['ink-2'], u % 1 === 0 ? 1 : 0.4); label(ctx, String(+u.toFixed(2)), X(u), h - 10, COL['ink-2'], 'center'); }
+    const ph = lo.phi % 1; [ph, ph + 1].forEach(u => line(ctx, [[X(u), y0 - 4], [X(u), y0 + 4 * rh + 4]], COL.ink, 2.2));
+    label(ctx, 'φ', x0 - 14, h - 10, COL['ink-2'], 'center');
+  }
+  function drawTop() {
+    const { ctx, w, h } = fitCanvas(top); ctx.clearRect(0, 0, w, h);
+    const k = Math.min(w / 1.5, h / 0.75), cx = w / 2, cy = h / 2;
+    const X = p => [cx + (p[0] - lo.x) * k, cy - (p[1] - lo.y) * k];
+    const g0 = Math.floor((lo.x - 1) / 0.25) * 0.25;
+    for (let gx = g0; gx < lo.x + 1; gx += 0.25) line(ctx, [X([gx, lo.y - 1]), X([gx, lo.y + 1])], COL.rule, 0.8);
+    for (let gy = -0.5; gy <= 0.5; gy += 0.25) line(ctx, [X([lo.x - 1, gy]), X([lo.x + 1, gy])], COL.rule, 0.8);
+    const st = lo.feet.map((f, i) => [f, i]).filter(([f]) => !f.swing).map(([f]) => [f.p[0], f.p[1]]);
+    const hull = convexHull(st);
+    if (hull.length >= 2) {
+      ctx.beginPath(); hull.forEach((p, i) => { const q = X(p); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.closePath();
+      ctx.globalAlpha = 0.32; ctx.fillStyle = COL.yellow; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = COL.yellow; ctx.lineWidth = hull.length === 2 ? 4 : 2; ctx.stroke();
+    }
+    const b = [lo.x + com[0], lo.y + com[1]], bl = DOG.bodyL / 2, bw = DOG.bodyW / 2;
+    const c0 = X([b[0] - bl, b[1] + bw]); ctx.globalAlpha = 0.55; ctx.strokeStyle = COL.ink; ctx.lineWidth = 1.5; ctx.strokeRect(c0[0], c0[1], 2 * bl * k, 2 * bw * k); ctx.globalAlpha = 1;
+    lo.feet.forEach((f, i) => {
+      const L = LEGS[i], hp = X([b[0] + L.sx * DOG.hipX, b[1] + L.sy * (DOG.hipY + DOG.L1)]), p = X(f.p);
+      line(ctx, [hp, p], COL['ink-2'], 1.2);
+      if (f.swing) { circ(ctx, p[0], p[1], 8, COL.paper, L.c, 2.5); if (f.tgt) { const t2 = X(f.tgt); line(ctx, [p, t2], L.c, 1, [3, 3]); line(ctx, [[t2[0] - 4, t2[1] - 4], [t2[0] + 4, t2[1] + 4]], L.c, 1.5); line(ctx, [[t2[0] - 4, t2[1] + 4], [t2[0] + 4, t2[1] - 4]], L.c, 1.5); } }
+      else circ(ctx, p[0], p[1], 8, L.c);
+    });
+    const m = hist.length ? hist[hist.length - 1][1] : null, C = X(b), good = m !== null && m > 0;
+    circ(ctx, C[0], C[1], 9, COL.paper, good ? COL.good : COL.bad, 2.5);
+    ctx.fillStyle = good ? COL.good : COL.bad; ctx.beginPath(); ctx.moveTo(C[0], C[1]); ctx.arc(C[0], C[1], 9, 0, Math.PI / 2); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(C[0], C[1]); ctx.arc(C[0], C[1], 9, Math.PI, Math.PI * 1.5); ctx.closePath(); ctx.fill();
+    label(ctx, '진행 방향 →', w - 10, 14, COL['ink-2'], 'right');
+  }
+  function draw() {
+    drawChart(); drawTop();
+    const nSt = lo.feet.filter(f => !f.swing).length, m = hist.length ? hist[hist.length - 1][1] : null;
+    const ms = hist.map(x => x[1]), worst = ms.some(x => x === null) ? null : (ms.length ? Math.min(...ms) : null);
+    stat.innerHTML = `<span>땅에 닿은 발 ${nSt}개</span>` +
+      (m === null ? `<span class="warn">지지 다각형이 선이나 점: 정적으로는 넘어지는 중</span>` : `<span class="${m > 0 ? 'ok' : 'warn'}">안정 여유 ${(m * 100).toFixed(1)} cm</span>`) +
+      `<span>최근 한 주기 최소 여유: ${worst === null ? '발 2개 이하 구간 있음' : (worst * 100).toFixed(1) + ' cm'}</span>`;
+  }
+  let last = performance.now();
+  function tick(now) {
+    requestAnimationFrame(tick);
+    const dt = Math.min(0.04, (now - last) / 1000); last = now;
+    if (!visibleSet.has(fig) || !playing) return;
+    step(dt); draw();
+  }
+  for (let i = 0; i < 90; i++) step(1 / 60);
+  draw(); requestAnimationFrame(tick);
+  new ResizeObserver(draw).observe(chart); themeHooks.push(draw);
+}
+
+/* ---- 위젯 C: 스윙 궤적 ---- */
+function setupSwing() {
+  const cv = $('#swCv'), fig = cv.closest('.fig'); visObs.observe(fig);
+  const P = { v: 0.6, T: 0.5, b: 0.55, H: 0.09 }; let playing = !reduceMotion, t = 0;
+  const bind = (id, key, fmt) => { const el = $(id), o = $(id + 'o'); const up = () => { P[key] = parseFloat(el.value); o.textContent = fmt(P[key]); if (!playing) draw(); }; el.addEventListener('input', up); up(); };
+  bind('#swV', 'v', x => x.toFixed(2) + ' m/s'); bind('#swT', 'T', x => x.toFixed(2) + ' s'); bind('#swB', 'b', x => x.toFixed(2)); bind('#swH', 'H', x => (x * 100).toFixed(0) + ' cm');
+  const btn = $('#swPlay'); btn.textContent = playing ? '일시정지' : '재생';
+  btn.addEventListener('click', () => { playing = !playing; btn.textContent = playing ? '일시정지' : '재생'; });
+  const h0 = 0.43;
+  function footAt(u) {    // u ∈ [0,1): 디딤 먼저, 그다음 스윙
+    const Ls = P.v * P.b * P.T;
+    if (u < P.b) { const s = u / P.b; return { p: [Ls / 2 - Ls * s, -h0], swing: false }; }
+    const s = (u - P.b) / (1 - P.b), bl = smooth(s);
+    return { p: [-Ls / 2 + Ls * bl, -h0 + P.H * Math.sin(Math.PI * s)], swing: true };
+  }
+  function draw() {
+    const { ctx, w, h } = fitCanvas(cv); ctx.clearRect(0, 0, w, h);
+    const k = Math.min(w / 1.3, h / 0.72), ox = w / 2, oy = 0.1 * k + 6;
+    const X = p => [ox + p[0] * k, oy - p[1] * k];
+    for (let gx = -0.6; gx <= 0.601; gx += 0.1) line(ctx, [X([gx, 0.05]), X([gx, -0.5])], COL.rule, 0.6);
+    line(ctx, [X([-0.65, -h0 - DOG.footR]), X([0.65, -h0 - DOG.footR])], COL['ink-2'], 1.5);
+    const Ls = P.v * P.b * P.T, pathPts = []; for (let u = 0; u <= 1.0001; u += 0.005) pathPts.push(X(footAt(u % 1).p));
+    line(ctx, pathPts, COL['ink-2'], 1.5, [5, 4]);
+    const u = (t / P.T) % 1, f = footAt(u), r = legIK([f.p[0], DOG.L1, f.p[1]], 1), q = r.q;
+    const A = X([0, 0]), K = X([-DOG.L2 * Math.sin(q[1]), -DOG.L2 * Math.cos(q[1])]), F = X(f.p);
+    ctx.globalAlpha = 0.28; ctx.fillStyle = COL.yellow; const b0 = X([-0.62, 0.075]), b1 = X([0.14, -0.075]); ctx.fillRect(b0[0], b0[1], b1[0] - b0[0], b1[1] - b0[1]); ctx.globalAlpha = 1;
+    line(ctx, [A, K], '#1C2126', 13); line(ctx, [A, K], '#F0B800', 9); line(ctx, [K, F], r.ok ? COL.ink : COL.bad, 6);
+    circ(ctx, A[0], A[1], 8, COL.ink); circ(ctx, K[0], K[1], 6, COL.ink); circ(ctx, F[0], F[1], 8, f.swing ? COL.blue : COL.ink, COL.paper, 2);
+    const Lp = X([Ls / 2, -h0 - 0.06]), Lm = X([-Ls / 2, -h0 - 0.06]);
+    line(ctx, [Lm, Lp], COL.orange, 2); line(ctx, [[Lm[0], Lm[1] - 6], [Lm[0], Lm[1] + 6]], COL.orange, 2); line(ctx, [[Lp[0], Lp[1] - 6], [Lp[0], Lp[1] + 6]], COL.orange, 2);
+    label(ctx, '보폭 ' + (Ls * 100).toFixed(1) + ' cm', (Lm[0] + Lp[0]) / 2, Lm[1] + 16, COL.orange, 'center');
+    label(ctx, f.swing ? '스윙' : '디딤', F[0] + 14, F[1] - 12, f.swing ? COL.blue : COL.ink);
+    const ar = X([0.3, 0.02]); line(ctx, [ar, [ar[0] + 50, ar[1]]], COL.ink, 2); line(ctx, [[ar[0] + 50, ar[1]], [ar[0] + 42, ar[1] - 5]], COL.ink, 2); line(ctx, [[ar[0] + 50, ar[1]], [ar[0] + 42, ar[1] + 5]], COL.ink, 2);
+    label(ctx, '몸 속도 v', ar[0] + 25, ar[1] - 14, COL.ink, 'center');
+    const tsw = (1 - P.b) * P.T, ok = Math.abs(Ls / 2) < 0.36;
+    $('#swStat').innerHTML = `<span>보폭 L = vβT = ${(Ls * 100).toFixed(1)} cm</span><span>스윙 시간 ${(tsw * 1000).toFixed(0)} ms</span><span>스윙 발 평균 속도 ${(P.v / (1 - P.b)).toFixed(2)} m/s</span>` + (ok ? '' : '<span class="warn">보폭이 다리 길이에 비해 너무 김: 주기를 줄이거나 β를 낮추기</span>');
+  }
+  let last = performance.now();
+  function tick(now) { requestAnimationFrame(tick); const dt = Math.min(0.04, (now - last) / 1000); last = now; if (!visibleSet.has(fig) || !playing) return; t += dt; draw(); }
+  draw(); requestAnimationFrame(tick);
+  new ResizeObserver(draw).observe(cv); themeHooks.push(draw);
+}
+
+/* ---- 위젯 D: 몸통 운동 모델 ---- */
+function setupBody() {
+  const cv = $('#bmCv'); const P = { vx: 0.6, vy: 0.3, w: 0.5, t: 1.5 };
+  const bind = (id, key, fmt) => { const el = $(id), o = $(id + 'o'); const up = () => { P[key] = parseFloat(el.value); o.textContent = fmt(P[key]); draw(); }; el.addEventListener('input', up); o.textContent = fmt(P[key]); };
+  bind('#bmVx', 'vx', x => x.toFixed(2) + ' m/s'); bind('#bmVy', 'vy', x => x.toFixed(2) + ' m/s'); bind('#bmW', 'w', x => x.toFixed(2) + ' rad/s'); bind('#bmT', 't', x => x.toFixed(2) + ' s');
+  function traj(vy) { const out = [[0, 0, 0]]; let x = 0, y = 0, ps = 0; const dt = 0.01; for (let k = 0; k < 400; k++) { x += (P.vx * Math.cos(ps) - vy * Math.sin(ps)) * dt; y += (P.vx * Math.sin(ps) + vy * Math.cos(ps)) * dt; ps += P.w * dt; out.push([x, y, ps]); } return out; }
+  function draw() {
+    const { ctx, w, h } = fitCanvas(cv); ctx.clearRect(0, 0, w, h);
+    const A = traj(P.vy), B = traj(0), all = A.concat(B);
+    let mnx = Math.min(...all.map(p => p[0])) - 0.6, mxx = Math.max(...all.map(p => p[0])) + 0.6, mny = Math.min(...all.map(p => p[1])) - 0.6, mxy = Math.max(...all.map(p => p[1])) + 0.6;
+    const k = Math.min(w / (mxx - mnx), h / (mxy - mny)), ox = (w - (mxx - mnx) * k) / 2 - mnx * k, oy = (h + (mxy - mny) * k) / 2 + mny * k;
+    const X = p => [ox + p[0] * k, oy - p[1] * k];
+    const step = k > 120 ? 0.25 : k > 50 ? 0.5 : 1;
+    for (let gx = Math.floor(mnx / step) * step; gx <= mxx; gx += step) line(ctx, [X([gx, mny]), X([gx, mxy])], COL.rule, 0.6);
+    for (let gy = Math.floor(mny / step) * step; gy <= mxy; gy += step) line(ctx, [X([mnx, gy]), X([mxx, gy])], COL.rule, 0.6);
+    line(ctx, B.map(X), COL.blue, 2, [7, 6]); line(ctx, A.map(X), COL.ink, 2.5);
+    const robot = (p, alpha, fill) => {
+      const c = Math.cos(p[2]), s = Math.sin(p[2]), bl = DOG.bodyL / 2, bw = DOG.bodyW / 2;
+      const cs = [[bl, bw], [bl, -bw], [-bl, -bw], [-bl, bw]].map(([a, b]) => X([p[0] + c * a - s * b, p[1] + s * a + c * b]));
+      ctx.globalAlpha = alpha; ctx.beginPath(); cs.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath();
+      if (fill) { ctx.fillStyle = fill; ctx.fill(); } ctx.strokeStyle = COL.ink; ctx.lineWidth = 1.5; ctx.stroke();
+      const nose = X([p[0] + c * bl * 1.3, p[1] + s * bl * 1.3]), cc = X(p); line(ctx, [cc, nose], COL.ink, 2); ctx.globalAlpha = 1;
+    };
+    for (let s = 0; s <= 400; s += 100) robot(A[s], 0.3, null);
+    const idx = Math.round(P.t / 0.01), cur = A[idx];
+    robot(cur, 1, COL.yellow);
+    const c = Math.cos(cur[2]), s = Math.sin(cur[2]), C = X(cur), sc = 0.9;
+    const vb = [[c, s], [-s, c]];
+    const arrow = (d, col, lab) => { const E = X([cur[0] + d[0] * sc, cur[1] + d[1] * sc]); line(ctx, [C, E], col, 2.5); const a = Math.atan2(E[1] - C[1], E[0] - C[0]); line(ctx, [E, [E[0] - 9 * Math.cos(a - 0.4), E[1] - 9 * Math.sin(a - 0.4)]], col, 2.5); line(ctx, [E, [E[0] - 9 * Math.cos(a + 0.4), E[1] - 9 * Math.sin(a + 0.4)]], col, 2.5); if (lab) label(ctx, lab, E[0] + 6, E[1] - 8, col); };
+    if (Math.abs(P.vx) > 0.01) arrow([vb[0][0] * P.vx, vb[0][1] * P.vx], COL['ink-2'], 'vₓ');
+    if (Math.abs(P.vy) > 0.01) arrow([vb[1][0] * P.vy, vb[1][1] * P.vy], COL['ink-2'], 'v_y');
+    const wx = c * P.vx - s * P.vy, wy = s * P.vx + c * P.vy; arrow([wx, wy], COL.orange, '(ẋ, ẏ)');
+    label(ctx, '시작', X([0, 0])[0] - 8, X([0, 0])[1] + 18, COL['ink-2'], 'right');
+    const R = [[c, -s], [s, c]], cls = [['cos', 'sin'], ['sin', 'cos']];
+    $('#bmMx').innerHTML = `<span>ψ(${P.t.toFixed(2)} s) = ${(cur[2] * R2D).toFixed(1)}°</span>&nbsp;&nbsp;` + mxHTML([[{ v: wx }], [{ v: wy }]].map(r => r.map(x => ({ ...x, c: 'res' })))) + '<span class="eq">=</span>' +
+      mxHTML(R.map((r, i) => r.map((v, j) => ({ v, c: cls[i][j] })))) + mxHTML([[{ v: P.vx }], [{ v: P.vy }]]) +
+      `<span style="margin-left:10px">위치 (${cur[0].toFixed(2)}, ${cur[1].toFixed(2)}) m</span>`;
+  }
+  draw(); new ResizeObserver(draw).observe(cv); themeHooks.push(draw);
+}
+
+/* ================= 5. 시작 ================= */
+function boot() {
+  try { if (window.hljs) hljs.highlightAll(); } catch (e) { }
+  try { initSim(); } catch (e) { console.error(e); const el = $('#simErr'); el.style.display = 'flex'; $('#joy').style.display = 'none'; }
+  [setupLeg, setupGait, setupSwing, setupBody].forEach(f => { try { f(); } catch (e) { console.error(e); } });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+</script>
+</body>
+</html>
